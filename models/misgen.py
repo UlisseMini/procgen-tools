@@ -110,6 +110,8 @@ class InterpretableImpalaBlock(nn.Module):
         x = self.res2(x)
         return x
 
+# NOTE: scale varies between lauro and master branch, since we use both
+# I monkeypatch this in model loading. Please, god, do not remove this constant.
 scale = 1
 class InterpretableImpalaModel(nn.Module):
     def __init__(self,
