@@ -1,0 +1,10 @@
+# must be lauro branch. master is not supported (different parsing would be required)
+git+https://github.com/JacobPfau/procgenAISC@lauro
+
+# very reckless not specifying versions... will freeze later
+gym
+gym3
+torch
+numpy
+matplotlib
+einops # aspirational for me
