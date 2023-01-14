@@ -10,11 +10,12 @@ https://gist.github.com/montemac/6f9f636507ec92967071bb755f37f17b
 import struct
 import typing
 from dataclasses import dataclass
+from collections import deque
 import numpy as np
 
 # Constants in numeric maze representation
 CHEESE = 2
-EMPTY = 100
+EMPTY = 100 # TODO: Change to OPEN (terminology isn't consistent)
 BLOCKED = 51
 
 # Parse the environment state dict
@@ -253,7 +254,6 @@ def get_grid(state_vals):
     grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
     return grid_vals
 
-
 def set_grid(state_vals, grid):
     "Set the grid of the maze. "
     world_dim = state_vals['world_dim'].val
@@ -265,13 +265,59 @@ def get_cheese_pos(grid: np.ndarray):
     "Get (x, y) position of the cheese in the grid"
     num_cheeses = (grid == CHEESE).sum()
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
-    return [ix[0] for ix in np.where(grid == CHEESE)]
+    return tuple(ix[0] for ix in np.where(grid == CHEESE))
 
 def set_cheese_pos(grid: np.ndarray, x, y):
     "Set the cheese position in the grid"
     grid[grid == CHEESE] = EMPTY
     assert grid[x, y] == EMPTY, f'grid[{x}, {y}]={grid[x, y]} should be EMPTY={EMPTY}'
     grid[x, y] = CHEESE
+
+
+def inner_grid(grid: np.ndarray) -> np.ndarray:
+    "Get the inside of the maze, ie. the stuff within the outermost walls"
+    # uses the fact that the mouse always starts in the bottom left.
+    bl = next(i for i in range(len(grid)) if grid[i][i] == EMPTY)
+    return grid[bl:-bl, bl:-bl]
+
+
+def fully_connected(inner_grid: np.ndarray) -> bool:
+    """
+    Is there exactly one path between any two open squares in the maze?
+    (Also known as, is the set of open squares a spanning tree)
+
+    >>> fully_connected(np.array([[EMPTY]*3]*3))
+    True
+    >>> fully_connected(np.array([[BLOCKED]*3]*3))
+    False
+    """
+
+    def get_neighbors(x, y):
+        "Get the neighbors of (x, y) in the grid"
+        return [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+
+    def ingrid(n):
+        "Is (x, y) in the grid?"
+        return 0 <= n[0] < inner_grid.shape[0] and 0 <= n[1] < inner_grid.shape[1]
+
+    def get_open_neighbors(x, y):
+        "Get the open neighbors of (x, y) in the grid"
+        return [n for n in get_neighbors(x, y) if ingrid(n) and inner_grid[n] == EMPTY]
+
+    node = (0,0)
+
+    visited = {node}
+    queue = deque([node])
+    while queue:
+        node = queue.popleft()
+        for neighbor in get_open_neighbors(*node):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+    # TODO: Check that there's *one path* - not just that every node is visitable
+    return len(visited) == (inner_grid == EMPTY).sum()
+
 
 
 # TODO? Constructor/wrap with docs for options. Or inject into docstring
