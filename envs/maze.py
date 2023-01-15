@@ -281,15 +281,10 @@ def inner_grid(grid: np.ndarray) -> np.ndarray:
     return grid[bl:-bl, bl:-bl]
 
 
-def fully_connected(inner_grid: np.ndarray) -> bool:
+def is_tree(inner_grid: np.ndarray) -> bool:
     """
     Is there exactly one path between any two open squares in the maze?
     (Also known as, is the set of open squares a spanning tree)
-
-    >>> fully_connected(np.array([[EMPTY]*3]*3))
-    True
-    >>> fully_connected(np.array([[BLOCKED]*3]*3))
-    False
     """
 
     def get_neighbors(x, y):
@@ -304,21 +299,28 @@ def fully_connected(inner_grid: np.ndarray) -> bool:
         "Get the open neighbors of (x, y) in the grid"
         return [n for n in get_neighbors(x, y) if ingrid(n) and inner_grid[n] == EMPTY]
 
-    node = (0,0)
-
-    visited = {node}
-    queue = deque([node])
-    while queue:
-        node = queue.popleft()
+    visited_edges = set()
+    visited_nodes = set()
+    stack = [(0,0)]
+    while stack:
+        node = stack.pop()
+        if node in visited_nodes:
+            print(f'{node} already visited, a cycle!')
+            return False
+        visited_nodes.add(node)
         for neighbor in get_open_neighbors(*node):
-            if neighbor not in visited:
-                visited.add(neighbor)
-                queue.append(neighbor)
+            edge = (node, neighbor)
+            if edge not in visited_edges and edge[::-1] not in visited_edges:
+                stack.append(neighbor)
+                visited_edges.add(edge)
 
-    # TODO: Check that there's *one path* - not just that every node is visitable
-    return len(visited) == (inner_grid == EMPTY).sum()
-
-
+    # There were no cycles, if we visited all the nodes, then it's a tree
+    visited_all_nodes = len(visited_nodes) == (inner_grid == EMPTY).sum()
+    if not visited_all_nodes:
+        # only print debugging on assertion fail
+        print(f'visited {len(visited_nodes)} out of {(inner_grid == EMPTY).sum()} nodes')
+        return False
+    return True
 
 # TODO? Constructor/wrap with docs for options. Or inject into docstring
 # from procgen import ProcgenGym3Env
