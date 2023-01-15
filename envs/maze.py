@@ -10,7 +10,6 @@ https://gist.github.com/montemac/6f9f636507ec92967071bb755f37f17b
 import struct
 import typing
 from dataclasses import dataclass
-from collections import deque
 import numpy as np
 
 # Constants in numeric maze representation
@@ -275,17 +274,26 @@ def set_cheese_pos(grid: np.ndarray, x, y):
 
 
 def inner_grid(grid: np.ndarray) -> np.ndarray:
-    "Get the inside of the maze, ie. the stuff within the outermost walls"
+    """
+    Get the inside of the maze, ie. the stuff within the outermost walls.
+    inner_grid(inner_grid(x)) = inner_grid(x) for all x.
+    """
     # uses the fact that the mouse always starts in the bottom left.
     bl = next(i for i in range(len(grid)) if grid[i][i] == EMPTY)
+    if bl == 0: # edgecase! the whole grid is the inner grid.
+        return grid
     return grid[bl:-bl, bl:-bl]
 
+def without_cheese(grid: np.ndarray) -> np.ndarray:
+    pass
 
-def is_tree(inner_grid: np.ndarray) -> bool:
+def is_tree(grid: np.ndarray, debug=False) -> bool:
     """
     Is there exactly one path between any two open squares in the maze?
     (Also known as, is the set of open squares a spanning tree)
     """
+    grid = inner_grid(grid).copy()
+    grid[grid == CHEESE] = EMPTY
 
     def get_neighbors(x, y):
         "Get the neighbors of (x, y) in the grid"
@@ -293,11 +301,11 @@ def is_tree(inner_grid: np.ndarray) -> bool:
 
     def ingrid(n):
         "Is (x, y) in the grid?"
-        return 0 <= n[0] < inner_grid.shape[0] and 0 <= n[1] < inner_grid.shape[1]
+        return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
 
     def get_open_neighbors(x, y):
         "Get the open neighbors of (x, y) in the grid"
-        return [n for n in get_neighbors(x, y) if ingrid(n) and inner_grid[n] == EMPTY]
+        return [n for n in get_neighbors(x, y) if ingrid(n) and grid[n] == EMPTY]
 
     visited_edges = set()
     visited_nodes = set()
@@ -305,7 +313,7 @@ def is_tree(inner_grid: np.ndarray) -> bool:
     while stack:
         node = stack.pop()
         if node in visited_nodes:
-            print(f'{node} already visited, a cycle!')
+            if debug: print(f'{node} already visited, a cycle!')
             return False
         visited_nodes.add(node)
         for neighbor in get_open_neighbors(*node):
@@ -315,21 +323,76 @@ def is_tree(inner_grid: np.ndarray) -> bool:
                 visited_edges.add(edge)
 
     # There were no cycles, if we visited all the nodes, then it's a tree
-    visited_all_nodes = len(visited_nodes) == (inner_grid == EMPTY).sum()
-    if not visited_all_nodes:
-        # only print debugging on assertion fail
-        print(f'visited {len(visited_nodes)} out of {(inner_grid == EMPTY).sum()} nodes')
+    visited_all_nodes = len(visited_nodes) == (grid == EMPTY).sum()
+    if debug:
+        print(f'visited {len(visited_nodes)} out of {(grid == EMPTY).sum()} nodes')
+    return visited_all_nodes
+
+def on_distribution(grid: np.ndarray, p=print) -> bool:
+    "Is the given maze something that could have been generated during training?"
+
+    # Make a copy of the inner grid without the cheese (if cheese exists)
+    g = inner_grid(grid).copy()
+    g[g == CHEESE] = EMPTY
+
+    # Assert invariants
+    if not (g[1::2, 1::2] == BLOCKED).all():
+        p("Squares where row,col are both odd must always be blocked")
         return False
+    if not (g[0::2, 0::2] == EMPTY).all():
+        p("Squares where row,col are both even must always be empty")
+        return False
+    if not is_tree(g):
+        p("There must be exactly one path between any two empty squares")
+        return False
+
     return True
 
-# TODO? Constructor/wrap with docs for options. Or inject into docstring
-# from procgen import ProcgenGym3Env
 
-from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
-from gym3 import ToBaselinesVecEnv
-# TODO: Options to use ViewerWrapper, VideoRecorderWrapper from gym3.
+def grid_editor(grid: np.ndarray, node_radius='8px'):
+    from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
+
+    CELL_TO_COLOR = {EMPTY: '#fde724', BLOCKED: '#24938b', CHEESE: '#440154'}
+    CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀'}
+
+    # will maintain a pointer into grid
+    g = inner_grid(grid)
+    rows, cols = g.shape
+    wgrid = GridspecLayout(rows, cols, width='min-content')
+
+    output = Output()
+
+    def button_clicked(b: Button):
+        i, j = getattr(b, 'coord')
+        if (g == CHEESE).sum() > 0:
+            g[i, j] = {EMPTY: BLOCKED, BLOCKED: EMPTY, CHEESE: EMPTY}[g[i,j]]
+        else:
+            g[i, j] = CHEESE
+        b.style.button_color = CELL_TO_COLOR[g[i,j]] # type: ignore
+        b.tooltip = CELL_TO_CHAR[g[i,j]]
+        with output:
+            output.clear_output()
+            on_distribution(g)
+
+    for i in range(rows):
+        for j in range(cols):
+            b = Button(layout=Layout(padding=node_radius, width='0px', height='0px', margin='0px'))
+            b.tooltip = CELL_TO_CHAR[g[i,j]]
+            setattr(b, 'coord', (i, j)) # monkey patch to pass coords
+            b.style.button_color = CELL_TO_COLOR[g[i,j]] # type: ignore
+            b.on_click(button_clicked)
+            # flip the grid so it's oriented correctly, like origin=lower in matplotlib.
+            wgrid[rows-i-1, j] = b
+    return HBox([wgrid, output])
+
 
 def wrap_venv(venv):
+    from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
+    from gym3 import ToBaselinesVecEnv
+
+    "Wrap a vectorized env, making it compatible with the gym apis, transposing, scaling, etc."
+    # TODO: Move this to another file (same thing is used for coinrun)
+
     venv = ToBaselinesVecEnv(venv) # gym3 env to gym env converter
     venv = VecExtractDictObs(venv, "rgb")
 
