@@ -386,10 +386,10 @@ def grid_editor(grid: np.ndarray, node_radius='8px'):
     return HBox([wgrid, output])
 
 
-def wrap_venv(venv):
-    from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
-    from gym3 import ToBaselinesVecEnv
+from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
+from gym3 import ToBaselinesVecEnv
 
+def wrap_venv(venv) -> ToBaselinesVecEnv:
     "Wrap a vectorized env, making it compatible with the gym apis, transposing, scaling, etc."
     # TODO: Move this to another file (same thing is used for coinrun)
 
@@ -398,5 +398,5 @@ def wrap_venv(venv):
 
     venv = TransposeFrame(venv)
     venv = ScaledFloatFrame(venv)
-    return venv
+    return venv # type: ignore - ToBaselinesVecEnv gives best type annotations
 
