@@ -8,8 +8,22 @@ https://gist.github.com/montemac/6ccf47f1e15349d82cff98f0ff5f30b1
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from models.utils import orthogonal_init, xavier_uniform_init
 import torch
+
+# type ignores are because of bad/inconsistent typing on gain
+
+def orthogonal_init(module, gain=nn.init.calculate_gain('relu')):
+    if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+        nn.init.orthogonal_(module.weight.data, gain) # type: ignore
+        nn.init.constant_(module.bias.data, 0) # type: ignore
+    return module
+
+
+def xavier_uniform_init(module, gain=1.0):
+    if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+        nn.init.xavier_uniform_(module.weight.data, gain)
+        nn.init.constant_(module.bias.data, 0) # type: ignore
+    return module
 
 
 class Flatten(nn.Module):
@@ -141,5 +155,42 @@ class InterpretableImpalaModel(nn.Module):
 
 
 
+class CategoricalPolicy(nn.Module):
+    """
+    Copied from train-procgen-pytorch, removed recurrent option as we're not using it.
+    """
+    def __init__(self, embedder, action_size):
+        """
+        embedder: (torch.Tensor) model to extract the embedding for observation
+        action_size: number of the categorical actions
+        """
+        super(CategoricalPolicy, self).__init__()
+        self.embedder = embedder
+        # small scale weight-initialization in policy enhances the stability        
+        self.fc_policy = orthogonal_init(nn.Linear(self.embedder.output_dim, action_size), gain=0.01)
+        self.fc_value = orthogonal_init(nn.Linear(self.embedder.output_dim, 1), gain=1.0)
 
+    def forward(self, x):
+        hidden = self.embedder(x)
+        logits = self.fc_policy(hidden)
+        log_probs = F.log_softmax(logits, dim=1)
+        p = Categorical(logits=log_probs)
+        v = self.fc_value(hidden).reshape(-1)
+        return p, v
+
+
+
+def load_policy(model_file: str, action_size: int, device = None) -> CategoricalPolicy:
+    assert type(action_size) == int
+
+    checkpoint = torch.load(model_file, map_location=device)
+
+    # CURSED. scale varies between models trained on the lauro vs. master branch. 
+    global scale
+    scale = checkpoint['model_state_dict']['embedder.block1.conv.weight'].shape[0]//16
+
+    model = InterpretableImpalaModel(in_channels=3)
+    policy = CategoricalPolicy(model, action_size=action_size)
+    policy.load_state_dict(checkpoint['model_state_dict'])
+    return policy
 
