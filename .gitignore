@@ -1,5 +1,5 @@
-# Pytorch
-*.pth
+*.pth  # Pytorch
+data/* # Pickle files from data gathering
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
