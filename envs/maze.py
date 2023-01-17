@@ -16,6 +16,7 @@ import numpy as np
 CHEESE = 2
 EMPTY = 100 # TODO: Change to OPEN (terminology isn't consistent)
 BLOCKED = 51
+MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
 
 # Parse the environment state dict
 
@@ -253,8 +254,36 @@ def get_grid(state_vals):
     grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
     return grid_vals
 
+def get_mouse_pos(state_vals):
+    "Get (x, y) position of mouse in grid."
+    ents = state_vals['ents'][0]
+    # flipped turns out to be oriented right for grid.
+    return int(ents['y'].val), int(ents['x'].val)
+
+def get_grid_with_mouse(state_vals):
+    "Get grid with mouse position"
+    grid = get_grid(state_vals)
+    grid[get_mouse_pos(state_vals)] = MOUSE
+    return grid
+
+def set_grid_with_mouse(state_vals, grid):
+    "Set grid with mouse position"
+    grid = grid.copy()
+    assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
+    x,y = [c[0] for c in np.where(grid==MOUSE)]
+
+    state_vals['ents'][0]['x'].val = float(y) + 0.5 # flip again to get back to original orientation
+    state_vals['ents'][0]['y'].val = float(x) + 0.5
+
+    grid[grid==MOUSE] = EMPTY
+    set_grid(state_vals, grid)
+
+    return state_vals
+
+
 def set_grid(state_vals, grid):
-    "Set the grid of the maze. "
+    "Set the grid of the maze."
+    assert (grid==MOUSE).sum() == 0, 'use set_grid_with_mouse'
     world_dim = state_vals['world_dim'].val
     assert grid.shape == (world_dim, world_dim)
     for i, dd in enumerate(state_vals['data']):
@@ -279,13 +308,11 @@ def inner_grid(grid: np.ndarray) -> np.ndarray:
     inner_grid(inner_grid(x)) = inner_grid(x) for all x.
     """
     # uses the fact that the mouse always starts in the bottom left.
-    bl = next(i for i in range(len(grid)) if grid[i][i] == EMPTY)
+    bl = next(i for i in range(len(grid)) if grid[i][i] != BLOCKED)
     if bl == 0: # edgecase! the whole grid is the inner grid.
         return grid
     return grid[bl:-bl, bl:-bl]
 
-def without_cheese(grid: np.ndarray) -> np.ndarray:
-    pass
 
 def is_tree(grid: np.ndarray, debug=False) -> bool:
     """
@@ -331,9 +358,10 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
 def on_distribution(grid: np.ndarray, p=print) -> bool:
     "Is the given maze something that could have been generated during training?"
 
-    # Make a copy of the inner grid without the cheese (if cheese exists)
+    # Make a copy of the inner grid without the cheese and mouse
     g = inner_grid(grid).copy()
     g[g == CHEESE] = EMPTY
+    g[g == MOUSE] = EMPTY
 
     # Assert invariants
     if not (g[1::2, 1::2] == BLOCKED).all():
@@ -352,8 +380,11 @@ def on_distribution(grid: np.ndarray, p=print) -> bool:
 def grid_editor(grid: np.ndarray, node_radius='8px'):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
 
-    CELL_TO_COLOR = {EMPTY: '#fde724', BLOCKED: '#24938b', CHEESE: '#440154'}
-    CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀'}
+    CELL_TO_COLOR = {EMPTY: '#fde724', BLOCKED: '#24938b', CHEESE: '#440154', MOUSE: '#3c4d8a'}
+    CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀', MOUSE: '🐭'}
+
+    num_mice = (grid==MOUSE).sum()
+    assert num_mice in (0,1), f'num_mice {num_mice}'
 
     # will maintain a pointer into grid
     g = inner_grid(grid)
@@ -364,10 +395,12 @@ def grid_editor(grid: np.ndarray, node_radius='8px'):
 
     def button_clicked(b: Button):
         i, j = getattr(b, 'coord')
-        if (g == CHEESE).sum() > 0:
-            g[i, j] = {EMPTY: BLOCKED, BLOCKED: EMPTY, CHEESE: EMPTY}[g[i,j]]
-        else:
+        if (g == CHEESE).sum() == 0:
             g[i, j] = CHEESE
+        elif (g == MOUSE).sum() == 0 and num_mice > 0:
+            g[i, j] = MOUSE
+        else:
+            g[i, j] = {EMPTY: BLOCKED, BLOCKED: EMPTY, CHEESE: EMPTY, MOUSE: EMPTY}[g[i,j]]
         b.style.button_color = CELL_TO_COLOR[g[i,j]] # type: ignore
         b.tooltip = CELL_TO_CHAR[g[i,j]]
         with output:
