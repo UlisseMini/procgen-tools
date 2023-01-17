@@ -245,8 +245,7 @@ def serialize_maze_state(state_vals: typing.Dict[str, StateValue], assert_=True)
     return state_bytes
 
 
-# TODO: Better abstraction would return some kind of "Grid object" which automatically
-# updated state_vals when updated, as well as having helper functions for common ops.
+# TODO: Rename functions to be clear which take state_vals vs. grid (e.g. sget vs. gget?)
 
 def get_grid(state_vals):
     "Get numpy (world_dim, world_dim) grid of the maze. "
@@ -254,7 +253,7 @@ def get_grid(state_vals):
     grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
     return grid_vals
 
-def get_mouse_pos(state_vals):
+def get_mouse_grid_pos(state_vals):
     "Get (x, y) position of mouse in grid."
     ents = state_vals['ents'][0]
     # flipped turns out to be oriented right for grid.
@@ -267,9 +266,11 @@ def get_grid_with_mouse(state_vals):
     return grid
 
 def set_grid_with_mouse(state_vals, grid):
-    "Set grid with mouse position"
-    grid = grid.copy()
+    "Set state_vals <- grid with mouse position. grid must be (world_dim, world_dim)"
+    assert grid.shape == (state_vals['world_dim'].val, state_vals['world_dim'].val)
     assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
+
+    grid = grid.copy()
     x,y = [c[0] for c in np.where(grid==MOUSE)]
 
     state_vals['ents'][0]['x'].val = float(y) + 0.5 # flip again to get back to original orientation
@@ -289,11 +290,20 @@ def set_grid(state_vals, grid):
     for i, dd in enumerate(state_vals['data']):
         dd['i'].val = int(grid.ravel()[i])
 
-def get_cheese_pos(grid: np.ndarray):
+
+def get_cheese_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     "Get (x, y) position of the cheese in the grid"
     num_cheeses = (grid == CHEESE).sum()
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
     return tuple(ix[0] for ix in np.where(grid == CHEESE))
+
+
+def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
+    "Get (x, y) position of the mouse in the grid"
+    num_mouses = (grid == MOUSE).sum()
+    assert num_mouses == 1, f'{num_mouses} mice, should be 1'
+    return tuple(ix[0] for ix in np.where(grid == MOUSE))
+
 
 def set_cheese_pos(grid: np.ndarray, x, y):
     "Set the cheese position in the grid"
@@ -312,6 +322,22 @@ def inner_grid(grid: np.ndarray) -> np.ndarray:
     if bl == 0: # edgecase! the whole grid is the inner grid.
         return grid
     return grid[bl:-bl, bl:-bl]
+
+
+def euclidian_dist_to_cheese(grid: np.ndarray) -> float:
+    "Compute the *euclidian* distance from the mouse to the cheese"
+    mx, my = get_mouse_pos(grid)
+    cx, cy = get_cheese_pos(grid)
+    return np.sqrt((mx - cx)**2 + (my - cy)**2)
+
+
+def true_dist_to_cheese(grid: np.ndarray) -> int:
+    "Compute the number of moves for the mouse to get the cheese (using A*)"
+    assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
+    assert (grid==CHEESE).sum() == 1, f'grid has {(grid==CHEESE).sum()} cheeses'
+    grid = inner_grid(grid).copy()
+    raise NotImplementedError
+
 
 
 def is_tree(grid: np.ndarray, debug=False) -> bool:

@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from procgen import ProcgenGym3Env
 import torch
 import envs.maze as maze
@@ -23,9 +23,9 @@ def create_venv(num_levels = 1, start_level = 0):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_file', type=str, default='./models/model_200015872.pth')
-    parser.add_argument('--num_timesteps', type=int, default=256)
-    parser.add_argument('--num_episodes', type=int, default=1000)
-    parser.add_argument('--argmax', action='store_true')
+    parser.add_argument('--num_timesteps', type=int, default=256, help='maximum timesteps per episode')
+    parser.add_argument('--num_episodes', type=int, default=1000, help='number of episodes to collect (agent finishes or times out)')
+    parser.add_argument('--argmax', action='store_true', help='argmax logits instead of sampling. often gets stuck, but when successful has less jittering')
 
     args = parser.parse_args()
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     model_name = args.model_file.split('/')[-1][:-4]
 
     # determinism
-    random.seed(0)
+    random.seed(42)
 
     # plt.ion()
     for episode in tqdm(range(args.num_episodes)):
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         obs = venv.reset()
         assert venv.num_envs == 1, 'Only one env supported (for now)'
         done = np.zeros(venv.num_envs)
-        log = {"rewards": [], "actions": [], "steps": 0}
+        log = {"rewards": [], "actions": [], "mouse_positions": [], "steps": 0}
 
         policy.eval()
 
@@ -64,15 +64,22 @@ if __name__ == '__main__':
             else:
                 act = p.sample().numpy()
             obs, rew, done_now, info = venv.step(act)
-            log["rewards"].append(float(rew[0]))
-            log["actions"].append(int(act[0]))
-            done = np.logical_or(done, done_now)
-            log["steps"] = step
+            done = np.logical_or(done, done_now) # used when we have more envs
             # plt.imshow(info[0]['rgb'])
             # plt.show()
-            plt.pause(0.01)
+            # plt.pause(0.01)
             if done:
-                break
+                break # IMPORTANT: we don't log here. otherwise we'll log the last frame (a new level)
+
+            log["rewards"].append(float(rew[0]))
+            log["actions"].append(int(act[0]))
+            log["steps"] = step
+            states_bytes = venv.env.callmethod('get_state')[0]
+            states_vals = maze.parse_maze_state_bytes(states_bytes)
+            log["mouse_positions"].append(maze.get_mouse_grid_pos(states_vals))
+            if log.get("grid") is None: # only needs to be done once, grid doesn't change
+                log["grid"] = maze.get_grid(states_vals) # Alternative: Use get_grid_with_mouse and delete mouse_positions
+            del states_vals, states_bytes # superstition. maybe helps the GC
 
 
         # level seed allows reproduction
