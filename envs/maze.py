@@ -15,7 +15,7 @@ import heapq
 
 # Constants in numeric maze representation
 CHEESE = 2
-EMPTY = 100 # TODO: Change to OPEN (terminology isn't consistent)
+EMPTY = 100
 BLOCKED = 51
 MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
 
@@ -342,8 +342,8 @@ def _ingrid(grid, n):
     "Is (x, y) in the grid?"
     return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
 
-def _get_open_neighbors(grid, x, y):
-    "Get the open neighbors of (x, y) in the grid"
+def _get_empty_neighbors(grid, x, y):
+    "Get the empty neighbors of (x, y) in the grid"
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
 
@@ -369,7 +369,7 @@ def shortest_path_to_cheese(grid: np.ndarray) -> typing.Tuple[typing.Dict, typin
         if current == goal:
             break
 
-        for next in _get_open_neighbors(grid, *current):
+        for next in _get_empty_neighbors(grid, *current):
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
@@ -382,8 +382,8 @@ def shortest_path_to_cheese(grid: np.ndarray) -> typing.Tuple[typing.Dict, typin
 
 def is_tree(grid: np.ndarray, debug=False) -> bool:
     """
-    Is there exactly one path between any two open squares in the maze?
-    (Also known as, is the set of open squares a spanning tree)
+    Is there exactly one path between any two empty squares in the maze?
+    (Also known as, is the set of empty squares a spanning tree)
     """
     grid = inner_grid(grid).copy()
     grid[grid == CHEESE] = EMPTY
@@ -397,7 +397,7 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
             if debug: print(f'{node} already visited, a cycle!')
             return False
         visited_nodes.add(node)
-        for neighbor in _get_open_neighbors(grid, *node):
+        for neighbor in _get_empty_neighbors(grid, *node):
             edge = (node, neighbor)
             if edge not in visited_edges and edge[::-1] not in visited_edges:
                 stack.append(neighbor)
