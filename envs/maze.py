@@ -11,6 +11,7 @@ import struct
 import typing
 from dataclasses import dataclass
 import numpy as np
+import heapq
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -331,13 +332,52 @@ def euclidian_dist_to_cheese(grid: np.ndarray) -> float:
     return np.sqrt((mx - cx)**2 + (my - cy)**2)
 
 
-def true_dist_to_cheese(grid: np.ndarray) -> int:
+
+
+def _get_neighbors(x, y):
+    "Get the neighbors of (x, y) in the grid"
+    return [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+
+def _ingrid(grid, n):
+    "Is (x, y) in the grid?"
+    return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
+
+def _get_open_neighbors(grid, x, y):
+    "Get the open neighbors of (x, y) in the grid"
+    return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
+
+
+def shortest_path_to_cheese(grid: np.ndarray) -> typing.Tuple[typing.Dict, typing.Dict]:
     "Compute the number of moves for the mouse to get the cheese (using A*)"
     assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
     assert (grid==CHEESE).sum() == 1, f'grid has {(grid==CHEESE).sum()} cheeses'
     grid = inner_grid(grid).copy()
-    raise NotImplementedError
 
+    # A* search
+    start = get_mouse_pos(grid)
+    goal = get_cheese_pos(grid)
+    frontier = []
+    heapq.heappush(frontier, (0, start))
+
+    came_from = {}
+    cost_so_far = {}
+    came_from[start] = None
+    cost_so_far[start] = 0
+
+    while len(frontier) > 0:
+        current = heapq.heappop(frontier)[1]
+        if current == goal:
+            break
+
+        for next in _get_open_neighbors(grid, *current):
+            new_cost = cost_so_far[current] + 1
+            if next not in cost_so_far or new_cost < cost_so_far[next]:
+                cost_so_far[next] = new_cost
+                priority = new_cost + euclidian_dist_to_cheese(grid)
+                heapq.heappush(frontier, (priority, next))
+                came_from[next] = current
+
+    return cost_so_far, came_from
 
 
 def is_tree(grid: np.ndarray, debug=False) -> bool:
@@ -348,18 +388,6 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
     grid = inner_grid(grid).copy()
     grid[grid == CHEESE] = EMPTY
 
-    def get_neighbors(x, y):
-        "Get the neighbors of (x, y) in the grid"
-        return [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
-
-    def ingrid(n):
-        "Is (x, y) in the grid?"
-        return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
-
-    def get_open_neighbors(x, y):
-        "Get the open neighbors of (x, y) in the grid"
-        return [n for n in get_neighbors(x, y) if ingrid(n) and grid[n] == EMPTY]
-
     visited_edges = set()
     visited_nodes = set()
     stack = [(0,0)]
@@ -369,7 +397,7 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
             if debug: print(f'{node} already visited, a cycle!')
             return False
         visited_nodes.add(node)
-        for neighbor in get_open_neighbors(*node):
+        for neighbor in _get_open_neighbors(grid, *node):
             edge = (node, neighbor)
             if edge not in visited_edges and edge[::-1] not in visited_edges:
                 stack.append(neighbor)
