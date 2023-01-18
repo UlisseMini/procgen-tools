@@ -55,6 +55,12 @@ if __name__ == '__main__':
         done = np.zeros(venv.num_envs)
         log = {"rewards": [], "actions": [], "mouse_positions": [], "steps": 0}
 
+
+        states_bytes = venv.env.callmethod('get_state')[0]
+        states_vals = maze.parse_maze_state_bytes(states_bytes)
+        log["mouse_positions"].append(maze.get_mouse_grid_pos(states_vals))
+        log["grid"] = maze.get_grid(states_vals) # TODO: Use get_grid_with_mouse and delete mouse_positions
+
         policy.eval()
 
         for step in tqdm(range(args.num_timesteps)):
@@ -77,8 +83,6 @@ if __name__ == '__main__':
             states_bytes = venv.env.callmethod('get_state')[0]
             states_vals = maze.parse_maze_state_bytes(states_bytes)
             log["mouse_positions"].append(maze.get_mouse_grid_pos(states_vals))
-            if log.get("grid") is None: # only needs to be done once, grid doesn't change
-                log["grid"] = maze.get_grid(states_vals) # Alternative: Use get_grid_with_mouse and delete mouse_positions
             del states_vals, states_bytes # superstition. maybe helps the GC
 
 
