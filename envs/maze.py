@@ -260,7 +260,7 @@ def get_grid(state_vals: StateValues):
     grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
     return grid_vals
 
-def get_mouse_grid_pos(state_vals: StateValues):
+def get_mouse_pos_sv(state_vals: StateValues):
     "Get (x, y) position of mouse in grid."
     ents = state_vals['ents'][0]
     # flipped turns out to be oriented right for grid.
@@ -269,7 +269,7 @@ def get_mouse_grid_pos(state_vals: StateValues):
 def get_grid_with_mouse(state_vals: StateValues):
     "Get grid with mouse position"
     grid = get_grid(state_vals)
-    grid[get_mouse_pos(grid)] = MOUSE
+    grid[get_mouse_pos_sv(state_vals)] = MOUSE
     return grid
 
 def set_grid_with_mouse(state_vals: StateValues, grid):
