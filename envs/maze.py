@@ -9,7 +9,7 @@ https://gist.github.com/montemac/6f9f636507ec92967071bb755f37f17b
 
 import struct
 import typing
-from typing import Optional, Tuple, Dict, Callable
+from typing import Tuple, Dict, Callable
 from dataclasses import dataclass
 import numpy as np
 import heapq
@@ -19,6 +19,17 @@ CHEESE = 2
 EMPTY = 100
 BLOCKED = 51
 MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
+
+# Types and things
+
+@dataclass
+class StateValue:
+    val: typing.Any
+    idx: int
+
+# fancy type just caused excessive checking / errors ;(
+StateValues = typing.Dict[str, typing.Any] # Union[StateValue, List[StateValue], 'StateValues']]
+Square = typing.Tuple[int, int]
 
 # Parse the environment state dict
 
@@ -151,13 +162,7 @@ MAZE_STATE_DICT_TEMPLATE = [
     ['int',    'world_dim'], 
     ['int',    'END_OF_BUFFER']]
 
-@dataclass
-class StateValue:
-    val: typing.Any
-    idx: int
-
-
-def parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> typing.Dict[str, StateValue]:
+def parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
         sz = struct.calcsize(fmt)
@@ -211,7 +216,7 @@ def parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> typing.Dict[str,
         assert serialize_maze_state(vals, assert_=False) == state_bytes, 'serialize(deserialize(state_bytes)) != state_bytes'
     return vals
 
-def serialize_maze_state(state_vals: typing.Dict[str, StateValue], assert_=True) -> bytes:
+def serialize_maze_state(state_vals: StateValues, assert_=True) -> bytes:
     # Serialize any value to a bytes object
     def serialize_val(val):
         if isinstance(val, StateValue):
@@ -249,25 +254,25 @@ def serialize_maze_state(state_vals: typing.Dict[str, StateValue], assert_=True)
 
 # TODO: Rename functions to be clear which take state_vals vs. grid (e.g. sget vs. gget?)
 
-def get_grid(state_vals):
+def get_grid(state_vals: StateValues):
     "Get numpy (world_dim, world_dim) grid of the maze. "
     world_dim = state_vals['world_dim'].val
     grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
     return grid_vals
 
-def get_mouse_grid_pos(state_vals):
+def get_mouse_grid_pos(state_vals: StateValues):
     "Get (x, y) position of mouse in grid."
     ents = state_vals['ents'][0]
     # flipped turns out to be oriented right for grid.
     return int(ents['y'].val), int(ents['x'].val)
 
-def get_grid_with_mouse(state_vals):
+def get_grid_with_mouse(state_vals: StateValues):
     "Get grid with mouse position"
     grid = get_grid(state_vals)
     grid[get_mouse_pos(grid)] = MOUSE
     return grid
 
-def set_grid_with_mouse(state_vals, grid):
+def set_grid_with_mouse(state_vals: StateValues, grid):
     "Set state_vals <- grid with mouse position. grid must be (world_dim, world_dim)"
     assert grid.shape == (state_vals['world_dim'].val, state_vals['world_dim'].val)
     assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
@@ -284,7 +289,7 @@ def set_grid_with_mouse(state_vals, grid):
     return state_vals
 
 
-def set_grid(state_vals, grid):
+def set_grid(state_vals: StateValues, grid: np.ndarray):
     "Set the grid of the maze."
     assert (grid==MOUSE).sum() == 0, 'use set_grid_with_mouse'
     world_dim = state_vals['world_dim'].val
@@ -346,11 +351,11 @@ def _get_neighbors(x, y):
     "Get the neighbors of (x, y) in the grid"
     return [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
 
-def _ingrid(grid, n):
+def _ingrid(grid: np.ndarray, n):
     "Is (x, y) in the grid?"
     return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
 
-def _get_empty_neighbors(grid, x, y):
+def _get_empty_neighbors(grid: np.ndarray, x, y):
     "Get the empty neighbors of (x, y) in the grid"
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
@@ -369,7 +374,7 @@ def shortest_path(
     start: Tuple[int, int],
     stop_condition: Callable[[np.ndarray, Tuple], bool] = lambda g, c: g[c] == CHEESE,
     heuristic: Callable[[np.ndarray, Tuple], float] = _euclidian_dist_to_cheese,
-) -> Tuple[Dict, Dict]:
+) -> Tuple[Dict[Square, int], Dict[Square, Square]]:
     """
     Compute the number of moves for the mouse to get the cheese (using A*)
     - default stop_condition is finding the cheese
