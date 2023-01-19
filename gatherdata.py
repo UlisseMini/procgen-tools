@@ -1,14 +1,13 @@
-# import matplotlib.pyplot as plt
 from procgen import ProcgenGym3Env
 import torch
 import envs.maze as maze
 from models import load_policy
-from gym.spaces import Discrete
 from tqdm import tqdm
 import numpy as np
 import pickle
 from argparse import ArgumentParser
 import random
+from data_util import Episode
 
 def create_venv(num_levels = 1, start_level = 0):
     venv = ProcgenGym3Env(
@@ -19,7 +18,6 @@ def create_venv(num_levels = 1, start_level = 0):
     venv = maze.wrap_venv(venv)
     return venv
 
-
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_file', type=str, default='./models/model_200015872.pth')
@@ -29,66 +27,54 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # num is the number of environments to create in the vec env
-    # num_levels is the number of levels to sample from (0 for infinite, 1 for deterministic)
-    venv = create_venv()
-
-    # Don't actually need to save. seed is enough.
-    # state_bytes_list = venv.env.callmethod('get_state')
-    # state_vals_list = [maze.parse_maze_state_bytes(sb) for sb in state_bytes_list]
-    # grids = [maze.get_grid(s) for s in state_vals_list]
-
-    # venv.env.callmethod("set_state", [state_bytes])
-
-    assert isinstance(venv.action_space, Discrete)
-    policy = load_policy(args.model_file, venv.action_space.n, device=torch.device('cpu'))
+    policy = load_policy(args.model_file, action_size=15, device=torch.device('cpu'))
     model_name = args.model_file.split('/')[-1][:-4]
 
     # determinism
     random.seed(42)
 
-    # plt.ion()
-    for episode in tqdm(range(args.num_episodes)):
-        venv = create_venv(random.randint(0, 100000))
-        obs = venv.reset()
+    for ep in tqdm(range(args.num_episodes)):
+        venv = create_venv(start_level=random.randint(0, 100000))
         assert venv.num_envs == 1, 'Only one env supported (for now)'
-        done = np.zeros(venv.num_envs)
-        log = {"rewards": [], "actions": [], "mouse_positions": [], "steps": 0}
 
-
+        # grab initial_state_bytes and initial info for episode object
         states_bytes = venv.env.callmethod('get_state')[0]
         states_vals = maze.parse_maze_state_bytes(states_bytes)
-        log["mouse_positions"].append(maze.get_mouse_grid_pos(states_vals))
-        log["grid"] = maze.get_grid(states_vals) # TODO: Use get_grid_with_mouse and delete mouse_positions
+        info = venv.env.get_info()
+
+        # init episode object
+        mouse_positions_outer = [maze.get_mouse_grid_pos(states_vals)]
+        actions, rewards = [], []
+        sampler = "argmax" if args.argmax else "sample"
+        episode = Episode(
+            initial_state_bytes=states_bytes,
+            mouse_positions_outer=mouse_positions_outer,
+            actions=actions, rewards=rewards, sampler=sampler,
+            level_seed=int(info[0]["level_seed"]),
+        )
 
         policy.eval()
-
+        done = np.zeros(venv.num_envs)
+        obs = venv.reset()
         for step in tqdm(range(args.num_timesteps)):
             p, v = policy(torch.FloatTensor(obs))
             if args.argmax:
                 act = p.probs.argmax(dim=-1).numpy()
             else:
                 act = p.sample().numpy()
-            obs, rew, done_now, info = venv.step(act)
-            done = np.logical_or(done, done_now) # used when we have more envs
-            # plt.imshow(info[0]['rgb'])
-            # plt.show()
-            # plt.pause(0.01)
+            obs, rew, done, info = venv.step(act)
             if done:
-                break # IMPORTANT: we don't log here. otherwise we'll log the last frame (a new level)
+                # IMPORTANT: we don't update episode here. otherwise we'll log the last frame (a new level)
+                break
 
-            log["rewards"].append(float(rew[0]))
-            log["actions"].append(int(act[0]))
-            log["steps"] = step
             states_bytes = venv.env.callmethod('get_state')[0]
             states_vals = maze.parse_maze_state_bytes(states_bytes)
-            log["mouse_positions"].append(maze.get_mouse_grid_pos(states_vals))
-            del states_vals, states_bytes # superstition. maybe helps the GC
+
+            rewards.append(float(rew[0]))
+            actions.append(int(act[0]))
+            mouse_positions_outer.append(maze.get_mouse_grid_pos(states_vals))
 
 
-        # level seed allows reproduction
-        log["level_seed"] = int(info[0]["prev_level_seed"]) # type: ignore
         # get basename of model file
-        sampler = 'argmax' if args.argmax else 'sample'
-        with open(f'data/{model_name}-ep{episode}-seed{log["level_seed"]}-{sampler}-{log["steps"]}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
-            pickle.dump(log, f, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(f'data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
+            pickle.dump(episode, f, protocol=pickle.HIGHEST_PROTOCOL)
