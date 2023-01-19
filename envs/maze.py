@@ -9,6 +9,7 @@ https://gist.github.com/montemac/6f9f636507ec92967071bb755f37f17b
 
 import struct
 import typing
+from typing import Optional, Tuple, Dict, Callable
 from dataclasses import dataclass
 import numpy as np
 import heapq
@@ -360,15 +361,23 @@ def _get_empty_neighbors(grid, x, y):
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
 
-def shortest_path_to_cheese(grid: np.ndarray) -> typing.Tuple[typing.Dict, typing.Dict]:
-    "Compute the number of moves for the mouse to get the cheese (using A*)"
-    assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
+def shortest_path(
+    grid: np.ndarray,
+    start: Tuple[int, int],
+    stop_condition: Callable[[np.ndarray, Tuple], bool] = lambda g, c: g[c] == CHEESE,
+    heuristic: Callable[[np.ndarray, Tuple], float] = lambda g, c: euclidian_dist_to_cheese(g, c),
+) -> Tuple[Dict, Dict]:
+    """
+    Compute the number of moves for the mouse to get the cheese (using A*)
+    - default stop_condition is finding the cheese
+    - default heuristic is euclidian distance to cheese
+    """
+    # assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice' # relaxed by start param
     assert (grid==CHEESE).sum() == 1, f'grid has {(grid==CHEESE).sum()} cheeses'
+
     grid = inner_grid(grid).copy()
 
     # A* search
-    start = get_mouse_pos(grid)
-    goal = get_cheese_pos(grid)
     frontier = []
     heapq.heappush(frontier, (0, start))
 
@@ -379,14 +388,14 @@ def shortest_path_to_cheese(grid: np.ndarray) -> typing.Tuple[typing.Dict, typin
 
     while len(frontier) > 0:
         current = heapq.heappop(frontier)[1]
-        if current == goal:
+        if stop_condition(grid, current):
             break
 
         for next in _get_empty_neighbors(grid, *current):
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
-                priority = new_cost + euclidian_dist_to_cheese(grid)
+                priority = new_cost + heuristic(grid, next)
                 heapq.heappush(frontier, (priority, next))
                 came_from[next] = current
 
