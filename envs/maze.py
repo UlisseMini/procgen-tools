@@ -9,7 +9,7 @@ https://gist.github.com/montemac/6f9f636507ec92967071bb755f37f17b
 
 import struct
 import typing
-from typing import Tuple, Dict, Callable
+from typing import Tuple, Dict, Callable, List
 from dataclasses import dataclass
 import numpy as np
 import heapq
@@ -408,6 +408,15 @@ def shortest_path(
                 came_from[next] = current
 
     return cost_so_far, came_from
+
+
+def reconstruct_path(came_from: Dict[Square, Square], end: Square) -> List[Square]:
+    path = [end]
+    while path[-1] in came_from:
+        path += [came_from[path[-1]]]
+
+    path = path[::-1][1:] # reverse, remove None
+    return path
 
 
 def is_tree(grid: np.ndarray, debug=False) -> bool:
