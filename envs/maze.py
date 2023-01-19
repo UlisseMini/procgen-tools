@@ -341,12 +341,6 @@ def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
     return outer
 
 
-def euclidian_dist_to_cheese(grid: np.ndarray, coord: Tuple) -> float:
-    "Compute the *euclidian* distance from (x,y) to the cheese"
-    mx, my = coord
-    cx, cy = get_cheese_pos(grid)
-    return np.sqrt((mx - cx)**2 + (my - cy)**2)
-
 
 def _get_neighbors(x, y):
     "Get the neighbors of (x, y) in the grid"
@@ -361,11 +355,20 @@ def _get_empty_neighbors(grid, x, y):
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
 
+def _euclidian_dist_to_cheese(grid: np.ndarray, coord: Tuple) -> float:
+    """
+    Euclidian distance from (x,y) to the cheese. default heuristic for A*
+    """
+    mx, my = coord
+    cx, cy = get_cheese_pos(grid)
+    return np.sqrt((mx - cx)**2 + (my - cy)**2)
+
+
 def shortest_path(
     grid: np.ndarray,
     start: Tuple[int, int],
     stop_condition: Callable[[np.ndarray, Tuple], bool] = lambda g, c: g[c] == CHEESE,
-    heuristic: Callable[[np.ndarray, Tuple], float] = lambda g, c: euclidian_dist_to_cheese(g, c),
+    heuristic: Callable[[np.ndarray, Tuple], float] = _euclidian_dist_to_cheese,
 ) -> Tuple[Dict, Dict]:
     """
     Compute the number of moves for the mouse to get the cheese (using A*)
