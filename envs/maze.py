@@ -264,7 +264,7 @@ def get_mouse_grid_pos(state_vals):
 def get_grid_with_mouse(state_vals):
     "Get grid with mouse position"
     grid = get_grid(state_vals)
-    grid[get_mouse_pos(state_vals)] = MOUSE
+    grid[get_mouse_pos(grid)] = MOUSE
     return grid
 
 def set_grid_with_mouse(state_vals, grid):
