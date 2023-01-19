@@ -313,7 +313,7 @@ def set_cheese_pos(grid: np.ndarray, x, y):
     grid[x, y] = CHEESE
 
 
-def inner_grid(grid: np.ndarray) -> np.ndarray:
+def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     """
     Get the inside of the maze, ie. the stuff within the outermost walls.
     inner_grid(inner_grid(x)) = inner_grid(x) for all x.
@@ -322,16 +322,29 @@ def inner_grid(grid: np.ndarray) -> np.ndarray:
     bl = next(i for i in range(len(grid)) if grid[i][i] != BLOCKED)
     if bl == 0: # edgecase! the whole grid is the inner grid.
         return grid
-    return grid[bl:-bl, bl:-bl]
+
+    inner = grid[bl:-bl, bl:-bl]
+    if assert_:
+        assert (outer_grid(inner, grid.shape[0], assert_=False) == grid).all()
+    return inner
 
 
-def euclidian_dist_to_cheese(grid: np.ndarray) -> float:
-    "Compute the *euclidian* distance from the mouse to the cheese"
-    mx, my = get_mouse_pos(grid)
+def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
+    """
+    The inverse of inner_grid(). Could also be called "pad_grid".
+    """
+    bl = (world_dim - len(grid)) // 2
+    outer = np.pad(grid, bl, 'constant', constant_values=BLOCKED)
+    if assert_:
+        assert (inner_grid(outer, assert_=False) == grid).all()
+    return outer
+
+
+def euclidian_dist_to_cheese(grid: np.ndarray, coord: Tuple) -> float:
+    "Compute the *euclidian* distance from (x,y) to the cheese"
+    mx, my = coord
     cx, cy = get_cheese_pos(grid)
     return np.sqrt((mx - cx)**2 + (my - cy)**2)
-
-
 
 
 def _get_neighbors(x, y):
