@@ -372,9 +372,9 @@ def _euclidian_dist_to_cheese(grid: np.ndarray, coord: Tuple) -> float:
 def shortest_path(
     grid: np.ndarray,
     start: Tuple[int, int],
-    stop_condition: Callable[[np.ndarray, Tuple], bool] = lambda g, c: g[c] == CHEESE,
-    heuristic: Callable[[np.ndarray, Tuple], float] = _euclidian_dist_to_cheese,
-) -> Tuple[Dict[Square, int], Dict[Square, Square]]:
+    stop_condition: Callable[[np.ndarray, Tuple], bool] = None, # type: ignore
+    heuristic: Callable[[np.ndarray, Tuple], float] = None, # type: ignore
+) -> Tuple[Dict[Square, int], Dict[Square, Square], Dict[str, typing.Any]]:
     """
     Compute the number of moves for the mouse to get the cheese (using A*)
     - default stop_condition is finding the cheese
@@ -385,6 +385,11 @@ def shortest_path(
 
     grid = inner_grid(grid).copy()
 
+    if heuristic is None and stop_condition is None:
+        heuristic = _euclidian_dist_to_cheese
+    if stop_condition is None:
+        stop_condition = lambda g, c: g[c] == CHEESE
+
     # A* search
     frontier = []
     heapq.heappush(frontier, (0, start))
@@ -393,10 +398,12 @@ def shortest_path(
     cost_so_far = {}
     came_from[start] = None
     cost_so_far[start] = 0
+    extra = {'last_square': None}
 
     while len(frontier) > 0:
         current = heapq.heappop(frontier)[1]
         if stop_condition(grid, current):
+            extra['last_square'] = current
             break
 
         for next in _get_empty_neighbors(grid, *current):
@@ -407,7 +414,7 @@ def shortest_path(
                 heapq.heappush(frontier, (priority, next))
                 came_from[next] = current
 
-    return cost_so_far, came_from
+    return cost_so_far, came_from, extra
 
 
 def reconstruct_path(came_from: Dict[Square, Square], end: Square) -> List[Square]:
