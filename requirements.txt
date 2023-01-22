@@ -4,6 +4,8 @@ gym3
 torch
 numpy
 matplotlib
+tqdm
+ipywidgets
 # einops # aspirational
 
 # procgen gets mad if this isn't here
