@@ -43,7 +43,7 @@ if __name__ == '__main__':
         info = venv.env.get_info()
 
         # init episode object
-        mouse_positions_outer = [maze.get_mouse_grid_pos(states_vals)]
+        mouse_positions_outer = [maze.get_mouse_pos_sv(states_vals)]
         actions, rewards = [], []
         sampler = "argmax" if args.argmax else "sample"
         episode = Episode(
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
             rewards.append(float(rew[0]))
             actions.append(int(act[0]))
-            mouse_positions_outer.append(maze.get_mouse_grid_pos(states_vals))
+            mouse_positions_outer.append(maze.get_mouse_pos_sv(states_vals))
 
 
         # get basename of model file
