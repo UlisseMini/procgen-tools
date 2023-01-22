@@ -389,6 +389,8 @@ def shortest_path(
         heuristic = _euclidian_dist_to_cheese
     if stop_condition is None:
         stop_condition = lambda g, c: g[c] == CHEESE
+    if heuristic is None:
+        heuristic = lambda *_: 1 # disable heuristic, none given
 
     # A* search
     frontier = []
