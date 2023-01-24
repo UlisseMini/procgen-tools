@@ -2,6 +2,7 @@ import warnings
 import envs.maze as maze
 from typing import List, Tuple
 from functools import cache
+import numpy as np
 from procgen import ProcgenGym3Env
 import pickle
 
@@ -92,6 +93,15 @@ class Episode():
         g = self.outer_grid().copy()
         g[self.mouse_positions_outer[t]] = maze.MOUSE
         return maze.inner_grid(g)
+
+
+    @property
+    @cache
+    def got_cheese(self) -> bool:
+        "Checks if mouse is adjacent to cheese on last timestep, which is *almost always* the same as getting the cheese."
+        # TODO: Store got_cheese in gatherdata.py
+        g = self.grid(t=-1)
+        return (np.abs(np.array(maze.get_mouse_pos(g)) - np.array(maze.get_cheese_pos(g))).sum() == 1.).all()
 
 
 def load_episode(file: str, load_venv=False) -> Episode:
