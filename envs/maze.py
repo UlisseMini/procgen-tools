@@ -479,8 +479,9 @@ def on_distribution(grid: np.ndarray, p=print) -> bool:
     return True
 
 
-def grid_editor(grid: np.ndarray, node_radius='8px'):
+def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
+    import time
 
     CELL_TO_COLOR = {EMPTY: '#fde724', BLOCKED: '#24938b', CHEESE: '#440154', MOUSE: '#3c4d8a'}
     CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀', MOUSE: '🐭'}
@@ -518,6 +519,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px'):
             b.on_click(button_clicked)
             # flip the grid so it's oriented correctly, like origin=lower in matplotlib.
             wgrid[rows-i-1, j] = b
+        time.sleep(delay)
     return HBox([wgrid, output])
 
 
