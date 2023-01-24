@@ -1,4 +1,4 @@
-# very reckless not specifying versions... will freeze later
+# very reckless not specifying versions... will freeze later. maybe.
 gym
 gym3
 torch
@@ -6,10 +6,12 @@ numpy
 matplotlib
 tqdm
 ipywidgets
+procgen
 # einops # aspirational
 
-# procgen gets mad if this isn't here
-pyqt5
 
+# Build procgenAISC, not needed for now
+
+# pyqt5 # procgen build gets mad if this isn't here
 # must be lauro branch. master is not supported (different parsing would be required)
-git+https://github.com/UlisseMini/procgenAISC@lauro
+# git+https://github.com/UlisseMini/procgenAISC@lauro
