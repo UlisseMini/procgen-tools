@@ -457,11 +457,23 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
         print(f'visited {len(visited_nodes)} out of {(grid == EMPTY).sum()} nodes')
     return visited_all_nodes
 
-def on_distribution(grid: np.ndarray, p=print) -> bool:
-    "Is the given maze something that could have been generated during training?"
+def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -> bool:
+    """
+    Is the given *maze* something that could have been generated during training?
+    If full is passed the maze must include a single mouse and cheese.
+    """
 
     # Make a copy of the inner grid without the cheese and mouse
     g = inner_grid(grid).copy()
+    if full:
+        if (g == MOUSE).sum() != 1:
+            p(f'grid has {(g == MOUSE).sum()} mice')
+            return False
+        if (g == CHEESE).sum() != 1:
+            p(f'grid has {(g == CHEESE).sum()} cheeses')
+            return False
+
+    # For the rest of the checks, we don't care about the mouse or cheese
     g[g == CHEESE] = EMPTY
     g[g == MOUSE] = EMPTY
 
@@ -479,7 +491,7 @@ def on_distribution(grid: np.ndarray, p=print) -> bool:
     return True
 
 
-def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01):
+def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
@@ -504,11 +516,15 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01):
             g[i, j] = MOUSE
         else:
             g[i, j] = {EMPTY: BLOCKED, BLOCKED: EMPTY, CHEESE: EMPTY, MOUSE: EMPTY}[g[i,j]]
+
         b.style.button_color = CELL_TO_COLOR[g[i,j]] # type: ignore
         b.tooltip = CELL_TO_CHAR[g[i,j]]
         with output:
             output.clear_output()
             on_distribution(g)
+            if callback is not None:
+                callback(grid)
+
 
     for i in range(rows):
         for j in range(cols):
@@ -521,6 +537,39 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01):
             wgrid[rows-i-1, j] = b
         time.sleep(delay)
     return HBox([wgrid, output])
+
+
+
+def venv_editor(venv, **kwargs):
+    """
+    Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
+    """
+
+    from ipywidgets import VBox, HTML
+
+    def make_cb(i: int):
+        def _cb(gridm: np.ndarray):
+            if on_distribution(gridm, p=lambda *_: None):
+                print('Saving state to venv')
+                # if we have mice, use set_grid_with_mouse. otherwise just set the grid.
+                if (gridm == MOUSE).sum() > 0:
+                    set_grid_with_mouse(state_vals_list[i], gridm)
+                else:
+                    set_grid(state_vals_list[i], gridm)
+                state_bytes_list[i] = serialize_maze_state(state_vals_list[i])
+                venv.env.callmethod("set_state", state_bytes_list)
+        return _cb
+
+    state_bytes_list = venv.env.callmethod("get_state")
+    state_vals_list = [parse_maze_state_bytes(sb) for sb in state_bytes_list]
+    gridm_list = [get_grid_with_mouse(sv) for sv in state_vals_list]
+    editors = [grid_editor(gridm_list[i], callback=make_cb(i), **kwargs) for i in range(len(gridm_list))]
+    elements = []
+    for i in range(len(editors)):
+        elements.append(editors[i])
+        elements.append(HTML('<hr>'))
+
+    return VBox(elements)
 
 
 from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
