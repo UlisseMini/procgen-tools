@@ -99,7 +99,7 @@ for ax in axes:
     ax.set_xlabel('')
     ax.set_ylabel('')
 plt.show()
-
+plt.savefig('./figs/action.png')
 
 with open('./saved-mazes.pkl', 'wb') as f:
     pickle.dump(state_bytes_list, f)
@@ -132,7 +132,7 @@ if COLAB:
 
 
 # download from https://drive.google.com/file/d/1db1qJn_ZM49CUcA1k7uSMdsdiAQ4eR5a/view?usp=share_link
-policy = load_policy('/home/turneale/Documents/Work/MATS/23-Winter/models/maze_i.pth', action_size=venv.action_space.n, device=t.device('cpu'))
+policy = load_policy('/home/turneale/Documents/Work/MATS/23-Winter/models/maze_I/model_rand_region_5.pth', action_size=venv.action_space.n, device=t.device('cpu'))
 
 
 
@@ -166,15 +166,15 @@ plt.close()
 fig, (ax1, ax2) = plt.subplots(1, 2)
 # Make triple-barplot with matplotlib,
 for i in range(venv.num_envs):
-    ax1.bar(x+(i-1)*.2, p.logits[i][actions], width=width, label=('far', 'near', 'vanished')[i])
-    ax2.bar(x+(i-1)*.2, p.probs[i][actions], width=width, label=('far', 'near', 'vanished')[i])
+    ax1.bar(x+(i-1)*width, p.logits[i][actions], width=width, label=('far', 'near', 'vanished')[i])
+    ax2.bar(x+(i-1)*width, p.probs[i][actions], width=width, label=('far', 'near', 'vanished')[i])
 
 ax1.set_title('Action logits')
 ax2.set_title('Action probabilities')
-plt.xticks(x, labels)
+plt.xticks(labels, labels)
 plt.legend()
 plt.show()
-input()
+plt.savefig('./figs/action_probs.png')
 
 
 
