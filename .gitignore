@@ -1,5 +1,8 @@
-*.pth  # Pytorch
-data/* # Pickle files from data gathering
+*.pth   # Pytorch models
+data/   # Pickle files from data gathering
+models/ # Saved models
+*.zip
+*.7z
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
