@@ -5,6 +5,8 @@ import envs.maze as maze
 # Helpers
 
 def decision_square(mgrid: np.ndarray) -> Optional[Tuple[int, int]]:
+    "Get the decision square (square where agent can choose to go to cheese or top right) if it exists"
+
     _, came_from, _ = maze.shortest_path(mgrid, (0, 0))
     path_to_cheese = maze.reconstruct_path(came_from, maze.get_cheese_pos(mgrid))
 
