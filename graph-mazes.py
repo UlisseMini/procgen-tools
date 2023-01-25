@@ -169,9 +169,12 @@ for i in range(venv.num_envs):
     ax1.bar(x+(i-1)*width, p.logits[i][actions], width=width, label=('far', 'near', 'vanished')[i])
     ax2.bar(x+(i-1)*width, p.probs[i][actions], width=width, label=('far', 'near', 'vanished')[i])
 
-ax1.set_title('Action logits')
-ax2.set_title('Action probabilities')
-plt.xticks(labels, labels)
+# Set it so that each axis has xticks with labels given by "labels", at intervals given by "x"
+for ax in (ax1, ax2):
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_title(('Action logits', 'Action probabilities')[ax==ax2])
+
 plt.legend()
 plt.show()
 plt.savefig('./figs/action_probs.png')
