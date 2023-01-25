@@ -39,8 +39,8 @@ def path_len(cost, _, extra) -> int:
     return cost[extra["last_square"]]
 
 
-def euclidian_distance(s1: Tuple[int,int], s2: Tuple[int, int]) -> float:
-    return ((s1[0]-s2[0])**2 + (s1[1]-s2[1])**2)**.5
+def distance(s1: Tuple[int,int], s2: Tuple[int, int], p=2) -> float:
+    return (abs(s1[0]-s2[0])**p + abs(s1[1]-s2[1])**p)**(1/p)
 
 
 def dist_cheese_nxn(grid: np.ndarray, start: Tuple[int, int], n: int, _filter=lambda g,c: g[c] != maze.BLOCKED, p=2) -> float:
@@ -78,7 +78,13 @@ def metric(fn: MetricFn):
 @metric
 def euc_dist_cheese_decision_square(grid: np.ndarray) -> float:
     "Euclidean distance between cheese and decision-square"
-    return euclidian_distance(maze.get_cheese_pos(grid), get_dsq(grid))
+    return distance(maze.get_cheese_pos(grid), get_dsq(grid))
+
+
+@metric
+def taxi_dist_cheese_decision_square(grid: np.ndarray) -> float:
+    "Taxicab (L1) distance between cheese and decision-square"
+    return distance(maze.get_cheese_pos(grid), get_dsq(grid), p=1)
 
 
 @metric
@@ -96,13 +102,25 @@ def steps_between_cheese_top_right(grid: np.ndarray) -> int:
 @metric
 def euc_dist_cheese_top_right(grid: np.ndarray) -> float:
     "Euclidean distance between cheese and top-right"
-    return euclidian_distance(maze.get_cheese_pos(grid), (grid.shape[0]-1, grid.shape[1]-1))
+    return distance(maze.get_cheese_pos(grid), (grid.shape[0]-1, grid.shape[1]-1))
+
+
+@metric
+def taxi_dist_cheese_top_right(grid: np.ndarray) -> float:
+    "Taxicab (L1) distance between cheese and top-right"
+    return distance(maze.get_cheese_pos(grid), (grid.shape[0]-1, grid.shape[1]-1), p=1)
 
 
 @metric
 def euc_dist_decision_square_top_right(grid: np.ndarray) -> float:
     "Euclidean distance between decision-square and top-right"
-    return euclidian_distance(get_dsq(grid), (grid.shape[0]-1, grid.shape[1]-1))
+    return distance(get_dsq(grid), (grid.shape[0]-1, grid.shape[1]-1))
+
+
+@metric
+def taxi_dist_decision_square_top_right(grid: np.ndarray) -> float:
+    "Taxicab (L1) distance between decision-square and top-right"
+    return distance(get_dsq(grid), (grid.shape[0]-1, grid.shape[1]-1), p=1)
 
 
 @metric
@@ -132,6 +150,18 @@ def euc_dist_cheese_5x5(grid: np.ndarray, **kwargs) -> float:
 
 
 @metric
+def taxi_dist_cheese_5x5(grid: np.ndarray, **kwargs) -> float:
+    "Shortest Taxicab (L1) distance between cheese and a square in the top-right 5*5 region"
+    return dist_cheese_nxn(grid, maze.get_cheese_pos(grid), n=5, p=1, **kwargs)
+
+
+@metric
 def euc_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
     "Shortest Euclidean distance between decision-square and a square in the top-right 5*5 region"
     return dist_cheese_nxn(grid, get_dsq(grid), n=5, **kwargs)
+
+
+@metric
+def taxi_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
+    "Shortest Taxicab (L1) distance between decision-square and a square in the top-right 5*5 region"
+    return dist_cheese_nxn(grid, get_dsq(grid), n=5, p=1, **kwargs)
