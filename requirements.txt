@@ -1,12 +1,12 @@
 # very reckless not specifying versions... will freeze later. maybe.
-gym
-gym3
-torch
-numpy
-matplotlib
-tqdm
-ipywidgets
-procgen
+gym==0.21.0
+gym3==0.3.3
+torch==1.13.1
+numpy==1.24.1
+matplotlib==3.6.3
+tqdm==4.64.1
+ipywidgets==7.7.2 # vscode bug on v8
+procgen==0.10.7
 # einops # aspirational
 
 
