@@ -10,6 +10,7 @@ if COLAB and 'procgen-tools' not in os.getcwd():
 # %load_ext autoreload
 # %matplotlib inline
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 import numpy as np
 from procgen import ProcgenGym3Env
@@ -39,70 +40,8 @@ try:
             venv.env.callmethod('set_state', state_bytes_list)
 
 except FileNotFoundError:
-    print('No ./saved-mazes.pkl file exists, generating venv from scratch')
+    print('No ./saved-mazes.pkl file exists, using default envs')
         
-
-obs = venv.reset()
-# plot all the envs in the vectorized env
-for i in range(obs.shape[0]):
-    plt.imshow(obs[i].transpose(1, 2, 0))
-    # plt.show()
-
- 
-# ## Edit the maze interactively
-# 
-# Using the magic `maze.grid_editor` function!
-# Clicking in the maze changes walls to empty space and vise versa.
-# If you click the cheese it'll disappear and reappear where you click next.
-
-
-from ipywidgets import VBox, Text
-
-
-editor_lst, grid_lst = [], []
-vals_lst = []
-for i in range(venv.num_envs):
-    state_bytes = venv.env.callmethod('get_state')[i]
-    vals_lst.append(maze.parse_maze_state_bytes(state_bytes))
-    grid_lst.append(maze.get_grid_with_mouse(vals_lst[-1])) # gridm because it includes the mouse
-    editor_lst.append(maze.grid_editor(grid_lst[-1], node_radius='8px'))
-    editor_lst.append(Text("-----"))
-VBox(editor_lst)
-
-
-"""
-Overwrite the env with the edited maze
-
-If you don't do this venv will still be using the old state!
-"""
-
-for i in range(venv.num_envs):
-    maze.set_grid_with_mouse(vals_lst[i], grid_lst[i])
-    
-state_bytes_list = [maze.serialize_maze_state(sv) for sv in vals_lst]
-venv.env.callmethod("set_state", state_bytes_list)
-
-obs = venv.reset()
-info = venv.env.get_info()
-# Show all three environments, with each titled "far", "near", and "vanished" respectively
-
-plt.close()
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-for i in range(obs.shape[0]):
-    # plt.imshow(obs[i].transpose(1, 2, 0)) # agent view
-    axes[i].imshow(info[i]['rgb'])
-    axes[i].set_title(('far', 'near', 'vanished')[i])
-# Remove axis ticks and labels
-for ax in axes:
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-plt.show()
-plt.savefig('./figs/action.png')
-
-with open('./saved-mazes.pkl', 'wb') as f:
-    pickle.dump(state_bytes_list, f)
 
  
 # ## Check that maze is in-distribution
@@ -139,46 +78,85 @@ policy = load_policy('../models/maze_I/model_rand_region_5.pth', action_size=ven
 done = np.zeros(venv.num_envs)
 obs = venv.reset()
 
-# actions:
-"""
-2 left
-3 down 
+# import type-checking library
+from typing import List
+def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_probs: bool = True, max_steps: int = 50, basename='traj_probs'):
+    """
+    Roll out the policy in the virtual environments, displaying side-by-side videos of the agent's actions. If action_probs is True, also display the agent's action probabilities. Saves the figure in "../figures/{basename}.gif".
+    """
+    action_dict = {'left': 2, 'down': 3, 'up': 5, 'right': 6}
+    num_envs = venv.num_envs
+    assert num_envs == len(condition_names), "Number of environments must match number of condition names"
 
-5 up
-6 right
-"""
+    obs = venv.reset() # reset the environments
+    dones = np.zeros(num_envs, dtype=bool)
 
-policy.eval()
-with t.no_grad():
-    p, v = policy(t.FloatTensor(obs))
+    # Initialize the figure
+    plt.clf()    
+    fig = plt.figure(figsize=(15, 5))
+    axs = [fig.add_subplot(2, num_envs, i+1) for i in range(num_envs)]
 
-actions, labels = t.tensor([2, 3, 5, 6], dtype=t.long), ['left', 'down', 'up', 'right']
-x=np.arange(len(labels))
-width = .2
+    # Remove axis ticks and labels
+    for i, ax in enumerate(axs):
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.set_title(condition_names[i])
 
-far, near, vanished = [p.logits[i] for i in range(venv.num_envs)]
-farp, nearp, vanishedp = [p.probs[i] for i in range(venv.num_envs)]
+    if action_probs: # Initialize the probability axes
+        # There is a single action probability bar chart below the video axes
+        logit_ax, prob_ax = [fig.add_subplot(2, num_envs, num_envs+i) for i in (1,2)]
+        logit_ax.set_title('Logits')
+        prob_ax.set_title('Probabilities')
+        x = np.arange(action_dict.keys().__len__()) # x-axis for the bar chart
+        width = .8 / num_envs # width of each bar; want whitespace in between actions
+        
+        bars = {'prob': [], 'logit': []}
+        for i in range(num_envs):
+            bars['logit'].append(logit_ax.bar(x + (i-1)*width, np.ones_like(x) * -10, width=width, label=condition_names[i]))
+            bars['prob'].append(prob_ax.bar(x + (i-1)*width, np.ones_like(x), width=width, label=condition_names[i]))
 
-# Clear previous plot
-plt.clf()
-plt.close()
-# Make two barplot axes
-fig, (ax1, ax2) = plt.subplots(1, 2)
-# Make triple-barplot with matplotlib,
-for i in range(venv.num_envs):
-    ax1.bar(x+(i-1)*width, p.logits[i][actions], width=width, label=('far', 'near', 'vanished')[i])
-    ax2.bar(x+(i-1)*width, p.probs[i][actions], width=width, label=('far', 'near', 'vanished')[i])
+        # Add a legend to the action probability axes
+        prob_ax.legend()
 
-# Set it so that each axis has xticks with labels given by "labels", at intervals given by "x"
-for ax in (ax1, ax2):
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_title(('Action logits', 'Action probabilities')[ax==ax2])
+        ax.set_xticks(x)
+        ax.set_xticklabels(action_dict.keys())
 
-plt.legend()
-plt.show()
-plt.savefig('./figs/action_probs.png')
+    p_tens, v = t.zeros((num_envs, venv.action_space.n)), t.zeros((num_envs,))
+    p = t.distributions.categorical.Categorical(logits=p_tens)
+    last_info = np.empty((num_envs, 512, 512, 3), dtype=np.int32) # keep track of the last observation
+    
+    # Start recording a video of the figure 
+    anim = animation.PillowWriter(fps=10)            
+    with anim.saving(fig, f"./figs/{basename}.gif", 100):
+        for step in range(max_steps):
+            if dones.all(): break 
 
+            # Plot the observations
+            info = venv.env.get_info()
+            for i in range(obs.shape[0]):
+                if not dones[i]: last_info[i] = info[i]['rgb']
+                axs[i].imshow(last_info[i])
 
+            with t.no_grad():
+                p_cat, v[~dones] = policy(t.FloatTensor(obs[~dones]))
+            p.logits[~dones] = p_cat.logits 
 
+            if action_probs: # Plot the action probabilities
+                indices = list(action_dict.values())
+                for i in range(num_envs):    
+                    for act_ind in range(len(action_dict)): # set the height of each bar
+                        bars['logit'][i][act_ind].set_height(p.logits[i][indices[act_ind]])
+                        bars['prob'][i][act_ind].set_height(p.probs[i][indices[act_ind]])
+
+            # Add a frame to the animation TODO convert to FFMPEGWriter 
+            anim.grab_frame()
+            
+            # Sample actions 
+            actions = p.sample().numpy()
+            obs, rewards, dones_now, info = venv.step(actions)
+            dones = np.logical_or(dones, dones_now)            
+
+get_movies(venv, policy, condition_names=['far', 'near', 'vanished'])
 
