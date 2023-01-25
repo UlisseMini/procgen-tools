@@ -1,4 +1,3 @@
-# very reckless not specifying versions... will freeze later. maybe.
 gym==0.21.0
 gym3==0.3.3
 torch==1.13.1
