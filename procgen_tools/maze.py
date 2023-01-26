@@ -584,7 +584,7 @@ def venv_editor(venv, **kwargs):
 # ================ Venv Wrappers ===================
 
 
-from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
+from .procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
 from gym3 import ToBaselinesVecEnv
 
 def wrap_venv(venv) -> ToBaselinesVecEnv:

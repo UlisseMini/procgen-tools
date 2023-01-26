@@ -1,5 +1,5 @@
 import warnings
-import envs.maze as maze
+from . import maze
 from typing import List, Tuple
 from functools import cache
 import numpy as np

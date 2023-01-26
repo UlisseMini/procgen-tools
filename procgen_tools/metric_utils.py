@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Optional, Tuple, Dict, Callable
-import envs.maze as maze
+from . import maze
 
 # Helpers
 
