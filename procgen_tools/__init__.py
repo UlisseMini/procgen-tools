@@ -1,3 +1,3 @@
-from . import maze, data_util, metric_utils, models, procgen_wrappers
+from . import maze, episodes, metrics, models, procgen_wrappers
 
 
