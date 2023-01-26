@@ -17,6 +17,7 @@ from procgen import ProcgenGym3Env
 import envs.maze as maze
 from models import load_policy
 import torch as t
+from torch.distributions.categorical import Categorical
 from IPython import display
 import pickle
 
@@ -124,7 +125,8 @@ def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_pro
         ax.set_xticklabels(action_dict.keys())
 
     p_tens, v = t.zeros((num_envs, venv.action_space.n)), t.zeros((num_envs,))
-    p = t.distributions.categorical.Categorical(logits=p_tens)
+
+    p = Categorical(logits=p_tens)
     last_info = np.empty((num_envs, 512, 512, 3), dtype=np.int32) # keep track of the last observation
     
     # Start recording a video of the figure 
@@ -141,7 +143,8 @@ def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_pro
 
             with t.no_grad():
                 p_cat, v[~dones] = policy(t.FloatTensor(obs[~dones]))
-            p.logits[~dones] = p_cat.logits 
+            p_tens[~dones] = p_cat.logits
+            p = Categorical(logits=p_tens)
 
             if action_probs: # Plot the action probabilities
                 indices = list(action_dict.values())
