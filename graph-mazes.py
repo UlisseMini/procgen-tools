@@ -86,6 +86,7 @@ def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_pro
     Roll out the policy in the virtual environments, displaying side-by-side videos of the agent's actions. If action_probs is True, also display the agent's action probabilities. Saves the figure in "../figures/{basename}.gif".
     """
     action_dict = {'left': 2, 'down': 3, 'up': 5, 'right': 6}
+    indices = list(action_dict.values())
     num_envs = venv.num_envs
     assert num_envs == len(condition_names), "Number of environments must match number of condition names"
 
@@ -121,8 +122,9 @@ def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_pro
         # Add a legend to the action probability axes
         prob_ax.legend()
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(action_dict.keys())
+        for ax in (logit_ax, prob_ax):
+            ax.set_xticks(x)
+            ax.set_xticklabels(action_dict.keys())
 
     p_tens, v = t.zeros((num_envs, venv.action_space.n)), t.zeros((num_envs,))
 
@@ -147,11 +149,11 @@ def get_movies(venv, policy: t.nn.Module, condition_names: List[str], action_pro
             p = Categorical(logits=p_tens)
 
             if action_probs: # Plot the action probabilities
-                indices = list(action_dict.values())
                 for i in range(num_envs):    
                     for act_ind in range(len(action_dict)): # set the height of each bar
                         bars['logit'][i][act_ind].set_height(p.logits[i][indices[act_ind]])
                         bars['prob'][i][act_ind].set_height(p.probs[i][indices[act_ind]])
+
 
             # Add a frame to the animation TODO convert to FFMPEGWriter 
             anim.grab_frame()
