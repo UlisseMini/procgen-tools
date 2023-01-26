@@ -77,4 +77,5 @@ if __name__ == '__main__':
 
         # get basename of model file
         with open(f'data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
-            pickle.dump(episode, f, protocol=pickle.HIGHEST_PROTOCOL)
+            state = episode.__getstate__()
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)

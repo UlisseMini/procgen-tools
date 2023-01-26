@@ -1,5 +1,9 @@
+"""
+!!!!! WARNING/IMPORTANT NOTE: This file is a copy of episodes.py in procgen_tools, and will be deleted after everyone runs fix-episode-imports.py !!!!!
+"""
+
 import warnings
-from . import maze
+from procgen_tools import maze
 from typing import List, Tuple
 from functools import cache
 import numpy as np
@@ -107,8 +111,7 @@ def load_episode(file: str, load_venv=False) -> Episode:
     (Disabled by default for speed, since it requires creating a venv)
     """
     with open(file, 'rb') as f:
-        state: dict = pickle.load(f)
-        episode = Episode(**state)
+        episode: Episode = pickle.load(f)
 
     if load_venv:
         venv = ProcgenGym3Env(
