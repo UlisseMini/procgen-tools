@@ -16,6 +16,7 @@ import circrl.module_hook as cmh
 import sys
 sys.path.append('../../procgen-tools')
 import models
+
 import gatherdata
 
 # %%
@@ -23,6 +24,8 @@ import gatherdata
 import pickle as pkl
 from procgen import ProcgenGym3Env
 import envs.maze as maze
+import lovely_tensors as lt 
+lt.monkey_patch()
 
 venv = ProcgenGym3Env(
     num=2, env_name='maze', num_levels=1, start_level=0,
@@ -43,7 +46,7 @@ action_size = 15 # lol
 env = gatherdata.create_venv()
 
 # Load model
-policy = models.load_policy(modelpath, action_size, device=device)
+policy = load_policy(modelpath, action_size, device=device)
 
 # Hook the network and run this observation through a custom predict-like function
 hook = cmh.ModuleHook(policy)
@@ -74,6 +77,8 @@ action_logits = hook.get_value_by_label('fc_policy_out').squeeze()
 # (Just ablate the first channel of the above activation as a test)
 mask = np.zeros_like(value, dtype=bool)
 mask[0,...] = True
+
+activ_diff = value - value_patched
 
 patches = {label: cmh.PatchDef(
     t.from_numpy(mask),
