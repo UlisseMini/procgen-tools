@@ -11,6 +11,7 @@ import struct
 import typing
 from typing import Tuple, Dict, Callable, List
 from dataclasses import dataclass
+from functools import cache
 import numpy as np
 import heapq
 
@@ -159,10 +160,13 @@ MAZE_STATE_DICT_TEMPLATE = [
     # end grid.serialize(b'],
     # end BasicAbstractGame::serialize(b'],
     ['int',    'maze_dim'],
-    ['int',    'world_dim'], 
+    ['int',    'world_dim'],
     ['int',    'END_OF_BUFFER']]
 
-def parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
+
+
+@cache
+def _parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
         sz = struct.calcsize(fmt)
@@ -213,10 +217,10 @@ def parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
         idx = parse_value(vals, val_def, idx)
 
     if assert_:
-        assert serialize_maze_state(vals, assert_=False) == state_bytes, 'serialize(deserialize(state_bytes)) != state_bytes'
+        assert _serialize_maze_state(vals, assert_=False) == state_bytes, 'serialize(deserialize(state_bytes)) != state_bytes'
     return vals
 
-def serialize_maze_state(state_vals: StateValues, assert_=True) -> bytes:
+def _serialize_maze_state(state_vals: StateValues, assert_=True) -> bytes:
     # Serialize any value to a bytes object
     def serialize_val(val):
         if isinstance(val, StateValue):
@@ -248,54 +252,71 @@ def serialize_maze_state(state_vals: StateValues, assert_=True) -> bytes:
     state_bytes = b''.join([serialize_val(val) for val in flat_vals])
 
     if assert_:
-        assert parse_maze_state_bytes(state_bytes, assert_=False) == state_vals, 'deserialize(serialize(state_vals)) != state_vals'
+        assert _parse_maze_state_bytes(state_bytes, assert_=False) == state_vals, 'deserialize(serialize(state_vals)) != state_vals'
     return state_bytes
 
 
-# TODO: Rename functions to be clear which take state_vals vs. grid (e.g. sget vs. gget?)
 
-def get_grid(state_vals: StateValues):
-    "Get numpy (world_dim, world_dim) grid of the maze. "
-    world_dim = state_vals['world_dim'].val
-    grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
-    return grid_vals
+class EnvState():
+    def __init__(self, state_bytes: bytes):
+        self.state_bytes = state_bytes
 
-def get_mouse_pos_sv(state_vals: StateValues):
-    "Get (x, y) position of mouse in grid."
-    ents = state_vals['ents'][0]
-    # flipped turns out to be oriented right for grid.
-    return int(ents['y'].val), int(ents['x'].val)
+    @property
+    def state_vals(self):
+        return _parse_maze_state_bytes(self.state_bytes)
 
-def get_grid_with_mouse(state_vals: StateValues):
-    "Get grid with mouse position"
-    grid = get_grid(state_vals)
-    grid[get_mouse_pos_sv(state_vals)] = MOUSE
-    return grid
+    @property
+    def world_dim(self):
+        return self.state_vals['world_dim'].val
 
-def set_grid_with_mouse(state_vals: StateValues, grid):
-    "Set state_vals <- grid with mouse position. grid must be (world_dim, world_dim)"
-    assert grid.shape == (state_vals['world_dim'].val, state_vals['world_dim'].val)
-    assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice'
+    def full_grid(self, with_mouse=True):
+        "Get numpy (world_dim, world_dim) grid of the maze. Includes the mouse by default."
+        world_dim = self.world_dim
+        grid = np.array([dd['i'].val for dd in self.state_vals['data']]).reshape(world_dim, world_dim)
+        if with_mouse:
+            grid[self.mouse_pos] = MOUSE
 
-    grid = grid.copy()
-    x,y = [c[0] for c in np.where(grid==MOUSE)]
+        return grid
 
-    state_vals['ents'][0]['x'].val = float(y) + 0.5 # flip again to get back to original orientation
-    state_vals['ents'][0]['y'].val = float(x) + 0.5
+    def inner_grid(self, with_mouse=True):
+        "Get inner grid of the maze. Includes the mouse by default."
+        return inner_grid(self.full_grid(with_mouse=with_mouse))
 
-    grid[grid==MOUSE] = EMPTY
-    set_grid(state_vals, grid)
-
-    return state_vals
+    @property
+    def mouse_pos(self) -> Tuple[int, int]:
+        "Get (x, y) position of mouse in grid."
+        ents = self.state_vals['ents'][0]
+        # flipped turns out to be oriented right for grid.
+        return int(ents['y'].val), int(ents['x'].val)
 
 
-def set_grid(state_vals: StateValues, grid: np.ndarray):
-    "Set the grid of the maze."
-    assert (grid==MOUSE).sum() == 0, 'use set_grid_with_mouse'
-    world_dim = state_vals['world_dim'].val
-    assert grid.shape == (world_dim, world_dim)
-    for i, dd in enumerate(state_vals['data']):
-        dd['i'].val = int(grid.ravel()[i])
+    def set_grid(self, grid: np.ndarray, pad=False):
+        """
+        Set the grid of the maze.
+        """
+        if pad:
+            grid = outer_grid(grid, self.world_dim)
+        assert grid.shape == (self.world_dim, self.world_dim)
+
+        state_vals = self.state_vals
+        grid = grid.copy() # might need to remove mouse if in grid
+        if (grid==MOUSE).sum() > 0:
+            x, y = get_mouse_pos(grid)
+
+            state_vals['ents'][0]['x'].val = float(y) + 0.5 # flip again to get back to original orientation
+            state_vals['ents'][0]['y'].val = float(x) + 0.5
+
+            grid[x, y] = EMPTY
+
+        world_dim = state_vals['world_dim'].val
+        assert grid.shape == (world_dim, world_dim)
+        for i, dd in enumerate(state_vals['data']):
+            dd['i'].val = int(grid.ravel()[i])
+
+        self.state_bytes = _serialize_maze_state(state_vals)
+
+
+# ============== Grid helpers ==============
 
 
 def get_cheese_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
@@ -310,13 +331,6 @@ def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     num_mouses = (grid == MOUSE).sum()
     assert num_mouses == 1, f'{num_mouses} mice, should be 1'
     return tuple(ix[0] for ix in np.where(grid == MOUSE))
-
-
-def set_cheese_pos(grid: np.ndarray, x, y):
-    "Set the cheese position in the grid"
-    grid[grid == CHEESE] = EMPTY
-    assert grid[x, y] == EMPTY, f'grid[{x}, {y}]={grid[x, y]} should be EMPTY={EMPTY}'
-    grid[x, y] = CHEESE
 
 
 def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
@@ -344,7 +358,6 @@ def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
     if assert_:
         assert (inner_grid(outer, assert_=False) == grid).all()
     return outer
-
 
 
 def _get_neighbors(x, y):
@@ -544,6 +557,7 @@ def venv_editor(venv, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
+    # TODO: Hook venv so after reset it maintains the edited version
 
     from ipywidgets import VBox, HTML
 
@@ -551,25 +565,23 @@ def venv_editor(venv, **kwargs):
         def _cb(gridm: np.ndarray):
             if on_distribution(gridm, p=lambda *_: None):
                 print('Saving state to venv')
-                # if we have mice, use set_grid_with_mouse. otherwise just set the grid.
-                if (gridm == MOUSE).sum() > 0:
-                    set_grid_with_mouse(state_vals_list[i], gridm)
-                else:
-                    set_grid(state_vals_list[i], gridm)
-                state_bytes_list[i] = serialize_maze_state(state_vals_list[i])
-                venv.env.callmethod("set_state", state_bytes_list)
+                env_states[i].set_grid(gridm)
+                # FIXME: If the maze is edited externally this will break (state_vals_list is constant)
+                venv.env.callmethod("set_state", [vs.state_bytes for vs in env_states])
         return _cb
 
-    state_bytes_list = venv.env.callmethod("get_state")
-    state_vals_list = [parse_maze_state_bytes(sb) for sb in state_bytes_list]
-    gridm_list = [get_grid_with_mouse(sv) for sv in state_vals_list]
-    editors = [grid_editor(gridm_list[i], callback=make_cb(i), **kwargs) for i in range(len(gridm_list))]
+    env_states = [EnvState(sb) for sb in venv.env.callmethod("get_state")]
+    editors = [grid_editor(vs.full_grid(), callback=make_cb(i), **kwargs) for i, vs in enumerate(env_states)]
     elements = []
     for i in range(len(editors)):
         elements.append(editors[i])
         elements.append(HTML('<hr>'))
 
     return VBox(elements)
+
+
+
+# ================ Venv Wrappers ===================
 
 
 from envs.procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs

@@ -168,3 +168,5 @@ cython_debug/
 figs/*.png
 *.gif
 *.json
+.vscode
+*.code-workspace
