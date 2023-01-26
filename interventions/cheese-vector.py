@@ -19,17 +19,21 @@ import models
 import gatherdata
 
 # %%
-# Load model
-
-env = gatherdata.create_venv()
-
-model_dict = t.load('../../models/maze_I/model_rand_region_5.pth', map_location=t.device('cpu'))
-policy = models.CategoricalPolicy(
-    models.InterpretableImpalaModel(in_channels=env.observation_space.shape[0]),
-    env.action_space.n)
-policy.load_state_dict(model_dict['model_state_dict'])
+# Load two levels
+import pickle as pkl
+venv = pkl.load('../mazes/2.pkl') 
 
 # %%
+# Load model
+modelpath = '../../models/maze_I/model_rand_region_5.pth'
+device = t.device('cuda' if t.cuda.is_available() else 'cpu')
+
+action_size = 15 # lol
+env = gatherdata.create_venv()
+
+# Load model
+policy = models.load_policy(modelpath, action_size, device=device)
+
 # Hook the network and run this observation through a custom predict-like function
 hook = cmh.ModuleHook(policy)
 
@@ -50,15 +54,16 @@ hook.probe_with_input(obs, func=forward_func_policy)
 print(hook.values_by_label.keys())
 
 # Visualize a random intermediate activation, and the logits
-label = 'embedder.block2.maxpool_out'
+label = 'embedder.fc_out'
 value = hook.get_value_by_label(label)
 action_logits = hook.get_value_by_label('fc_policy_out').squeeze()
-px.imshow(value[0,0,...], title=label).show()
+# px.imshow(value[0,...], title=label).show()
 
 # Demonstrate ablating some values to zero, show impact on action logits
 # (Just ablate the first channel of the above activation as a test)
 mask = np.zeros_like(value, dtype=bool)
-mask[0,0,...] = True
+mask[0,...] = True
+
 patches = {label: cmh.PatchDef(
     t.from_numpy(mask),
     t.from_numpy(np.array([0.], dtype=np.float32)))}
@@ -74,3 +79,5 @@ fig.add_trace(go.Scatter(y=action_logits_patched, name='patched'))
 fig.update_layout(title="Action logits")
 fig.update_xaxes(tickvals=np.arange(len(action_logits)), ticktext=action_meanings)
 fig.show()
+
+# %%
