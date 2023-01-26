@@ -21,7 +21,18 @@ import gatherdata
 # %%
 # Load two levels
 import pickle as pkl
-venv = pkl.load('../mazes/2.pkl') 
+from procgen import ProcgenGym3Env
+import envs.maze as maze
+
+venv = ProcgenGym3Env(
+    num=2, env_name='maze', num_levels=1, start_level=0,
+    distribution_mode='hard', num_threads=1, render_mode="rgb_array",
+)
+venv = maze.wrap_venv(venv)
+
+with open('../mazes/2.pkl', 'rb') as f:
+    state_bytes = pkl.load(f) 
+venv.env.callmethod('set_state', state_bytes)
 
 # %%
 # Load model
