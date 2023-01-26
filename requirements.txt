@@ -8,6 +8,11 @@ ipywidgets==7.7.2 # vscode bug on v8
 procgen==0.10.7
 # einops # aspirational
 
+# Monte's code
+pandas==1.5.3
+circrl==0.0.1
+plotly==5.13.0
+
 
 # Build procgenAISC, not needed for now
 
