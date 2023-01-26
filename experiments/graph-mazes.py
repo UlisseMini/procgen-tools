@@ -3,8 +3,8 @@ import matplotlib.animation as animation
 
 import numpy as np
 from procgen import ProcgenGym3Env
-import envs.maze as maze
-from models import *
+from procgen_tools import maze
+from procgen_tools.models import *
 import torch as t
 from torch.distributions.categorical import Categorical
 from IPython import display

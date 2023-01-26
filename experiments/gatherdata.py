@@ -1,7 +1,7 @@
 from procgen import ProcgenGym3Env
 import torch
-import envs.maze as maze
-from models import load_policy
+from procgen_tools import maze
+from procgen_tools.models import load_policy
 from tqdm import tqdm
 import numpy as np
 import pickle
@@ -76,6 +76,6 @@ if __name__ == '__main__':
 
 
         # get basename of model file
-        with open(f'data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
+        with open(f'../episode_data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
             state = episode.__getstate__()
             pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)

@@ -10,12 +10,8 @@ import plotly.graph_objects as go
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
 import circrl.module_hook as cmh
-
-# This is a hack, we should make our shared repo into a python package we can install locally with
-# pip install -e
-import sys
-sys.path.append('../../procgen-tools')
-import models
+from procgen_tools import maze
+from procgen_tools.models import load_policy
 
 import gatherdata
 
@@ -23,8 +19,7 @@ import gatherdata
 # Load two levels
 import pickle as pkl
 from procgen import ProcgenGym3Env
-import envs.maze as maze
-import lovely_tensors as lt 
+import lovely_tensors as lt
 lt.monkey_patch()
 
 venv = ProcgenGym3Env(
@@ -39,7 +34,7 @@ venv.env.callmethod('set_state', state_bytes)
 
 # %%
 # Load model
-modelpath = '../../models/maze_I/model_rand_region_5.pth'
+modelpath = '../trained_models/model_rand_region_5.pth'
 device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
 action_size = 15 # lol
