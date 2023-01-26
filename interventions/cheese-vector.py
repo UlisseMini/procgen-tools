@@ -27,6 +27,8 @@ import envs.maze as maze
 import lovely_tensors as lt 
 lt.monkey_patch()
 
+import lovely_numpy as ln
+
 venv = ProcgenGym3Env(
     num=2, env_name='maze', num_levels=1, start_level=0,
     distribution_mode='hard', num_threads=1, render_mode="rgb_array",
@@ -43,10 +45,9 @@ modelpath = '../../models/maze_I/model_rand_region_5.pth'
 device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
 action_size = 15 # lol
-env = gatherdata.create_venv()
 
 # Load model
-policy = load_policy(modelpath, action_size, device=device)
+policy = models.load_policy(modelpath, action_size, device=device)
 
 # Hook the network and run this observation through a custom predict-like function
 hook = cmh.ModuleHook(policy)
@@ -57,8 +58,8 @@ def forward_func_policy(network, inp):
     return network.fc_policy(hidden)
 
 # Get initial observation, and show maze rendering
-obs = env.reset().astype(np.float32)  # Not sure why the env is returning a float64 object?
-render = env.render(mode='rgb_array')
+obs = venv.reset().astype(np.float32)  # Not sure why the venv is returning a float64 object?
+render = venv.render(mode='rgb_array')
 # px.imshow(render, title='Rendering').show()
 
 # Do an initial run of this observation through the network
@@ -78,22 +79,31 @@ action_logits = hook.get_value_by_label('fc_policy_out').squeeze()
 mask = np.zeros_like(value, dtype=bool)
 mask[0,...] = True
 
-activ_diff = value - value_patched
+# %%
+cheese, vanish = value[0,...], value[1,...]
+activ_diff = t.from_numpy(cheese - vanish).unsqueeze(0) # Add batch dimension
+#activ_diff=t.zeros_like(t.from_numpy(cheese)).unsqueeze(0) Even this doesn't work
 
+
+# %%
 patches = {label: cmh.PatchDef(
     t.from_numpy(mask),
-    t.from_numpy(np.array([0.], dtype=np.float32)))}
+    activ_diff)}
 # Run the patched probe
 hook.probe_with_input(obs,  func=forward_func_policy, patches=patches)
 value_patched = hook.get_value_by_label(label)
 action_logits_patched = hook.get_value_by_label('fc_policy_out').squeeze()
-# Plot results
-action_meanings = env.env.combos
-fig = go.Figure()
-fig.add_trace(go.Scatter(y=action_logits, name='original'))
-fig.add_trace(go.Scatter(y=action_logits_patched, name='patched'))
-fig.update_layout(title="Action logits")
-fig.update_xaxes(tickvals=np.arange(len(action_logits)), ticktext=action_meanings)
-fig.show()
 
+# Plot results
+action_meanings = venv.env.combos
+fig = go.Figure()
+fig.add_trace(go.Scatter(y=action_logits[0], name='original'))
+fig.add_trace(go.Scatter(y=action_logits_patched[1], name='patched'))
+fig.update_layout(title="Action logits")
+fig.update_xaxes(tickvals=np.arange(len(action_logits.shape[-1])), ticktext=action_meanings)
+fig.show()
+# %%
+action_logits.shape
+import matplotlib.pyplot as plt
+plt.imshow(venv.env.get_info()[1]['rgb'])
 # %%
