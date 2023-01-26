@@ -195,7 +195,7 @@ def human_readable_actions(c: Categorical) -> dict:
     """
     import numpy as np
     probs: np.ndarray = c.probs # type: ignore
-    return {act_name: probs[:, act_indexes].sum(1) for act_name, act_indexes in MAZE_ACTION_INDICES.items()}
+    return {act_name: probs[..., np.array(act_indexes)].sum(-1) for act_name, act_indexes in MAZE_ACTION_INDICES.items()}
 
 
 def load_policy(model_file: str, action_size: int, device = None) -> CategoricalPolicy:
