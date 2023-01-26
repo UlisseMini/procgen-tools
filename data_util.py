@@ -76,12 +76,8 @@ class Episode():
 
     @property
     @cache
-    def state_vals(self):
-        return maze.parse_maze_state_bytes(self.initial_state_bytes)
-
-    @cache
-    def outer_grid(self):
-        return maze.get_grid(self.state_vals)
+    def env_state(self) -> maze.EnvState:
+        return maze.EnvState(self.initial_state_bytes)
 
     @property
     def steps(self) -> int:
@@ -90,7 +86,7 @@ class Episode():
     @cache
     def grid(self, t=0):
         "Return the grid in inner coordinates, with the mouse at a specific timestep"
-        g = self.outer_grid().copy()
+        g = self.env_state.full_grid(with_mouse=False).copy()
         g[self.mouse_positions_outer[t]] = maze.MOUSE
         return maze.inner_grid(g)
 
@@ -99,7 +95,7 @@ class Episode():
     @cache
     def got_cheese(self) -> bool:
         "Checks if mouse is adjacent to cheese on last timestep, which is *almost always* the same as getting the cheese."
-        # TODO: Store got_cheese in gatherdata.py
+        # FIXME: Store got_cheese in gatherdata.py. This *isn't the same as getting the cheese*
         g = self.grid(t=-1)
         return (np.abs(np.array(maze.get_mouse_pos(g)) - np.array(maze.get_cheese_pos(g))).sum() == 1.).all()
 
