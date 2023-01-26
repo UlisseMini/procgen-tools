@@ -179,6 +179,17 @@ class CategoricalPolicy(nn.Module):
         return p, v
 
 
+def cat_to_human(c: Categorical) -> dict:
+    import numpy as np
+    probs: np.ndarray = c.probs # type: ignore
+    return {
+        "LEFT": probs[:, [0, 1, 2]].sum(1).numpy(),
+        "DOWN": probs[:, [3]].sum(1).numpy(),
+        "UP": probs[:, [5]].sum(1).numpy(),
+        "RIGHT": probs[:, [6, 7, 8]].sum(1).numpy(),
+        "NOOP": probs[:, [4,9,10,11,12,13,14]].sum(1).numpy(),
+    }
+
 
 def load_policy(model_file: str, action_size: int, device = None) -> CategoricalPolicy:
     assert type(action_size) == int
