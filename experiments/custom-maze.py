@@ -1,20 +1,12 @@
 # %%
-import sys, os
-COLAB = 'google.colab' in sys.modules 
-if COLAB and 'procgen-tools' not in os.getcwd():
-    os.system("git clone https://github.com/UlisseMini/procgen-tools")
-    os.chdir('procgen-tools')
-    # %pip install -r requirements.txt
-
-# %%
 # %load_ext autoreload
 # %matplotlib inline
 import matplotlib.pyplot as plt
 
 import numpy as np
 from procgen import ProcgenGym3Env
-import envs.maze as maze
-from models import load_policy
+from procgen_tools import maze
+from procgen_tools.models import load_policy
 import torch
 from IPython import display
 import pickle
