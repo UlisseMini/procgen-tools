@@ -1,6 +1,6 @@
 *.pth   # Pytorch models
-data/   # Pickle files from data gathering
-models/ # Saved models
+episode_data/   # Pickle files from data gathering
+trained_models/ # Saved models
 *.zip
 *.7z
 
