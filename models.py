@@ -179,7 +179,7 @@ class CategoricalPolicy(nn.Module):
         return p, v
 
 
-MAZE_ACITON_INDEXES = {
+MAZE_ACTION_INDICES = {
     'LEFT': [0, 1, 2],
     'DOWN': [3],
     'UP': [5],
@@ -188,10 +188,14 @@ MAZE_ACITON_INDEXES = {
 }
 
 
-def cat_to_human(c: Categorical) -> dict:
+def human_readable_actions(c: Categorical) -> dict:
+    """
+    Convert a categorical distribution to a human-readable dict of actions, with probabilities. 
+    The original action space is 15 actions, but we only care about 5 of them in this maze environment.
+    """
     import numpy as np
     probs: np.ndarray = c.probs # type: ignore
-    return {act_name: probs[:, act_indexes].sum(1) for act_name, act_indexes in MAZE_ACITON_INDEXES.items()}
+    return {act_name: probs[:, act_indexes].sum(1) for act_name, act_indexes in MAZE_ACTION_INDICES.items()}
 
 
 def load_policy(model_file: str, action_size: int, device = None) -> CategoricalPolicy:
