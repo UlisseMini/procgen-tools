@@ -28,7 +28,7 @@ venv = ProcgenGym3Env(
 )
 venv = maze.wrap_venv(venv)
 
-with open('../mazes/2.pkl', 'rb') as f:
+with open('mazes/2.pkl', 'rb') as f:
     state_bytes = pkl.load(f) 
 venv.env.callmethod('set_state', state_bytes)
 
@@ -73,7 +73,7 @@ action_logits = hook.get_value_by_label('fc_policy_out').squeeze()
 mask = np.zeros_like(value, dtype=bool)
 mask[0,...] = True
 
-activ_diff = value - value_patched
+# activ_diff = value - value_patched
 
 patches = {label: cmh.PatchDef(
     t.from_numpy(mask),

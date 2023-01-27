@@ -31,7 +31,7 @@ except FileNotFoundError:
     print('No ./saved-mazes.pkl file exists, using default envs')
         
 # download from https://drive.google.com/file/d/1db1qJn_ZM49CUcA1k7uSMdsdiAQ4eR5a/view?usp=share_link
-policy = load_policy('../models/maze_I/model_rand_region_5.pth', action_size=venv.action_space.n, device=t.device('cpu'))
+policy = load_policy('../trained_models/maze_I/model_rand_region_5.pth', action_size=venv.action_space.n, device=t.device('cpu'))
 
 done = np.zeros(venv.num_envs)
 obs = venv.reset()
