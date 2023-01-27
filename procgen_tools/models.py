@@ -179,6 +179,8 @@ class CategoricalPolicy(nn.Module):
         return p, v
 
 
+# TODO: We should probably move these to a separate file, this isn't model code.
+
 MAZE_ACTION_INDICES = {
     'LEFT': [0, 1, 2],
     'DOWN': [3],
@@ -187,10 +189,27 @@ MAZE_ACTION_INDICES = {
     'NOOP': [4,9,10,11,12,13,14],
 }
 
+# action deltas. we index from bottom left by (row, col)
+MAZE_ACTION_DELTAS = {
+    'LEFT': (0, -1),
+    'RIGHT': (0, 1),
+    'UP': (1, 0),
+    'DOWN': (-1, 0),
+    'NOOP': (0, 0),
+}
+
+def human_readable_action(act: int) -> str:
+    """
+    Convert an action index to a human-readable action name.
+    The original action space is 15 actions, but we only care about 5 of them in this maze environment.
+    """
+    assert act in range(15), f'{act} is not in range(15)'
+    return next(act_name for act_name, act_indexes in MAZE_ACTION_INDICES.items() if act in act_indexes)
+
 
 def human_readable_actions(c: Categorical) -> dict:
     """
-    Convert a categorical distribution to a human-readable dict of actions, with probabilities. 
+    Convert a categorical distribution to a human-readable dict of actions, with probabilities.
     The original action space is 15 actions, but we only care about 5 of them in this maze environment.
     """
     import numpy as np

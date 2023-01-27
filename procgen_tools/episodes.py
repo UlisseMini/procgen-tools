@@ -1,10 +1,12 @@
 import warnings
-from . import maze
+from . import maze, models
 from typing import List, Tuple
 from functools import cache
 import numpy as np
 from procgen import ProcgenGym3Env
 import pickle
+
+# FIXME: Memory limit on cache (possibly configurable)
 
 class Episode():
     """
@@ -44,6 +46,7 @@ class Episode():
         assert isinstance(self.extra, dict)
         assert isinstance(self.level_seed, int)
 
+        # FIXME: Should be equal to len(self.mouse_positions_outer), but gatherdata.py had a bug
         assert len(self.actions) == len(self.rewards) == len(self.mouse_positions_outer)-1
         assert all(isinstance(x, int) for x in self.actions)
         assert all(isinstance(x, float) for x in self.rewards)
@@ -94,9 +97,9 @@ class Episode():
     @property
     @cache
     def got_cheese(self) -> bool:
-        "Checks if mouse is adjacent to cheese on last timestep, which is *almost always* the same as getting the cheese."
-        # FIXME: Store got_cheese in gatherdata.py. This *isn't the same as getting the cheese*
+        "Checks if mouse got the cheese. Currently a hack, will fix when we re-run gatherdata."
         g = self.grid(t=-1)
+        # previously we checked if the mouse was adjacent to the cheese
         return (np.abs(np.array(maze.get_mouse_pos(g)) - np.array(maze.get_cheese_pos(g))).sum() == 1.).all()
 
 
