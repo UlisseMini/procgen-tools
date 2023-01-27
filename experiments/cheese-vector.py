@@ -77,10 +77,13 @@ zero = {label: cmh.PatchDef(
 duplicate = {label: cmh.PatchDef(
     mask,
     t.from_numpy(value[0,...]))}
+cheese_vanish_diff = {label: cmh.PatchDef(
+    mask,
+    t.from_numpy(value[0,...] - value[1,...]).unsqueeze(0))}
 
 # Run the patched probes
-for name, patches in zip(('zero patch', 'cheese patch'), (zero, duplicate)):
-    hook.probe_with_input(obs,  func=forward_func_policy, patches=patches)
+for name, patches in zip(('zero patch', 'cheese patch', '(cheese - vanish) patch'), (zero, duplicate, cheese_vanish_diff)):
+    hook.probe_with_input(obs, func=forward_func_policy, patches=patches)
     value_patched = hook.get_value_by_label(label)
     action_logits_patched = hook.get_value_by_label('fc_policy_out').squeeze()
     if name == 'cheese patch': 
