@@ -62,16 +62,17 @@ if __name__ == '__main__':
                 act = p.probs.argmax(dim=-1).numpy()
             else:
                 act = p.sample().numpy()
+
             obs, rew, done, info = venv.step(act)
+            rewards.append(float(rew[0]))
+            actions.append(int(act[0]))
             if done:
-                # IMPORTANT: we don't update episode here. otherwise we'll log the last frame (a new level)
+                # IMPORTANT: we don't update mouse_positions here, otherwise we'd log the new episode.
                 break
 
             states_bytes = venv.env.callmethod('get_state')[0]
             states_vals = maze.parse_maze_state_bytes(states_bytes)
 
-            rewards.append(float(rew[0]))
-            actions.append(int(act[0]))
             mouse_positions_outer.append(maze.get_mouse_pos_sv(states_vals))
 
 
