@@ -114,7 +114,7 @@ def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
     patches = {activation_label: lambda outp: outp - diff_coeff*cheese_diff}
 
     DETERMINISTIC = False
-    MAX_STEPS = 200
+    MAX_STEPS = 400
     action_logits_label = 'fc_policy_out'
 
     for mode in ('original', 'patched'):
@@ -133,7 +133,7 @@ def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
             vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
             display(Video(vid_fn, embed=True))
             
-            vidpath = path_prefix + f'videos/{level}-{mode}-{diff_coeff}.mp4'
+            vidpath = path_prefix + f'videos/lvl-{level}-{mode}{"-" + str(diff_coeff) if mode == "patched" else ""}.mp4'
             clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=fps)
             clip.write_videofile(vidpath, logger=None)
 
