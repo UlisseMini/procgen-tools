@@ -120,7 +120,7 @@ def logits_to_action_plot(logits, title=''):
     # Get px imshow of the logits, with the action labels, showing the title
 
 # Get patching function 
-def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpath: str = '', display_bl: bool = True, vanished=False):
+def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpath: str = '', display_bl: bool = True, vanished=False, steps: int = 1000):
     """
     Subtract coeff*(values[0, ...] - values[1, ...]) from the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
     """
@@ -131,13 +131,11 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpat
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
     cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
-
     patches = {activation_label: lambda outp: outp - coeff*cheese_diff}
 
-    mode = 'patched' if coeff != 0 else 'unpatched'
     env = copy_venv(venv, 1 if vanished else 0)
     with hook.use_patches(patches):
-        seq, _, _ = cro.run_rollout(predict, env, max_steps=250, deterministic=False)
+        seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
 
     hook.probe_with_input(seq.obs.astype(np.float32))
     action_logits = hook.get_value_by_label('fc_policy_out')
@@ -145,7 +143,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpat
     if display_bl:
         logits_to_action_plot(action_logits, title=activation_label)
         
-        vidpath = path_prefix + f'videos/{rand_region}/lvl-{levelpath}-{coeff}.mp4'
+        vidpath = path_prefix + f'videos/{rand_region}/lvl:{levelpath}_coeff:{coeff}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
         clip.write_videofile(vidpath, logger=None)
         display(Video(vidpath, embed=True))
@@ -165,20 +163,23 @@ def get_values(seed:int, label:str, hook: cmh.ModuleHook):
     hook.probe_with_input(obs, func=forward_func_policy)
     return hook.get_value_by_label(label)
 
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values:Optional[np.ndarray]=None, label='embedder.block2.res1.resadd_out'):
+def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
     """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = venv_patch_pair(seed) 
 
     # Get values if not provided
     if values is None:
         values = get_values(seed, label, hook)
+        value_src = seed 
+    else:
+        values, value_src = values
 
     # Show behavior on the level without cheese
-    patch_layer(hook, values, 0, label, venv, levelpath=f'vanished-{seed}', display_bl=display_bl, vanished=True)
+    patch_layer(hook, values, 0, label, venv, levelpath=f'{seed}-vanished', display_bl=display_bl, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
         # hook.probe_with_input(obs, func=forward_func_policy) # TODO does this have to be reset?
-        patch_layer(hook, values, coeff, label, venv, levelpath=seed, display_bl=display_bl, vanished=False)
+        patch_layer(hook, values, coeff, label, venv, levelpath=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
 
         # Wait for input from jupyter notebook
         # print(f"Finished {seed} {diff_coeff}")
@@ -193,15 +194,27 @@ for seed in range(50):
 # %% 
 # Try using one patch for many levels at different strengths
 venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
-values = get_values(0, label, hook)
+value_seed = 0
+values = get_values(value_seed, label, hook) 
 
 for seed in range(20):  
-    run_seed(seed, hook, diff_coeffs, values=values)
+    run_seed(seed, hook, [1,5,10], values=(values, str(value_seed)))
 
 # %% 
-# Try all labels 
+# Average diff over a bunch of seeds
+values = np.zeros_like(get_values(0, label, hook))
+seeds = slice(10e5,10e5+50)
+for seed in range(seeds):
+    values += get_values(seed, label, hook)
+values /= len(seeds)
+
+for seed in range(20):
+    run_seed(seed, hook, [1,5,10], values=(values, f'avg from {seeds.start} to {seeds.stop}'))
+
+# %% 
+# Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 for label in labels: 
-    run_seed(0, hook, diff_coeffs, label=label)
+    run_seed(0, hook, [1], label=label)
 
 # %%
