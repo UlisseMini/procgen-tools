@@ -96,12 +96,10 @@ def logits_to_action_plot(logits, title=''):
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
     # Get px imshow of the logits, with the action labels, showing the title
 
-diff_coeff = 100
-
 # Get patching function 
-def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
+def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpath: str = '', display_bl: bool = True):
     """
-    Subtract (values[0, ...] - values[1, ...]) from the activations at label given by activation_label. Plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Assumes existence of global "diff_coeff" variable. Saves movie at "videos/lvl-{level}-patched-{diff_coeff}.mp4".
+    Subtract coeff*(values[0, ...] - values[1, ...]) from the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
     """
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
 
@@ -111,31 +109,23 @@ def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
 
     cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
 
-    patches = {activation_label: lambda outp: outp - diff_coeff*cheese_diff}
+    patches = {activation_label: lambda outp: outp - coeff*cheese_diff}
 
-    DETERMINISTIC = False
-    MAX_STEPS = 200
-    action_logits_label = 'fc_policy_out'
+    mode = 'patched' if coeff != 0 else 'unpatched'
+    env = copy_venv(venv, 0)
+    with hook.use_patches(patches):
+        seq, _, _ = cro.run_rollout(predict, env, max_steps=250, deterministic=False)
 
-    for mode in ('original', 'patched'):
-        env = copy_venv(venv, 0)
-        if mode == 'patched':
-            with hook.use_patches(patches):
-                seq, _, _ = cro.run_rollout(predict, env, max_steps=MAX_STEPS, deterministic=DETERMINISTIC)
-        else:
-            seq, _, _ = cro.run_rollout(predict, env, max_steps=MAX_STEPS, deterministic=DETERMINISTIC)
+    hook.probe_with_input(seq.obs.astype(np.float32))
+    action_logits = hook.get_value_by_label('fc_policy_out')
 
-        hook.probe_with_input(seq.obs.astype(np.float32))
-        action_logits = hook.get_value_by_label(action_logits_label)
-
-        if mode == 'patched':
-            logits_to_action_plot(action_logits, title=activation_label)
-            vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
-            display(Video(vid_fn, embed=True))
-            
-            vidpath = path_prefix + f'videos/lvl-{level}-{mode}{"-" + str(diff_coeff) if mode == "patched" else ""}.mp4'
-            clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=fps)
-            clip.write_videofile(vidpath, logger=None)
+    if display_bl:
+        logits_to_action_plot(action_logits, title=activation_label)
+        
+        vidpath = path_prefix + f'videos/lvl-{levelpath}-{coeff}.mp4'
+        clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
+        clip.write_videofile(vidpath, logger=None)
+        display(Video(vidpath, embed=True))
 
 # %%
 # Sweep all levels using patches gained from each level
@@ -144,15 +134,16 @@ def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
 label = 'embedder.block2.res1.resadd_out'
+diff_coeffs = (0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000)
 
-for diff_coeff in (1, 2, 3, 5, 10, 20, 50, 100, 1000):
+for diff_coeff in diff_coeffs:
     for mazename in ('0', '0-rev', '2'):
         venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
         obs = venv.reset().astype(np.float32)
 
         hook.probe_with_input(obs, func=forward_func_policy)
         values = hook.get_value_by_label(label)
-        patch_layer(hook, values, label, venv, level=mazename)
+        patch_layer(hook, values, diff_coeff, label, venv, levelpath=mazename, display_bl=True)
 
 # %% 
 # Try using one patch for many levels at different strengths
@@ -170,10 +161,10 @@ hook.probe_with_input(obs, func=forward_func_policy)
 values = hook.get_value_by_label(label)
 
 for diff_coeff in (1, 2, 3, 5, 10, 20):
-    for mazename in ('0',): 
+    for mazename in ('0',):  # TODO find way to save video for unpatched behavior on vanished level
         venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
         # hook.probe_with_input(obs, func=forward_func_policy)
-        patch_layer(hook, values, label, venv, level=f'{mazename}-fixed-{fixed_value_source}')
+        patch_layer(hook, values, diff_coeff, label, venv, levelpath=f'{mazename}-fixed-{fixed_value_source}')
 
 # %% 
 # Try all labels 
