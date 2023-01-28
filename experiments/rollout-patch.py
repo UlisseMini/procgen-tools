@@ -149,10 +149,6 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
         display(Video(vidpath, embed=True))
 
 
-# %%
-label = 'embedder.block2.res1.resadd_out'
-diff_coeffs = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000]
-hook = cmh.ModuleHook(policy)
 
 # %% 
 # Infrastructure for running different kinds of seeds
@@ -186,36 +182,40 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
         # if in_jupyter:
         #     input("Press Enter to continue...")
 
-# %%
-# Sweep all levels using patches gained from each level
-for seed in range(50):
-    run_seed(seed, hook, diff_coeffs)
-
 # %% EXPERIMENTS
+label = 'embedder.block2.res1.resadd_out'
+diff_coeffs = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000]
+interesting_coeffs = [0,1,2,3,4,5,10]
+hook = cmh.ModuleHook(policy)
+
 # %% 
 # Try using one patch for many levels at different strengths
 venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
 value_seed = 0
 values_tup = get_values(value_seed, label, hook) 
+# %%
+# Sweep all levels using patches gained from each level
+for seed in range(50):
+    run_seed(seed, hook, diff_coeffs)
+
 
 for seed in range(20):  
-    run_seed(seed, hook, [1,5,10], values_tup=(values_tup, str(value_seed)))
+    run_seed(seed, hook, interesting_coeffs, values_tup=(values_tup, str(value_seed)))
 
 # %% 
 # Average diff over a bunch of seeds
-values = np.zeros_like(get_values(0, label, hook))
-seeds = slice(10e5,10e5+50)
-for seed in range(seeds):
+values = np.zeros_like(get_values(0, label, hook)[0])
+seeds = slice(int(10e5),int(10e5+50))
+# Iterate over range specified by slice
+for seed in range(seeds.start, seeds.stop):
     values += get_values(seed, label, hook)[0]
-values /= len(seeds)
+values /= seeds.stop - seeds.start
 
 for seed in range(20):
-    run_seed(seed, hook, [1,5,10], values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+    run_seed(seed, hook, interesting_coeffs, values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
 # %% 
 # Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 for label in labels: 
     run_seed(0, hook, [1], label=label)
-
-# %%
