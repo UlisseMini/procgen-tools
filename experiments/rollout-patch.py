@@ -113,6 +113,8 @@ def patch_layer(hook, values, activation_label: str, venv):
 
     cheese = values[0,...]
     no_cheese = values[1,...]
+    assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
+
     cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
 
     patches = {activation_label: lambda outp: outp - cheese_diff}
@@ -131,9 +133,10 @@ def patch_layer(hook, values, activation_label: str, venv):
 
         hook.probe_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label(action_logits_label)
-        # logits_to_action_plot(action_logits, title=activation_label)
-        vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
-        # display(Video(vid_fn, embed=True))
+        if len(seq.obs) > 1:
+            logits_to_action_plot(action_logits, title=activation_label)
+            vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
+            display(Video(vid_fn, embed=True))
 
 # %%
 hook = cmh.ModuleHook(policy)
@@ -144,15 +147,21 @@ hook.probe_with_input(obs, func=forward_func_policy)
 
 # Try all labels 
 labels = list(hook.values_by_label.keys())
-for label in labels[1:]:
-    if label == 'embedder.block1.maxpool_out': break 
+for label in labels: # block2 res2 resadoutt seems promising somehow?
+    # if label == 'embedder.block1.maxpool_out': break 
     values = hook.get_value_by_label(label)
-    print(values[:,0,:5,:5])
     patch_layer(hook, values, label, venv)
+
+    mask = obs[0] != obs[1]
+    masked_img = obs[0] * mask  
+    import matplotlib.pyplot as plt
+    masked_img = rearrange(masked_img, 'c w h -> w h c')
+    # plt.imshow(masked_img)
+    # plt.show()
     # for i in range(2):
-    #     img = rearrange(obs[i], 'c w h -> w h c')
+    #     
     #     # Show the image
-    #     import matplotlib.pyplot as plt
+    #    
     #     plt.imshow(img)
     #     plt.show()
     hook.probe_with_input(obs, func=forward_func_policy)
