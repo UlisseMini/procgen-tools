@@ -101,7 +101,7 @@ diff_coeff = 100
 # Get patching function 
 def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
     """
-    Subtract (values[0, ...] - values[1, ...]) from the activations at label given by activation_label. Plot using logits_to_action_plot and video of rollout in the first environment specified by venv. 
+    Subtract (values[0, ...] - values[1, ...]) from the activations at label given by activation_label. Plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Assumes existence of global "diff_coeff" variable. Saves movie at "videos/lvl-{level}-patched-{diff_coeff}.mp4".
     """
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
 
