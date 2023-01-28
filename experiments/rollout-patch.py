@@ -114,7 +114,7 @@ def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
     patches = {activation_label: lambda outp: outp - diff_coeff*cheese_diff}
 
     DETERMINISTIC = False
-    MAX_STEPS = 400
+    MAX_STEPS = 200
     action_logits_label = 'fc_policy_out'
 
     for mode in ('original', 'patched'):
@@ -138,20 +138,42 @@ def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
             clip.write_videofile(vidpath, logger=None)
 
 # %%
+# Sweep all levels using patches gained from each level
 hook = cmh.ModuleHook(policy)
 def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
 label = 'embedder.block2.res1.resadd_out'
 
-for diff_coeff in (1, 2, 3, 5, 10, 20, 50, 100, 1000, 10000):
-    for mazename in ('0', '0-rev', '2'): # Compare across both files
+for diff_coeff in (1, 2, 3, 5, 10, 20, 50, 100, 1000):
+    for mazename in ('0', '0-rev', '2'):
         venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
         obs = venv.reset().astype(np.float32)
 
         hook.probe_with_input(obs, func=forward_func_policy)
         values = hook.get_value_by_label(label)
         patch_layer(hook, values, label, venv, level=mazename)
+
+# %% 
+# Try using one patch for many levels at different strengths
+hook = cmh.ModuleHook(policy)
+def forward_func_policy(network, inp):
+    hidden = network.embedder(inp)
+    return network.fc_policy(hidden)
+label = 'embedder.block2.res1.resadd_out'
+
+fixed_value_source = '0-rev'
+venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
+obs = venv.reset().astype(np.float32)
+
+hook.probe_with_input(obs, func=forward_func_policy)
+values = hook.get_value_by_label(label)
+
+for diff_coeff in (1, 2, 3, 5, 10, 20):
+    for mazename in ('0',): 
+        venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
+        # hook.probe_with_input(obs, func=forward_func_policy)
+        patch_layer(hook, values, label, venv, level=f'{mazename}-fixed-{fixed_value_source}')
 
 # %% 
 # Try all labels 
