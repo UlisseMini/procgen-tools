@@ -120,7 +120,7 @@ def logits_to_action_plot(logits, title=''):
     # Get px imshow of the logits, with the action labels, showing the title
 
 # Get patching function 
-def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpath: str = '', display_bl: bool = True, vanished=False, steps: int = 1000):
+def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', display_bl: bool = True, vanished=False, steps: int = 1000):
     """
     Subtract coeff*(values[0, ...] - values[1, ...]) from the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
     """
@@ -143,7 +143,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpat
     if display_bl:
         logits_to_action_plot(action_logits, title=activation_label)
         
-        vidpath = path_prefix + f'videos/{rand_region}/lvl:{levelpath}_coeff:{coeff}.mp4'
+        vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
         clip.write_videofile(vidpath, logger=None)
         display(Video(vidpath, embed=True))
@@ -161,25 +161,25 @@ def get_values(seed:int, label:str, hook: cmh.ModuleHook):
     venv = venv_patch_pair(seed) 
     obs = venv.reset().astype(np.float32)
     hook.probe_with_input(obs, func=forward_func_policy)
-    return hook.get_value_by_label(label)
+    return hook.get_value_by_label(label), seed
 
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
-    """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
+def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
+    """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = venv_patch_pair(seed) 
 
     # Get values if not provided
-    if values is None:
+    if values_tup is None:
         values = get_values(seed, label, hook)
         value_src = seed 
     else:
-        values, value_src = values
+        values, value_src = values_tup
 
     # Show behavior on the level without cheese
-    patch_layer(hook, values, 0, label, venv, levelpath=f'{seed}-vanished', display_bl=display_bl, vanished=True, steps=steps)
+    patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
         # hook.probe_with_input(obs, func=forward_func_policy) # TODO does this have to be reset?
-        patch_layer(hook, values, coeff, label, venv, levelpath=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
+        patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
 
         # Wait for input from jupyter notebook
         # print(f"Finished {seed} {diff_coeff}")
@@ -191,25 +191,26 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
 for seed in range(50):
     run_seed(seed, hook, diff_coeffs)
 
+# %% EXPERIMENTS
 # %% 
 # Try using one patch for many levels at different strengths
 venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
 value_seed = 0
-values = get_values(value_seed, label, hook) 
+values_tup = get_values(value_seed, label, hook) 
 
 for seed in range(20):  
-    run_seed(seed, hook, [1,5,10], values=(values, str(value_seed)))
+    run_seed(seed, hook, [1,5,10], values_tup=(values_tup, str(value_seed)))
 
 # %% 
 # Average diff over a bunch of seeds
 values = np.zeros_like(get_values(0, label, hook))
 seeds = slice(10e5,10e5+50)
 for seed in range(seeds):
-    values += get_values(seed, label, hook)
+    values += get_values(seed, label, hook)[0]
 values /= len(seeds)
 
 for seed in range(20):
-    run_seed(seed, hook, [1,5,10], values=(values, f'avg from {seeds.start} to {seeds.stop}'))
+    run_seed(seed, hook, [1,5,10], values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
 # %% 
 # Try all labels for a fixed seed and diff_coeff
