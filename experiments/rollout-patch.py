@@ -1,8 +1,5 @@
 # %%
 # Imports
-# %reload_ext autoreload
-# %autoreload 2
-
 import numpy as np
 import pandas as pd
 import torch as t
@@ -12,6 +9,7 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
@@ -67,13 +65,7 @@ def load_venv_from_file(path: str):
     venv.step = _step
     return venv
 
-venv = load_venv_from_file('mazes/2.pkl')
-
-# Get initial observation, and show maze rendering
-obs = venv.reset().astype(np.float32)  # Not sure why the venv is returning a float64 object?
-
 # Load model
-
 policy = models.load_policy(path_prefix + 'trained_models/maze_I/model_rand_region_15.pth', 15,
     t.device('cpu'))
 
@@ -104,8 +96,10 @@ def logits_to_action_plot(logits, title=''):
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
     # Get px imshow of the logits, with the action labels, showing the title
 
+diff_coeff = 100
+
 # Get patching function 
-def patch_layer(hook, values, activation_label: str, venv):
+def patch_layer(hook, values, activation_label: str, venv, level: str = ''):
     """
     Subtract (values[0, ...] - values[1, ...]) from the activations at label given by activation_label. Plot using logits_to_action_plot and video of rollout in the first environment specified by venv. 
     """
@@ -117,10 +111,10 @@ def patch_layer(hook, values, activation_label: str, venv):
 
     cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
 
-    patches = {activation_label: lambda outp: outp - cheese_diff}
+    patches = {activation_label: lambda outp: outp - diff_coeff*cheese_diff}
 
     DETERMINISTIC = False
-    MAX_STEPS = 50
+    MAX_STEPS = 200
     action_logits_label = 'fc_policy_out'
 
     for mode in ('original', 'patched'):
@@ -133,37 +127,39 @@ def patch_layer(hook, values, activation_label: str, venv):
 
         hook.probe_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label(action_logits_label)
-        if len(seq.obs) > 1:
+
+        if mode == 'patched':
             logits_to_action_plot(action_logits, title=activation_label)
             vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
             display(Video(vid_fn, embed=True))
+            
+            vidpath = path_prefix + f'videos/{level}-{mode}-{diff_coeff}.mp4'
+            clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=fps)
+            clip.write_videofile(vidpath, logger=None)
 
 # %%
 hook = cmh.ModuleHook(policy)
 def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
-hook.probe_with_input(obs, func=forward_func_policy)
+label = 'embedder.block2.res1.resadd_out'
 
+for diff_coeff in (1, 2, 3, 5, 10, 20, 50, 100, 1000, 10000):
+    for mazename in ('0', '0-rev', '2'): # Compare across both files
+        venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
+        obs = venv.reset().astype(np.float32)
+
+        hook.probe_with_input(obs, func=forward_func_policy)
+        values = hook.get_value_by_label(label)
+        patch_layer(hook, values, label, venv, level=mazename)
+
+# %% 
 # Try all labels 
 labels = list(hook.values_by_label.keys())
 for label in labels: # block2 res2 resadoutt seems promising somehow?
     # if label == 'embedder.block1.maxpool_out': break 
     values = hook.get_value_by_label(label)
     patch_layer(hook, values, label, venv)
-
-    mask = obs[0] != obs[1]
-    masked_img = obs[0] * mask  
-    import matplotlib.pyplot as plt
-    masked_img = rearrange(masked_img, 'c w h -> w h c')
-    # plt.imshow(masked_img)
-    # plt.show()
-    # for i in range(2):
-    #     
-    #     # Show the image
-    #    
-    #     plt.imshow(img)
-    #     plt.show()
     hook.probe_with_input(obs, func=forward_func_policy)
 
 # %%
