@@ -55,7 +55,7 @@ def forward_func_policy(network, inp):
 hook.probe_with_input(obs, func=forward_func_policy)
 
 # Visualize a random intermediate activation, and the logits
-label = 'embedder.res2.conv1'
+label = 'embedder.fc_out'
 value = hook.get_value_by_label(label)
 action_logits = hook.get_value_by_label('fc_policy_out').squeeze()
 # px.imshow(value[0,...], title=label).show()
