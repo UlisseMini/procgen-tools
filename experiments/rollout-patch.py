@@ -78,13 +78,7 @@ policy = models.load_policy(path_prefix + 'trained_models/maze_I/model_rand_regi
     t.device('cpu'))
 
 
-hook = cmh.ModuleHook(policy)
-def forward_func_policy(network, inp):
-    hidden = network.embedder(inp)
-    return network.fc_policy(hidden)
-hook.probe_with_input(obs, func=forward_func_policy)
 
-# print(hook.values_by_label.keys())
 
 # %% 
 # Custom predict function to match rollout expected interface, uses
@@ -111,35 +105,56 @@ def logits_to_action_plot(logits, title=''):
     # Get px imshow of the logits, with the action labels, showing the title
 
 # Get patching function 
-def patch_layer(hook, activation_label: str, venv):
+def patch_layer(hook, values, activation_label: str, venv):
     """
-    Add the cheese-diff patch to the activations of the given layer. Plot using logits_to_action_plot and video of rollout. 
+    Subtract (values[0, ...] - values[1, ...]) from the activations at label given by activation_label. Plot using logits_to_action_plot and video of rollout in the first environment specified by venv. 
     """
-    print(f'=====Patching layer {activation_label}=====')
-    value = hook.get_value_by_label(activation_label)
-    cheese_diff = value[0,...] - value[1,...] # Add this to activation_label's activations during forward passes
+    assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
+
+    cheese = values[0,...]
+    no_cheese = values[1,...]
+    cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
 
     patches = {activation_label: lambda outp: outp - cheese_diff}
 
     DETERMINISTIC = False
-    MAX_STEPS = 100
+    MAX_STEPS = 50
     action_logits_label = 'fc_policy_out'
 
     for mode in ('original', 'patched'):
         env = copy_venv(venv, 0)
         if mode == 'patched':
-            with hook.patch(patches):
+            with hook.use_patches(patches):
                 seq, _, _ = cro.run_rollout(predict, env, max_steps=MAX_STEPS, deterministic=DETERMINISTIC)
         else:
             seq, _, _ = cro.run_rollout(predict, env, max_steps=MAX_STEPS, deterministic=DETERMINISTIC)
 
         hook.probe_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label(action_logits_label)
-        logits_to_action_plot(action_logits, title=f'Original logits for env {i}')
+        # logits_to_action_plot(action_logits, title=activation_label)
         vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)
-        display(Video(vid_fn, embed=True))
+        # display(Video(vid_fn, embed=True))
 
 # %%
+hook = cmh.ModuleHook(policy)
+def forward_func_policy(network, inp):
+    hidden = network.embedder(inp)
+    return network.fc_policy(hidden)
+hook.probe_with_input(obs, func=forward_func_policy)
+
 # Try all labels 
-for label in hook.values_by_label.keys():
-    patch_layer(hook, label, venv)
+labels = list(hook.values_by_label.keys())
+for label in labels[1:]:
+    if label == 'embedder.block1.maxpool_out': break 
+    values = hook.get_value_by_label(label)
+    print(values[:,0,:5,:5])
+    patch_layer(hook, values, label, venv)
+    # for i in range(2):
+    #     img = rearrange(obs[i], 'c w h -> w h c')
+    #     # Show the image
+    #     import matplotlib.pyplot as plt
+    #     plt.imshow(img)
+    #     plt.show()
+    hook.probe_with_input(obs, func=forward_func_policy)
+
+# %%
