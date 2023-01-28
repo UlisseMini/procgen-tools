@@ -38,9 +38,9 @@ except NameError:
 
 path_prefix = '../' if in_jupyter else ''
 
-def create_venv(num: int):
+def create_venv(num: int, start_level: int = 0, num_levels: int = 1):
     venv = ProcgenGym3Env(
-        num=num, env_name='maze', num_levels=1, start_level=0,
+        num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
         distribution_mode='hard', num_threads=1, render_mode="rgb_array",
     )
     venv = maze.wrap_venv(venv)
@@ -53,6 +53,23 @@ def copy_venv(venv, idx: int):
     env = create_venv(num=1)
     env.env.callmethod("set_state", [sb])
     return env
+
+
+def venv_patch_pair(seed: int):
+    "Return a venv of 2 environments from a seed, one with cheese, one without cheese"
+    venv = create_venv(num=2, start_level=seed)
+    state_bytes_list = venv.env.callmethod("get_state")[1]
+    state = maze.EnvState(state_bytes_list[1])
+
+    # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
+    grid = state.full_grid()
+    grid[grid == maze.CHEESE] = 0
+    state.set_grid(grid)
+    state_bytes_list[1] = state.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+
+    return venv
+
 
 def load_venv_from_file(path: str):
     venv = create_venv(num=2)
@@ -127,23 +144,28 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, levelpat
         clip.write_videofile(vidpath, logger=None)
         display(Video(vidpath, embed=True))
 
+label = 'embedder.block2.res1.resadd_out'
+diff_coeffs = (0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000)
+
 # %%
 # Sweep all levels using patches gained from each level
 hook = cmh.ModuleHook(policy)
 def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
-label = 'embedder.block2.res1.resadd_out'
-diff_coeffs = (0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000)
 
 for diff_coeff in diff_coeffs:
-    for mazename in ('0', '0-rev', '2'):
-        venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
+    for seed in range(num):
+        venv = load_venv_from_file('mazes/lvl-num-'+seed+'.pkl')
         obs = venv.reset().astype(np.float32)
 
         hook.probe_with_input(obs, func=forward_func_policy)
         values = hook.get_value_by_label(label)
-        patch_layer(hook, values, diff_coeff, label, venv, levelpath=mazename, display_bl=True)
+        patch_layer(hook, values, diff_coeff, label, venv, levelpath=seed, display_bl=True)
+        # Wait for input from jupyter notebook
+        print(f"Finished {seed} {diff_coeff}")
+        if in_jupyter:
+            input("Press Enter to continue...")
 
 # %% 
 # Try using one patch for many levels at different strengths
@@ -151,7 +173,6 @@ hook = cmh.ModuleHook(policy)
 def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
-label = 'embedder.block2.res1.resadd_out'
 
 fixed_value_source = '0-rev'
 venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
@@ -161,10 +182,10 @@ hook.probe_with_input(obs, func=forward_func_policy)
 values = hook.get_value_by_label(label)
 
 for diff_coeff in (1, 2, 3, 5, 10, 20):
-    for mazename in ('0',):  # TODO find way to save video for unpatched behavior on vanished level
-        venv = load_venv_from_file('mazes/lvl-num-'+mazename+'.pkl')
+    for seed in ('0',):  
+        venv = load_venv_from_file(f'mazes/lvl-num-'+seed+'.pkl')
         # hook.probe_with_input(obs, func=forward_func_policy)
-        patch_layer(hook, values, diff_coeff, label, venv, levelpath=f'{mazename}-fixed-{fixed_value_source}')
+        patch_layer(hook, values, diff_coeff, label, venv, levelpath=f'{seed}-fixed-{fixed_value_source}')
 
 # %% 
 # Try all labels 
