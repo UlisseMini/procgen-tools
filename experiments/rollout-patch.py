@@ -158,15 +158,20 @@ hook = cmh.ModuleHook(policy)
 
 # %% 
 # Infrastructure for running different kinds of seeds
+def get_values(seed:int, label:str, hook: cmh.ModuleHook):
+    """ Get the cheese/no-cheese activations for the given seed. """
+    venv = venv_patch_pair(seed) 
+    obs = venv.reset().astype(np.float32)
+    hook.probe_with_input(obs, func=forward_func_policy)
+    return hook.get_value_by_label(label)
+
 def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values:Optional[np.ndarray]=None, label='embedder.block2.res1.resadd_out'):
     """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = venv_patch_pair(seed) 
 
     # Get values if not provided
     if values is None:
-        obs = venv.reset().astype(np.float32)
-        hook.probe_with_input(obs, func=forward_func_policy)
-        values = hook.get_value_by_label(label)
+        values = get_values(seed, label, hook)
 
     # Show behavior on the level without cheese
     patch_layer(hook, values, 0, label, venv, levelpath=f'vanished-{seed}', display_bl=display_bl, vanished=True)
@@ -187,13 +192,8 @@ for seed in range(50):
 
 # %% 
 # Try using one patch for many levels at different strengths
-
-fixed_value_source = '0-rev'
 venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
-obs = venv.reset().astype(np.float32)
-
-hook.probe_with_input(obs, func=forward_func_policy)
-values = hook.get_value_by_label(label)
+values = get_values(0, label, hook)
 
 for seed in range(20):  
     run_seed(seed, hook, diff_coeffs, values=values)
@@ -201,7 +201,7 @@ for seed in range(20):
 # %% 
 # Try all labels 
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
-for label in labels: # block2 res2 resadoutt seems promising somehow?
+for label in labels: 
     run_seed(0, hook, diff_coeffs, label=label)
 
 # %%
