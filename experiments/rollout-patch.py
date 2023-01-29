@@ -38,7 +38,7 @@ try:
 except NameError:
     in_jupyter = False
 
-rand_region = 15
+rand_region = 5
 path_prefix = '../' if in_jupyter else ''
 
 def create_venv(num: int, start_level: int = 0, num_levels: int = 1):
@@ -145,7 +145,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
         vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
         clip.write_videofile(vidpath, logger=None)
-        # display(Video(vidpath, embed=True))
+        display(Video(vidpath, embed=True))
 
 
 
@@ -217,6 +217,18 @@ for seed in range(20):
 values = t.rand_like(t.from_numpy(get_values(0, label, hook)[0])).numpy()
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'garbage'))
+
+# %% Try adding the cheese vector 
+# Average diff over a bunch of seeds
+values = np.zeros_like(get_values(0, label, hook)[0])
+seeds = slice(int(10e5),int(10e5+100))
+# Iterate over range specified by slice
+for seed in range(seeds.start, seeds.stop):
+    # Make values be rolling average of values from seeds
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + get_values(seed, label, hook)[0]/(seed-seeds.start+1)
+for seed in range(20):
+    run_seed(seed, hook, -1 * np.array(interesting_coeffs), values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+
 
 # %% 
 # Try all labels for a fixed seed and diff_coeff
