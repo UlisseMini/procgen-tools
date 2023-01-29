@@ -117,7 +117,6 @@ def logits_to_action_plot(logits, title=''):
     prob_dict = models.human_readable_actions(t.distributions.categorical.Categorical(probs=prob))
     prob_dist = t.stack(list(prob_dict.values()))
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
-    # Get px imshow of the logits, with the action labels, showing the title
 
 # Get patching function 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', display_bl: bool = True, vanished=False, steps: int = 1000):
@@ -141,7 +140,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
     action_logits = hook.get_value_by_label('fc_policy_out')
 
     if display_bl:
-        logits_to_action_plot(action_logits, title=activation_label)
+        # logits_to_action_plot(action_logits, title=activation_label)
         
         vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
@@ -165,8 +164,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
 
     # Get values if not provided
     if values_tup is None:
-        values = get_values(seed, label, hook)
-        value_src = seed 
+        values, value_src = get_values(seed, label, hook)
     else:
         values, value_src = values_tup
 
@@ -185,37 +183,56 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
 # %% EXPERIMENTS
 label = 'embedder.block2.res1.resadd_out'
 diff_coeffs = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000]
-interesting_coeffs = [0,1,2,3,4,5,10]
+interesting_coeffs = [0,1,2,3,4,5,10,50,200]
 hook = cmh.ModuleHook(policy)
+
 
 # %% 
 # Try using one patch for many levels at different strengths
-venv = load_venv_from_file(f'mazes/lvl-num-{fixed_value_source}.pkl')
 value_seed = 0
 values_tup = get_values(value_seed, label, hook) 
+
+for seed in range(20):  
+    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+
 # %%
 # Sweep all levels using patches gained from each level
 for seed in range(50):
     run_seed(seed, hook, diff_coeffs)
 
-
-for seed in range(20):  
-    run_seed(seed, hook, interesting_coeffs, values_tup=(values_tup, str(value_seed)))
-
 # %% 
 # Average diff over a bunch of seeds
 values = np.zeros_like(get_values(0, label, hook)[0])
-seeds = slice(int(10e5),int(10e5+50))
+seeds = slice(int(10e5),int(10e5+100))
 # Iterate over range specified by slice
 for seed in range(seeds.start, seeds.stop):
-    values += get_values(seed, label, hook)[0]
-values /= seeds.stop - seeds.start
+    # Make values be rolling average of values from seeds
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + get_values(seed, label, hook)[0]/(seed-seeds.start+1)
 
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+
+# %% 
+# Generate a random values vector and then patch it in
+values = t.rand_like(t.from_numpy(get_values(0, label, hook)[0])).numpy()
+for seed in range(20):
+    run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'garbage'))
+
+# %% Try adding the cheese vector 
+# Average diff over a bunch of seeds
+values = np.zeros_like(get_values(0, label, hook)[0])
+seeds = slice(int(10e5),int(10e5+100))
+# Iterate over range specified by slice
+for seed in range(seeds.start, seeds.stop):
+    # Make values be rolling average of values from seeds
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + get_values(seed, label, hook)[0]/(seed-seeds.start+1)
+for seed in range(20):
+    run_seed(seed, hook, -1 * np.array(interesting_coeffs), values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+
 
 # %% 
 # Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 for label in labels: 
     run_seed(0, hook, [1], label=label)
+
