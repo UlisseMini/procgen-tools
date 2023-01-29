@@ -187,6 +187,14 @@ MAZE_ACTION_INDICES = {
     'NOOP': [4,9,10,11,12,13,14],
 }
 
+# action deltas. we index from bottom left by (row, col)
+MAZE_ACTION_DELTAS = {
+    'LEFT': (0, -1),
+    'RIGHT': (0, 1),
+    'UP': (1, 0),
+    'DOWN': (-1, 0),
+    'NOOP': (0, 0),
+}
 
 def human_readable_actions(c: Categorical) -> dict:
     """
