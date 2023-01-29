@@ -1,7 +1,7 @@
 # %%
 # Imports
 
-from procgen_tools import models, maze
+from . import models, maze
 import matplotlib.pyplot as plt
 from procgen import ProcgenGym3Env
 import torch
@@ -62,18 +62,6 @@ def plot_vector_field(venv, policy, env_num=0):
     plt.quiver([x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions], [x[1] for x in arrows], [x[0] for x in arrows], color='red')
     plt.imshow(grid, origin='lower')
     # plt.imshow(venv.env.get_info()[0]['rgb'])
-
-# %%
-
-
-policy = models.load_policy(f'../trained_models/maze_I/model_rand_region_5.pth', 15, torch.device('cpu'))
-venv = ProcgenGym3Env(num=2, start_level=0, num_levels=0, env_name='maze', distribution_mode='hard', num_threads=1, render_mode='rgb_array')
-venv = maze.wrap_venv(venv)
-obs = venv.reset()
-
-for i in range(venv.num_envs):
-    plot_vector_field(venv, policy, i=i)
-    plt.show()
 
 
 # %%
