@@ -1,7 +1,7 @@
 # Custom
 *.pth
-episode_data/
-trained_models/
+episode_data/*
+trained_models/*
 *.zip
 *.7z
 

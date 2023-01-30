@@ -15,8 +15,9 @@ import pickle
 # %%
 # num is the number of environments to create in the vec env
 # num_levels is the number of levels to sample from (0 for infinite, 1 for deterministic)
+lvl_num = 0
 venv = ProcgenGym3Env(
-    num=3, env_name='maze', num_levels=1, start_level=0,
+    num=2, env_name='maze', num_levels=1, start_level=lvl_num,
     distribution_mode='hard', num_threads=1, render_mode="rgb_array",
 )
 venv = maze.wrap_venv(venv)
@@ -51,7 +52,7 @@ for i in range(obs.shape[0]):
 maze.venv_editor(venv)
 
 # %%
-with open('./saved-mazes.pkl', 'wb') as f:
+with open(f'../mazes/lvl-num-{lvl_num}-rev.pkl', 'wb') as f:
     pickle.dump(venv.env.callmethod("get_state"), f)
 
 # %% [markdown]
@@ -67,7 +68,7 @@ if COLAB:
 
 # %%
 # download from https://drive.google.com/file/d/1db1qJn_ZM49CUcA1k7uSMdsdiAQ4eR5a/view?usp=share_link
-policy = load_policy('../models/maze_I/model_rand_region_5.pth', action_size=venv.action_space.n, device=torch.device('cpu'))
+policy = load_policy('../trained_models/maze_I/model_rand_region_5.pth', action_size=venv.action_space.n, device=torch.device('cpu'))
 
 
 # %%
