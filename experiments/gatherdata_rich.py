@@ -1,5 +1,6 @@
 import os
 import random
+import copy
 
 import torch as t
 from tqdm.auto import tqdm
@@ -40,11 +41,11 @@ def get_maze_dataset(policy, policy_desc, num_episodes, num_timesteps, seed=42,
     # Maze state getter function to pass to run_rollout
     # (make all args kwargs so calling order doesn't matter)
     def get_maze_state(env=None, **kwargs):
-        return env.env.callmethod('get_state')[0]
+        return copy.deepcopy(env.env.callmethod('get_state')[0])
     # Logit getter function to pass to run_rollout
     # (make all args kwargs so calling order doesn't matter)
     def get_action_logits(predict_extra=None, **kwargs):
-        return predict_extra[0]
+        return predict_extra[0].copy()
     # Function to remove renders from the seq object to save space
     # (Modifies in-place, returns ref)
     def remove_renders_from_seq(seq):
