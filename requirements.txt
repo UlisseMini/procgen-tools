@@ -11,7 +11,7 @@ procgen==0.10.7
 
 # Monte's code
 pandas==1.5.3
-circrl==0.0.1
+circrl>=0.0.3
 plotly==5.13.0
 
 
