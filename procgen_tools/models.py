@@ -198,6 +198,7 @@ MAZE_ACTION_DELTAS = {
     'NOOP': (0, 0),
 }
 
+
 def human_readable_action(act: int) -> str:
     """
     Convert an action index to a human-readable action name.

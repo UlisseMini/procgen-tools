@@ -20,7 +20,7 @@ def create_venv(num_levels = 1, start_level = 0):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--model_file', type=str, default='./models/model_200015872.pth')
+    parser.add_argument('--model_file', type=str, default='./trained_models/model_200015872.pth')
     parser.add_argument('--num_timesteps', type=int, default=256, help='maximum timesteps per episode')
     parser.add_argument('--num_episodes', type=int, default=1000, help='number of episodes to collect (agent finishes or times out)')
     parser.add_argument('--argmax', action='store_true', help='argmax logits instead of sampling. often gets stuck, but when successful has less jittering')
