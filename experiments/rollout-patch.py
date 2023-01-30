@@ -10,15 +10,17 @@ import plotly as py
 import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
-from IPython.display import Video, display
+from IPython.display import Video, display, clear_output
+from ipywidgets import Text, interact
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+import matplotlib.pyplot as plt
 
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
 import circrl.module_hook as cmh
 import circrl.rollouts as cro
 
-from procgen_tools import maze
+from procgen_tools import maze, vfield
 from procgen_tools.models import load_policy
 import procgen_tools.models as models
 
@@ -142,11 +144,18 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
     if display_bl:
         # logits_to_action_plot(action_logits, title=activation_label)
         
-        vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
-        clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
-        clip.write_videofile(vidpath, logger=None)
-        display(Video(vidpath, embed=True))
+        # vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
+        # clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
+        # clip.write_videofile(vidpath, logger=None)
+        # display(Video(vidpath, embed=True))
 
+        plt.gca().set_title("Vector field of original network")
+        vfield.plot_vector_field(venv, hook.network)
+        plt.show()
+        with hook.use_patches(patches):
+            plt.gca().set_title("Vector field of patched network")
+            vfield.plot_vector_field(venv, hook.network)
+            plt.show()
 
 
 # %% 
@@ -169,16 +178,46 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
         values, value_src = values_tup
 
     # Show behavior on the level without cheese
-    patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
+    # patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
         # hook.probe_with_input(obs, func=forward_func_policy) # TODO does this have to be reset?
+        display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
 
         # Wait for input from jupyter notebook
         # print(f"Finished {seed} {diff_coeff}")
         # if in_jupyter:
         #     input("Press Enter to continue...")
+
+
+def plot_patched_vfield(seed: int, coeff: float):
+    values, _ = get_values(seed, label, hook)
+    cheese = values[0,...]
+    no_cheese = values[1,...]
+    assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
+
+    cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
+    patches = {label: lambda outp: outp - coeff*cheese_diff}
+
+    vanished = False # is the cheese there?
+    venv = copy_venv(venv_patch_pair(seed), 1 if vanished else 0)
+
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+    # remove axis ticks from images
+    for a in ax:
+        a.set_xticks([])
+        a.set_yticks([])
+
+    ax[0].set_xlabel("Original vfield")
+    vfield.plot_vector_field(venv, hook.network, ax=ax[0])
+    with hook.use_patches(patches):
+        ax[1].set_xlabel("Patched vfield")
+        vfield.plot_vector_field(venv, hook.network, ax=ax[1])
+
+    fig.suptitle(f"Level {seed} coeff {coeff}")
+    return fig, ax
+
 
 # %% EXPERIMENTS
 label = 'embedder.block2.res1.resadd_out'
@@ -192,8 +231,31 @@ hook = cmh.ModuleHook(policy)
 value_seed = 0
 values_tup = get_values(value_seed, label, hook) 
 
-for seed in range(20):  
+for seed in range(0):  
     run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+
+# %%
+# Interactive mode
+
+from ipywidgets import interact, IntSlider, fixed, FloatSlider
+
+@interact
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1)):
+    fig, _ = plot_patched_vfield(seed, coeff)
+    plt.show()
+
+# %%
+# Save figures for a bunch of (seed, coeff) pairs
+
+import itertools
+seeds = range(10)
+coeffs = [-2, -1, -0.5, 0.5, 1, 2]
+for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
+    fig, _ = plot_patched_vfield(seed, coeff)
+    fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png")
+    plt.clf()
+    plt.close()
+
 
 # %%
 # Sweep all levels using patches gained from each level

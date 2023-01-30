@@ -29,12 +29,10 @@ def set_mouse_pos(venv, pos, env_num=0):
 # %%
 # Plot vector field for every mouse position
 
-def plot_vector_field(venv, policy, env_num=0):
+def plot_vector_field(venv, policy, env_num=0, ax=None):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
-    i = env_num
-
     # really stupid way to do this tbh, should use numpy somehow
     def tmul(tup: tuple, s: float):
         return tuple(s * x for x in tup)
@@ -43,7 +41,7 @@ def plot_vector_field(venv, policy, env_num=0):
 
     arrows = []
 
-    plt.clf()
+    ax = ax if ax is not None else plt.gca()
 
     grid = maze.EnvState(venv.env.callmethod('get_state')[env_num]).inner_grid(with_mouse=False)
     legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
@@ -51,17 +49,18 @@ def plot_vector_field(venv, policy, env_num=0):
         set_mouse_pos(venv, pos, env_num)
         obs = venv.reset()
 
-        c, _ = policy(torch.Tensor(obs[env_num]).unsqueeze(0))
+        with torch.no_grad():
+            c, _ = policy(torch.Tensor(obs[env_num]).unsqueeze(0))
         probs_dict = models.human_readable_actions(c)
         probs_dict = {k: v[0].item() for k, v in probs_dict.items()}
         deltas = [tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
         arrows.append(tadd(*deltas))
 
 
-    # plt.quiver(legal_mouse_positions, arrows, color='red')
-    plt.quiver([x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions], [x[1] for x in arrows], [x[0] for x in arrows], color='red')
-    plt.imshow(grid, origin='lower')
-    # plt.imshow(venv.env.get_info()[0]['rgb'])
+    # ax.quiver(legal_mouse_positions, arrows, color='red')
+    ax.quiver([x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions], [x[1] for x in arrows], [x[0] for x in arrows], color='red')
+    ax.imshow(grid, origin='lower')
+    # ax.imshow(venv.env.get_info()[0]['rgb'])
 
 
 # %%
@@ -71,10 +70,12 @@ def plot_vector_field(venv, policy, env_num=0):
 if __name__ == '__main__':
     from tqdm import tqdm
 
-    policy = models.load_policy(f'../trained_models/maze_I/model_rand_region_5.pth', 15, torch.device('cpu'))
+    rand_region = 5
+    policy = models.load_policy(f'../trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, torch.device('cpu'))
     venv = ProcgenGym3Env(num=10, start_level=0, num_levels=0, env_name='maze', distribution_mode='hard', num_threads=1, render_mode='rgb_array')
     venv = maze.wrap_venv(venv)
     for i in tqdm(range(venv.num_envs)):
+        plt.clf()
         plot_vector_field(venv, policy, env_num=i)
         plt.savefig(f'../figures/maze_{i}_vfield.png')
         plt.close()
