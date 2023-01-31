@@ -5,7 +5,7 @@
 import warnings
 from procgen_tools import maze
 from typing import List, Tuple
-from functools import cache
+from functools import lru_cache
 import numpy as np
 from procgen import ProcgenGym3Env
 import pickle
@@ -79,7 +79,7 @@ class Episode():
         self.assert_valid()
 
     @property
-    @cache
+    @lru_cache(maxsize=100)
     def env_state(self) -> maze.EnvState:
         return maze.EnvState(self.initial_state_bytes)
 
@@ -87,7 +87,7 @@ class Episode():
     def steps(self) -> int:
         return len(self.mouse_positions_outer)
 
-    @cache
+    @lru_cache(maxsize=100)
     def grid(self, t=0):
         "Return the grid in inner coordinates, with the mouse at a specific timestep"
         g = self.env_state.full_grid(with_mouse=False).copy()
@@ -96,7 +96,7 @@ class Episode():
 
 
     @property
-    @cache
+    @lru_cache(maxsize=100)
     def got_cheese(self) -> bool:
         "Checks if mouse is adjacent to cheese on last timestep, which is *almost always* the same as getting the cheese."
         # FIXME: Store got_cheese in gatherdata.py. This *isn't the same as getting the cheese*
