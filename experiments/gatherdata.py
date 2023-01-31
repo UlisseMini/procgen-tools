@@ -13,7 +13,7 @@ def create_venv(num_levels = 1, start_level = 0):
     venv = ProcgenGym3Env(
         num=1,
         env_name='maze', num_levels=num_levels, start_level=start_level,
-        distribution_mode='hard', num_threads=4, render_mode="rgb_array",
+        distribution_mode='hard', num_threads=1, render_mode="rgb_array",
     )
     venv = maze.wrap_venv(venv)
     return venv
