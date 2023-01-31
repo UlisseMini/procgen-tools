@@ -68,12 +68,13 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     plt.clf()
     plt.close()
 # %% Custom value source
-seed = 10
+seed = 0
 venv = get_custom_venv_pair(seed=seed)
-obs = venv.reset()
+# %%
+venv.reset()
 values = values_from_venv(venv, hook, label)
 
-run_seed(seed, hook, interesting_coeffs, values_tup=(values, seed))
+patch_layer(hook, values, -.5, label, venv, steps=1)
 
 # %% Sweep all levels using patches gained from each level
 for seed in range(50):

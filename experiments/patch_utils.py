@@ -110,9 +110,9 @@ def get_patches(values: np.ndarray, coeff: float, label: str):
     cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
     return {label: lambda outp: outp + coeff*cheese_diff}
 
-def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 1000):
+def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
-    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
+    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed}-{coeff}.mp4", where rand_region is a global int.
     """
     # Custom predict function to match rollout expected interface, uses
     # the hooked network so it is patchable
@@ -144,8 +144,8 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
 
     if show_vfield:
         # Make a side-by-side subplot of the two vector fields
-        plt.figure(figsize=(10, 5))
-        plt.title(f"{activation_label} activations at coefficient {coeff}")
+        fig = plt.figure(figsize=(10, 5))
+        fig.title(f"{activation_label} activations at coefficient {coeff}")
         # Make the subplots 
         plt.subplot(1, 2, 1)
         plt.gca().set_title("Vector field of original network")
@@ -182,7 +182,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
 
     for coeff in diff_coeffs:
         display(Text(f'Patching with coeff {coeff} seed {seed}'))
-        patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', show_video=display_bl, vanished=False, steps=steps)
+        patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', show_video=display_bl, steps=steps)
 
 
 def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook):
