@@ -61,7 +61,7 @@ def copy_venv(venv, idx: int):
     return env
 
 
-def venv_patch_pair(seed: int):
+def get_cheese_venv_pair(seed: int):
     "Return a venv of 2 environments from a seed, one with cheese, one without cheese"
     venv = create_venv(num=2, start_level=seed)
     state_bytes_list = venv.env.callmethod("get_state")
@@ -76,6 +76,11 @@ def venv_patch_pair(seed: int):
 
     return venv
 
+def get_custom_venv_pair(seed: int):
+    """ Allow the user to edit two levels from a seed. Return a venv containing both environments. """
+    venv = create_venv(num=2, start_level=seed)
+    maze.venv_editor(venv)
+    return venv
 
 def load_venv_from_file(path: str):
     venv = create_venv(num=2)
@@ -127,15 +132,9 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
     Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
     """
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
-
-    cheese = values[0,...]
-    no_cheese = values[1,...]
-    assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
-
-    cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
-    patches = {activation_label: lambda outp: outp + coeff*cheese_diff}
-
     env = copy_venv(venv, 1 if vanished else 0)
+    
+    patches = get_patches(values, coeff, label=activation_label)
     with hook.use_patches(patches):
         seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
 
@@ -161,19 +160,32 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
 
 # %% 
 # Infrastructure for running different kinds of seeds
-def get_values(seed:int, label:str, hook: cmh.ModuleHook):
-    """ Get the cheese/no-cheese activations for the given seed. """
-    venv = venv_patch_pair(seed) 
-    obs = venv.reset().astype(np.float32)
+def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, label: str, forward_func):
+    """ Get the values of the activations at label for the given venv. """
+    obs = venv.reset().astype(np.float32) # TODO why reset?
     hook.probe_with_input(obs, func=forward_func_policy)
-    return hook.get_value_by_label(label), seed
+    return hook.get_value_by_label(label)
+
+def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
+    """ Get the activations at the label for the given seed. Returns both the cached values and the seed. """
+    venv = get_cheese_venv_pair(seed) 
+    return values_from_venv(venv, hook, label, forward_func_policy)
+
+def get_patches(values: np.ndarray, coeff: float, label: str):
+    """ Get a patch function that patches the activations at label with coeff*(values[0, ...] - values[1, ...]). """
+    cheese = values[0,...]
+    no_cheese = values[1,...]
+    assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
+
+    cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
+    return {label: lambda outp: outp + coeff*cheese_diff}
 
 def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
     """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
-    venv = venv_patch_pair(seed) 
+    venv = get_cheese_venv_pair(seed) 
 
     # Get values if not provided
-    values, value_src = get_values(seed, label, hook) if values_tup is None else values_tup
+    values, value_src = (cheese_diff_values(seed, label, hook), seed) if values_tup is None else values_tup
 
     # Show behavior on the level without cheese
     # patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
@@ -182,17 +194,17 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
         display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
 
-def plot_patched_vfield(seed: int, coeff: float):
+def plot_patched_vfield(seed: int, coeff: float, label: str):
+    """ Plot the vector field of the original and patched network. """
     values, _ = get_values(seed, label, hook)
     cheese = values[0,...]
     no_cheese = values[1,...]
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
-    cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
-    patches = {label: lambda outp: outp - coeff*cheese_diff}
+    cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
+    patches = {label: lambda outp: outp + coeff*cheese_diff}
 
-    vanished = False # is the cheese there?
-    venv = copy_venv(venv_patch_pair(seed), 1 if vanished else 0)
+    venv = copy_venv(get_cheese_venv_pair(seed), 0) # Get env where cheese is present
 
     fig, ax = plt.subplots(1,2, figsize=(10,5))
     # remove axis ticks from images
@@ -206,7 +218,7 @@ def plot_patched_vfield(seed: int, coeff: float):
         ax[1].set_xlabel("Patched vfield")
         vfield.plot_vector_field(venv, hook.network, ax=ax[1])
 
-    fig.suptitle(f"Level {seed} coeff {coeff}")
+    fig.suptitle(f"Level: {seed}, coeff: {coeff}, layer: {label}")
     return fig, ax
 
 # %%
@@ -215,22 +227,22 @@ def plot_patched_vfield(seed: int, coeff: float):
 from ipywidgets import interact, IntSlider, fixed, FloatSlider
 
 @interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1)):
-    fig, _ = plot_patched_vfield(seed, coeff)
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1), label=fixed('embedder.block2.res1.resadd_out'), hook=fixed(hook), patches=fixed(patches)):
+    fig, _ = plot_patched_vfield(seed, label, hook, patches)
     plt.show()
 
 # %% 
 label = 'embedder.block2.res1.resadd_out'
-interesting_coeffs = np.linspace(-3,3,10) # NOTE may break assumption that one of these is 0
+interesting_coeffs = np.linspace(-3,3,10) 
 hook = cmh.ModuleHook(policy)
 
 
 # %% RUN ABOVE here
 # Try using one patch for many levels at different strengths
 value_seed = 0
-values_tup = get_values(value_seed, label, hook) 
+values_tup = cheese_diff_values(value_seed, label, hook), value_seed
 
-for seed in range(0):  
+for seed in range(1):  
     run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
 
 # %%
@@ -238,7 +250,10 @@ for seed in range(0):
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-    fig, _ = plot_patched_vfield(seed, coeff)
+    values = cheese_diff_values(seed, label, hook)
+    patches = get_patches(values, coeff, label)
+
+    fig, _ = plot_patched_vfield(seed, label, hook, patches)
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png")
     plt.clf()
     plt.close()
@@ -253,32 +268,32 @@ for seed in range(50):
 
 # %% 
 # Average diff over a bunch of seeds
-values = np.zeros_like(get_values(0, label, hook)[0])
+values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 # Iterate over range specified by slice
 for seed in range(seeds.start, seeds.stop):
     # Make values be rolling average of values from seeds
-    values = (seed-seeds.start)/(seed-seeds.start+1)*values + get_values(seed, label, hook)[0]/(seed-seeds.start+1)
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
 
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
 # %% 
 # Generate a random values vector and then patch it in
-values = t.rand_like(t.from_numpy(get_values(0, label, hook)[0])).numpy()
+values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'garbage'))
 
-# %% Try adding the cheese vector 
+# %%  
 # Average diff over a bunch of seeds
-values = np.zeros_like(get_values(0, label, hook)[0])
+values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 # Iterate over range specified by slice
 for seed in range(seeds.start, seeds.stop):
     # Make values be rolling average of values from seeds
-    values = (seed-seeds.start)/(seed-seeds.start+1)*values + get_values(seed, label, hook)[0]/(seed-seeds.start+1)
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
 for seed in range(20):
-    run_seed(seed, hook, -1 * np.array(interesting_coeffs), values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+    run_seed(seed, hook, np.array(interesting_coeffs), values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
 
 # %% 
