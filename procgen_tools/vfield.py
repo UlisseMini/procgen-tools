@@ -1,7 +1,7 @@
 # %%
 # Imports
 
-from . import models, maze
+from procgen_tools import models, maze
 import matplotlib.pyplot as plt
 from procgen import ProcgenGym3Env
 import torch
@@ -14,14 +14,19 @@ def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
 
+def set_mouse_pos_env_state(state, pos):
+    return state
+
 def set_mouse_pos(venv, pos, env_num=0):
-    "FIXME: This should be in a library, and this should be two lines."
+    "FIXME: This should be in a library, and this should be two lines with more enlightened APIs."
     state_bytes_list = venv.env.callmethod('get_state')
+
     state = maze.EnvState(state_bytes_list[env_num])
     grid = state.inner_grid(with_mouse=False)
     assert grid[pos] == maze.EMPTY
     grid[pos] = maze.MOUSE
     state.set_grid(grid, pad=True)
+
     state_bytes_list[env_num] = state.state_bytes
     venv.env.callmethod('set_state', state_bytes_list)
 
@@ -65,7 +70,6 @@ def plot_vector_field(venv, policy, env_num=0, ax=None):
 
 # %%
 # Load policy and maze, then plot vector field for a bunch of mazes
-# FIXME(uli): There's a memory leak in plot_vector_field, num_envs=100 barely works on my 16GB machine.
 
 if __name__ == '__main__':
     from tqdm import tqdm

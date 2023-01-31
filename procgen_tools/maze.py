@@ -11,7 +11,7 @@ import struct
 import typing
 from typing import Tuple, Dict, Callable, List
 from dataclasses import dataclass
-from functools import cache
+from functools import lru_cache
 import numpy as np
 import heapq
 
@@ -165,7 +165,7 @@ MAZE_STATE_DICT_TEMPLATE = [
 
 
 
-@cache
+@lru_cache(maxsize=100)
 def _parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
