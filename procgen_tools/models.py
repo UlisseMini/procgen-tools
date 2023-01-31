@@ -181,6 +181,8 @@ class CategoricalPolicy(nn.Module):
 
 # TODO: We should probably move these to a separate file, this isn't model code.
 
+# DO NOT CHANGE ORDERING IN DICTS. ORDERING MATTERS. FILES DEPEND ON IT.
+
 MAZE_ACTION_INDICES = {
     'LEFT': [0, 1, 2],
     'DOWN': [3],
