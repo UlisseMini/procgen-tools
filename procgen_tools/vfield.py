@@ -32,21 +32,20 @@ def set_mouse_pos(venv, pos, env_num=0):
 
 
 # %%
-# Plot vector field for every mouse position
+# Get vector field
 
-def plot_vector_field(venv, policy, env_num=0, ax=None):
+# really stupid way to do this tbh, should use numpy somehow
+def _tmul(tup: tuple, s: float):
+    return tuple(s * x for x in tup)
+def _tadd(*tups):
+    return tuple(sum(axis) for axis in zip(*tups))
+
+
+def vector_field(venv, policy, env_num=0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
-    # really stupid way to do this tbh, should use numpy somehow
-    def tmul(tup: tuple, s: float):
-        return tuple(s * x for x in tup)
-    def tadd(*tups):
-        return tuple(sum(axis) for axis in zip(*tups))
-
     arrows = []
-
-    ax = ax if ax is not None else plt.gca()
 
     grid = maze.EnvState(venv.env.callmethod('get_state')[env_num]).inner_grid(with_mouse=False)
     legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
@@ -58,14 +57,34 @@ def plot_vector_field(venv, policy, env_num=0, ax=None):
             c, _ = policy(torch.Tensor(obs[env_num]).unsqueeze(0))
         probs_dict = models.human_readable_actions(c)
         probs_dict = {k: v[0].item() for k, v in probs_dict.items()}
-        deltas = [tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
-        arrows.append(tadd(*deltas))
+        deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
+        arrows.append(_tadd(*deltas))
 
+
+    # make vfield object for returning
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid}
+
+
+
+# %%
+# Plot vector field for every mouse position
+
+
+def plot_vector_field(venv, policy, env_num=0, ax=None):
+    """
+    Plot the vector field induced by the policy on the maze in venv env number i.
+    """
+    vf = vector_field(venv, policy, env_num=env_num)
+    arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
+
+    ax = ax if ax is not None else plt.gca()
 
     # ax.quiver(legal_mouse_positions, arrows, color='red')
     ax.quiver([x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions], [x[1] for x in arrows], [x[0] for x in arrows], color='red')
     ax.imshow(grid, origin='lower')
     # ax.imshow(venv.env.get_info()[0]['rgb'])
+
+    return vf
 
 
 # %%
