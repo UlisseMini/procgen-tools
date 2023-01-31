@@ -35,7 +35,7 @@ coeffs = [-3, -2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2, 3]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     fig, _, obj = plot_patched_vfield(seed, coeff, label, hook)
     name = f"seed-{seed}_coeff-{coeff}_rr-{rand_region}_label-{label}"
-    with open(f'{path_prefix}data/vfields/{name}.pkl.gz', 'wb') as fp:
+    with open(f'{path_prefix}data/vfields/{name}.pkl', 'wb') as fp:
         pickle.dump(obj, fp)
 
     fig.savefig(f"{path_prefix}figures/{name}.png")
