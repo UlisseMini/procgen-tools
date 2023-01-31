@@ -12,6 +12,7 @@ from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
 from ipywidgets import Text, interact
+import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
 
@@ -123,7 +124,7 @@ def logits_to_action_plot(logits, title=''):
 # Get patching function 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', display_bl: bool = True, vanished=False, steps: int = 1000):
     """
-    Subtract coeff*(values[0, ...] - values[1, ...]) from the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
+    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/lvl-{seed}-{coeff}.mp4".
     """
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
 
@@ -132,7 +133,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
     cheese_diff = cheese - no_cheese # Subtract this from activation_label's activations during forward passes
-    patches = {activation_label: lambda outp: outp - coeff*cheese_diff}
+    patches = {activation_label: lambda outp: outp + coeff*cheese_diff}
 
     env = copy_venv(venv, 1 if vanished else 0)
     with hook.use_patches(patches):
@@ -218,22 +219,6 @@ def plot_patched_vfield(seed: int, coeff: float):
     fig.suptitle(f"Level {seed} coeff {coeff}")
     return fig, ax
 
-
-# %% EXPERIMENTS
-label = 'embedder.block2.res1.resadd_out'
-diff_coeffs = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000]
-interesting_coeffs = [0,1,2,3,4,5,10,50,200]
-hook = cmh.ModuleHook(policy)
-
-
-# %% 
-# Try using one patch for many levels at different strengths
-value_seed = 0
-values_tup = get_values(value_seed, label, hook) 
-
-for seed in range(0):  
-    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
-
 # %%
 # Interactive mode
 
@@ -244,10 +229,22 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     fig, _ = plot_patched_vfield(seed, coeff)
     plt.show()
 
+# %% 
+label = 'embedder.block2.res1.resadd_out'
+interesting_coeffs = np.linspace(-3,3,10) # NOTE may break assumption that one of these is 0
+hook = cmh.ModuleHook(policy)
+
+
+# %% RUN ABOVE here
+# Try using one patch for many levels at different strengths
+value_seed = 0
+values_tup = get_values(value_seed, label, hook) 
+
+for seed in range(0):  
+    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+
 # %%
 # Save figures for a bunch of (seed, coeff) pairs
-
-import itertools
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
@@ -256,11 +253,13 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     plt.clf()
     plt.close()
 
+# %% 
+# Try different activations
 
 # %%
 # Sweep all levels using patches gained from each level
 for seed in range(50):
-    run_seed(seed, hook, diff_coeffs)
+    run_seed(seed, hook, interesting_coeffs)
 
 # %% 
 # Average diff over a bunch of seeds
