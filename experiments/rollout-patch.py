@@ -75,8 +75,6 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 seed = 0
 venv = get_custom_venv_pair(seed=seed)
 
-# %% Save the maze
-mazename = input("Enter mazename: ")
 # %% Compute values
 # venv = get_cheese_venv_pair(seed=0)
 values = values_from_venv(venv, hook, label)
