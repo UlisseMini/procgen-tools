@@ -1,3 +1,7 @@
+# %% Don't have to restart kernel and reimport each time you modify a dependency
+%reload_ext autoreload
+%autoreload 2
+
 # %%
 # Imports
 from typing import List, Tuple, Dict, Union, Optional, Callable
@@ -36,9 +40,9 @@ path_prefix = '../' if in_jupyter else ''
 policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15,
     t.device('cpu'))
 
-# %% 
+# %% Experiment parameters
 label = 'embedder.block2.res1.resadd_out'
-interesting_coeffs = np.linspace(-3,3,10) 
+interesting_coeffs = np.linspace(-2/3,2/3,10) 
 hook = cmh.ModuleHook(policy)
 
 # RUN ABOVE here
@@ -70,11 +74,16 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 # %% Custom value source
 seed = 0
 venv = get_custom_venv_pair(seed=seed)
-# %%
-venv.reset()
+
+# %% Save the maze
+mazename = input("Enter mazename: ")
+# %% Compute values
+# venv = get_cheese_venv_pair(seed=0)
 values = values_from_venv(venv, hook, label)
 
-patch_layer(hook, values, -.5, label, venv, steps=1)
+# %% Use these values in desired mazes
+for seed in range(10):
+    run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'near/far cheese')) 
 
 # %% Sweep all levels using patches gained from each level
 for seed in range(50):

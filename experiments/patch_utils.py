@@ -96,9 +96,9 @@ def get_patches(values: np.ndarray, coeff: float, label: str):
     cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
     return {label: lambda outp: outp + coeff*cheese_diff}
 
-def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
+def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
-    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed}-{coeff}.mp4", where rand_region is a global int.
+    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed_str}-{coeff}.mp4", where rand_region is a global int.
     """
     # Custom predict function to match rollout expected interface, uses
     # the hooked network so it is patchable
@@ -123,7 +123,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
         action_logits = hook.get_value_by_label('fc_policy_out')
         logits_to_action_plot(action_logits, title=activation_label)
         
-        vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
+        vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed_str}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
         clip.write_videofile(vidpath, logger=None)
         display(Video(vidpath, embed=True))
@@ -131,16 +131,18 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed: st
     if show_vfield:
         # Make a side-by-side subplot of the two vector fields
         fig = plt.figure(figsize=(10, 5))
-        fig.title(f"{activation_label} activations at coefficient {coeff}")
+
         # Make the subplots 
         plt.subplot(1, 2, 1)
-        plt.gca().set_title("Vector field of original network")
+        plt.gca().set_title("Original")
         vfield.plot_vector_field(venv, hook.network)
 
         plt.subplot(1, 2, 2)
         with hook.use_patches(patches):
-            plt.gca().set_title("Vector field of patched network")
+            plt.gca().set_title("Patched")
             vfield.plot_vector_field(venv, hook.network)
+        # Make a figure title above the two subplots
+        fig.suptitle(f"Vector fields for layer {activation_label} with coeff={coeff:.2f} and level={seed_str}") 
         plt.show()
 
 # %% 
@@ -156,19 +158,19 @@ def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(venv, hook, label)
 
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_bl: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
-    """ Run a single seed, with the given hook, diff_coeffs, and display_bl. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
+def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
+    """ Run a single seed, with the given hook and diff_coeffs. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = get_cheese_venv_pair(seed) 
 
     # Get values if not provided
-    values, value_src = cheese_diff_values(seed, label, hook), seed if values_tup is None else values_tup
+    values, value_src = (cheese_diff_values(seed, label, hook), seed) if values_tup is None else values_tup
 
     # Show behavior on the level without cheese
-    # patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
+    # patch_layer(hook, values, 0, label, venv, seed=seed, show_video=show_video, show_vfield=show_vfield, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
-        display(Text(f'Patching with coeff {coeff} seed {seed}'))
-        patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', show_video=display_bl, steps=steps)
+        # display(Text(f'Patching with coeff {coeff} seed {seed}'))
+        patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
 def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook):
