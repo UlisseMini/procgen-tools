@@ -173,24 +173,14 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
     venv = venv_patch_pair(seed) 
 
     # Get values if not provided
-    if values_tup is None:
-        values, value_src = get_values(seed, label, hook)
-    else:
-        values, value_src = values_tup
+    values, value_src = get_values(seed, label, hook) if values_tup is None else values_tup
 
     # Show behavior on the level without cheese
     # patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
-        # hook.probe_with_input(obs, func=forward_func_policy) # TODO does this have to be reset?
         display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed=f'{seed}_vals:{value_src}', display_bl=display_bl, vanished=False, steps=steps)
-
-        # Wait for input from jupyter notebook
-        # print(f"Finished {seed} {diff_coeff}")
-        # if in_jupyter:
-        #     input("Press Enter to continue...")
-
 
 def plot_patched_vfield(seed: int, coeff: float):
     values, _ = get_values(seed, label, hook)
