@@ -504,7 +504,7 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
     return True
 
 
-def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None):
+def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
@@ -534,7 +534,8 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None):
         b.tooltip = CELL_TO_CHAR[g[i,j]]
         with output:
             output.clear_output()
-            on_distribution(g)
+            if check_on_dist: 
+                on_distribution(g)
             if callback is not None:
                 callback(grid)
 
@@ -553,7 +554,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None):
 
 
 
-def venv_editor(venv, **kwargs):
+def venv_editor(venv, check_on_dist=True, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
@@ -563,7 +564,7 @@ def venv_editor(venv, **kwargs):
 
     def make_cb(i: int):
         def _cb(gridm: np.ndarray):
-            if on_distribution(gridm, p=lambda *_: None):
+            if (not check_on_dist) or on_distribution(gridm, p=lambda *_: None):
                 print('Saving state to venv')
                 env_states[i].set_grid(gridm)
                 # FIXME: If the maze is edited externally this will break (state_vals_list is constant)
@@ -571,7 +572,7 @@ def venv_editor(venv, **kwargs):
         return _cb
 
     env_states = [EnvState(sb) for sb in venv.env.callmethod("get_state")]
-    editors = [grid_editor(vs.full_grid(), callback=make_cb(i), **kwargs) for i, vs in enumerate(env_states)]
+    editors = [grid_editor(vs.full_grid(), callback=make_cb(i), check_on_dist=check_on_dist, **kwargs) for i, vs in enumerate(env_states)]
     elements = []
     for i in range(len(editors)):
         elements.append(editors[i])

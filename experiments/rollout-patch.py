@@ -15,7 +15,8 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
-from ipywidgets import Text, interact, IntSlider, fixed, FloatSlider
+from ipywidgets import interact
+from ipywidgets import Text, interact, IntSlider, FloatSlider
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
@@ -32,13 +33,6 @@ import pickle as pkl
 from procgen import ProcgenGym3Env
 
 rand_region = 5
-
-# Check whether we're in jupyter
-try:
-    get_ipython()
-    in_jupyter = True
-except NameError:
-    in_jupyter = False
 path_prefix = '../' if in_jupyter else ''
 
 # %%
@@ -54,7 +48,6 @@ hook = cmh.ModuleHook(policy)
 
 # RUN ABOVE here
 # %% Interactive mode for taking cheese-diffs on one seed
-
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1)):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
@@ -76,21 +69,23 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
     plt.clf()
     plt.close()
-# %% Custom value source
-seed = 0
-venv = get_custom_venv_pair(seed=seed)
-
-# %% Compute values
-# venv = get_cheese_venv_pair(seed=0)
-values = values_from_venv(venv, hook, label)
-
-# %% Plot performance interactively
+# %% Custom value source via hand-edited maze
+@interact 
+def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
+    global v_env 
+    v_env = get_custom_venvs(seed=seed)
+ 
+# %% Use these values in desired mazes
+# v_env = get_cheese_venv_pair(seed=0)
 # Assumes a fixed venv, hook, values, and label
 @interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-1, max=1, step=0.05, value=-.5)):
-    venv = get_cheese_venv_pair(seed)
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values, venv=venv)
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-.5)):
+    values = values_from_venv(v_env, hook, label)
+    render_venv = get_cheese_venv_pair(seed=seed)
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values, venv=render_venv)
     plt.show()
+
+# %% Try various off-distribution levels (e.g. with just cheese)
 
 # %% Sweep all levels using patches gained from each level
 for seed in range(50):
