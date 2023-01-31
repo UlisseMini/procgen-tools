@@ -170,7 +170,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
     venv = get_cheese_venv_pair(seed) 
 
     # Get values if not provided
-    values, value_src = cheese_diff_values(seed, label, hook) if values_tup is None else values_tup
+    values, value_src = cheese_diff_values(seed, label, hook), seed if values_tup is None else values_tup
 
     # Show behavior on the level without cheese
     # patch_layer(hook, values, 0, label, venv, seed=seed, display_bl=display_bl, vanished=True, steps=steps)
@@ -181,7 +181,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], display_b
 
 
 def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook):
-    values, _ = cheese_diff_values(seed, label, hook)
+    values = cheese_diff_values(seed, label, hook)
     patches = get_patches(values, coeff, label) 
 
     venv = copy_venv(get_cheese_venv_pair(seed), 0) # Get env with cheese present
