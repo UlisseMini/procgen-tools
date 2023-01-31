@@ -31,6 +31,7 @@ try:
 except NameError:
     in_jupyter = False
 
+path_prefix = '../' if in_jupyter else ''
 rand_region = 5
 
 
