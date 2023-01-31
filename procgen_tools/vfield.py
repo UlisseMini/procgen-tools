@@ -41,20 +41,21 @@ def _tadd(*tups):
     return tuple(sum(axis) for axis in zip(*tups))
 
 
-def vector_field(venv, policy, env_num=0):
+def vector_field(venv, policy):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
+    assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
     arrows = []
 
-    grid = maze.EnvState(venv.env.callmethod('get_state')[env_num]).inner_grid(with_mouse=False)
+    grid = maze.EnvState(venv.env.callmethod('get_state')[0]).inner_grid(with_mouse=False)
     legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
     for pos in legal_mouse_positions:
-        set_mouse_pos(venv, pos, env_num)
+        set_mouse_pos(venv, pos)
         obs = venv.reset()
 
         with torch.no_grad():
-            c, _ = policy(torch.Tensor(obs[env_num]).unsqueeze(0))
+            c, _ = policy(torch.Tensor(obs))
         probs_dict = models.human_readable_actions(c)
         probs_dict = {k: v[0].item() for k, v in probs_dict.items()}
         deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
@@ -70,11 +71,13 @@ def vector_field(venv, policy, env_num=0):
 # Plot vector field for every mouse position
 
 
-def plot_vector_field(venv, policy, env_num=0, ax=None):
+def plot_vector_field(venv, policy, ax=None, env_num=0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
-    vf = vector_field(venv, policy, env_num=env_num)
+    venv = maze.copy_venv(venv, env_num)
+
+    vf = vector_field(venv, policy)
     arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
 
     ax = ax if ax is not None else plt.gca()

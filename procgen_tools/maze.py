@@ -598,3 +598,21 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
     venv = ScaledFloatFrame(venv)
     return venv # type: ignore - ToBaselinesVecEnv gives best type annotations
 
+
+from procgen import ProcgenGym3Env
+
+def create_venv(num: int, start_level: int = 0, num_levels: int = 1):
+    venv = ProcgenGym3Env(
+        num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
+        distribution_mode='hard', num_threads=1, render_mode="rgb_array",
+    )
+    venv = wrap_venv(venv)
+    return venv
+
+
+def copy_venv(venv, idx: int):
+    "Return a copy of venv number idx. WARNING: After level is finished, the copy will be reset."
+    sb = venv.env.callmethod("get_state")[idx]
+    env = create_venv(num=1)
+    env.env.callmethod("set_state", [sb])
+    return env
