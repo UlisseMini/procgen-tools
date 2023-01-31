@@ -28,6 +28,9 @@ import numpy as np
 import pandas as pd
 import torch as t
 import xarray as xr
+import sklearn as sk
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
 import plotly.express as px
 import plotly as py
 import plotly.graph_objects as go
@@ -112,12 +115,11 @@ class NoDecisionSquareException(Exception):
 class NotReachedDecisionSquareException(Exception):
     pass
 
-def process_rollout(fn, hook, value_labels=
-        ['embedder.reluflatten_out', 'embedder.fc_out']):
+def process_rollout(fn):
     '''Extract quantities of interest from a rollout file:
         - location of decision square
         - termination status of episode (just cheese or not for now)
-        - layer activations at decision square'''
+        - observations at decision square'''
     # Load the data
     episode_data = cro.load_saved_rollout(fn)
     seq = episode_data['seq']
@@ -138,13 +140,10 @@ def process_rollout(fn, hook, value_labels=
     if dec_step is None:
         raise NotReachedDecisionSquareException
     # Probe the network
-    hook.probe_with_input(seq.obs.sel(step=[dec_step]).astype(np.float32))
-    values = {label: hook.get_value_by_label(label).squeeze(dim='step') 
-        for label in value_labels}
     return dict(
         dec_node = dec_node,
         did_get_cheese = episode_data['seq'].rewards[-1].values[()]>0.,
-        values = values,
+        obs = seq.obs.sel(step=dec_step).astype(np.float32),
     )
 
 
@@ -166,19 +165,33 @@ if __name__ == "__main__":
     dr = '../episode_data/20230130T204732' # Big run, but some don't have dec squares
     #dr = '../episode_data/20230130T221407' # Short test run
     
-    hook = cmh.ModuleHook(policy)
     data_all = []
     fns = glob.glob(os.path.join(dr, '*.dat'))
-    for fn in tqdm(fns):
+    for fn in tqdm(fns[:700]):
         try:
-            data_all.append(process_rollout(fn, hook))
+            data_all.append(process_rollout(fn))
         except (NoDecisionSquareException, NotReachedDecisionSquareException):
             pass #print(f'No decision square in rollout {ii}')
 
 # %%
-# Parse into a single set of tables and do some fitting!
+# Run obs through model
+#value_labels = ['embedder.reluflatten_out', 'embedder.fc_out']
+value_label = 'embedder.fc_out'
 if __name__ == "__main__":
-    label = 'embedder.fc_out'
-    activ = xr.concat([dd['values'][label] for dd in data_all], dim='batch')
+    batch_coords = np.arange(len(data_all))
+    obs_all = xr.concat([dd['obs'] for dd in data_all], 
+        dim='batch').assign_coords(dict(batch=batch_coords))
+    hook = cmh.ModuleHook(policy)
+    hook.probe_with_input(obs_all)
+    value = hook.get_value_by_label(value_label)
     did_get_cheese = xr.DataArray([dd['did_get_cheese'] for dd in data_all],
-        dims=['batch'])
+        dims=['batch'], coords=dict(batch=batch_coords))
+
+# %%
+# Do some fitting!
+if __name__ == "__main__":
+    X_train, X_test, y_train, y_test = train_test_split(
+        value, did_get_cheese, test_size=0.1, random_state=42)
+    clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+
