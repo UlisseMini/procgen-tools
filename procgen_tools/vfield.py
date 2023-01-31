@@ -100,7 +100,7 @@ if __name__ == '__main__':
     for i in tqdm(range(venv.num_envs)):
         plt.clf()
         plot_vector_field(venv, policy, env_num=i)
-        plt.savefig(f'../figures/maze_{i}_vfield.png')
+        plt.savefig(f'../figures/maze_{i}_vfield.png', dpi=300)
         plt.close()
 
 # %%

@@ -12,6 +12,7 @@ from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
 from ipywidgets import Text, interact
+import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
 
@@ -35,19 +36,10 @@ path_prefix = '../' if in_jupyter else ''
 policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15,
     t.device('cpu'))
 
-# %% EXPERIMENTS
-label = 'embedder.block2.res1.resadd_out'
-diff_coeffs = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000]
-interesting_coeffs = [0,1,2,3,4,5,10,50,200]
-hook = cmh.ModuleHook(policy)
-
 # %% 
-# Try using one patch for many levels at different strengths
-value_seed = 0
-values_tup = get_values(value_seed, label, hook) 
-
-for seed in range(0):  
-    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+label = 'embedder.block2.res1.resadd_out'
+interesting_coeffs = np.linspace(-3,3,10) # NOTE may break assumption that one of these is 0
+hook = cmh.ModuleHook(policy)
 
 # %%
 # Interactive mode
@@ -60,10 +52,30 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     plt.show()
 
 
+# %% RUN ABOVE here
+# Try using one patch for many levels at different strengths
+value_seed = 0
+values_tup = get_values(value_seed, label, hook) 
+
+for seed in range(0):  
+    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+
+# %%
+# Save figures for a bunch of (seed, coeff) pairs
+seeds = range(10)
+coeffs = [-2, -1, -0.5, 0.5, 1, 2]
+for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
+    fig, _ = plot_patched_vfield(seed, coeff)
+    fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
+    plt.clf()
+    plt.close()
+# %% 
+# Try different activations
+
 # %%
 # Sweep all levels using patches gained from each level
 for seed in range(50):
-    run_seed(seed, hook, diff_coeffs)
+    run_seed(seed, hook, interesting_coeffs)
 
 # %% 
 # Average diff over a bunch of seeds
