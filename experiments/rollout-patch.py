@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
-from ipywidgets import Text, interact
+from ipywidgets import Text, interact, IntSlider, fixed, FloatSlider
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
@@ -32,6 +32,13 @@ import pickle as pkl
 from procgen import ProcgenGym3Env
 
 rand_region = 5
+
+# Check whether we're in jupyter
+try:
+    get_ipython()
+    in_jupyter = True
+except NameError:
+    in_jupyter = False
 path_prefix = '../' if in_jupyter else ''
 
 # %%
@@ -46,9 +53,7 @@ interesting_coeffs = np.linspace(-2/3,2/3,10)
 hook = cmh.ModuleHook(policy)
 
 # RUN ABOVE here
-# %% Interactive mode
-
-from ipywidgets import interact, IntSlider, fixed, FloatSlider
+# %% Interactive mode for taking cheese-diffs on one seed
 
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1)):
@@ -79,9 +84,13 @@ venv = get_custom_venv_pair(seed=seed)
 # venv = get_cheese_venv_pair(seed=0)
 values = values_from_venv(venv, hook, label)
 
-# %% Use these values in desired mazes
-for seed in range(10):
-    run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'near/far cheese')) 
+# %% Plot performance interactively
+# Assumes a fixed venv, hook, values, and label
+@interact
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-1, max=1, step=0.05, value=-.5)):
+    venv = get_cheese_venv_pair(seed)
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values, venv=venv)
+    plt.show()
 
 # %% Sweep all levels using patches gained from each level
 for seed in range(50):
