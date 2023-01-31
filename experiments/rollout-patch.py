@@ -41,8 +41,8 @@ label = 'embedder.block2.res1.resadd_out'
 interesting_coeffs = np.linspace(-3,3,10) 
 hook = cmh.ModuleHook(policy)
 
-# %%
-# Interactive mode
+# RUN ABOVE here
+# %% Interactive mode
 
 from ipywidgets import interact, IntSlider, fixed, FloatSlider
 
@@ -52,16 +52,14 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     plt.show()
 
 
-# %% RUN ABOVE here
-# Try using one patch for many levels at different strengths
+# %% Try using one patch for many levels at different strengths
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
 
 for seed in range(1):  
     run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
 
-# %%
-# Save figures for a bunch of (seed, coeff) pairs
+# %% Save figures for a bunch of (seed, coeff) pairs
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
@@ -69,16 +67,19 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
     plt.clf()
     plt.close()
-# %% 
-# Try different activations
+# %% Custom value source
+seed = 10
+venv = get_custom_venv_pair(seed=seed)
+obs = venv.reset()
+values = values_from_venv(venv, hook, label)
 
-# %%
-# Sweep all levels using patches gained from each level
+run_seed(seed, hook, interesting_coeffs, values_tup=(values, seed))
+
+# %% Sweep all levels using patches gained from each level
 for seed in range(50):
     run_seed(seed, hook, interesting_coeffs)
 
-# %% 
-# Average diff over a bunch of seeds
+# %% Average diff over a bunch of seeds
 values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 # Iterate over range specified by slice
@@ -89,26 +90,12 @@ for seed in range(seeds.start, seeds.stop):
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
-# %% 
-# Generate a random values vector and then patch it in
+# %% Generate a random values vector and then patch it in
 values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
 for seed in range(20):
     run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'garbage'))
 
-# %%  
-# Average diff over a bunch of seeds
-values = np.zeros_like(cheese_diff_values(0, label, hook))
-seeds = slice(int(10e5),int(10e5+100))
-# Iterate over range specified by slice
-for seed in range(seeds.start, seeds.stop):
-    # Make values be rolling average of values from seeds
-    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
-for seed in range(20):
-    run_seed(seed, hook, np.array(interesting_coeffs), values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
-
-
-# %% 
-# Try all labels for a fixed seed and diff_coeff
+# %% Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 for label in labels: 
     run_seed(0, hook, [1], label=label)
