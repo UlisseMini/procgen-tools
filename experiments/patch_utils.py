@@ -17,6 +17,7 @@ import circrl.rollouts as cro
 
 from procgen_tools import maze, vfield
 import procgen_tools.models as models
+from procgen_tools.maze import copy_venv, create_venv
 
 # %% 
 # Load two levels and get values
@@ -30,23 +31,8 @@ try:
 except NameError:
     in_jupyter = False
 
+path_prefix = '../' if in_jupyter else ''
 rand_region = 5
-
-def create_venv(num: int, start_level: int = 0, num_levels: int = 1):
-    venv = ProcgenGym3Env(
-        num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
-        distribution_mode='hard', num_threads=1, render_mode="rgb_array",
-    )
-    venv = maze.wrap_venv(venv)
-    return venv
-
-
-def copy_venv(venv, idx: int):
-    "Return a copy of venv number idx. WARNING: After reset, env will be a new maze."
-    sb = venv.env.callmethod("get_state")[idx]
-    env = create_venv(num=1)
-    env.env.callmethod("set_state", [sb])
-    return env
 
 
 def get_cheese_venv_pair(seed: int):
