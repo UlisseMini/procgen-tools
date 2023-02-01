@@ -16,7 +16,7 @@ from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
 from ipywidgets import interact
-from ipywidgets import Text, interact, IntSlider, FloatSlider
+from ipywidgets import Text, interact, IntSlider, FloatSlider, Dropdown
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
@@ -86,7 +86,7 @@ def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-1)):
     values = values_from_venv(v_env, hook, label)
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
     plt.show()
 
 # %% Check behavior in custom target maze
@@ -97,8 +97,7 @@ fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_e
 plt.show()
 
 # %%
-
-fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
+fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=v_env)
 
 
 # %% Try various off-distribution levels (e.g. with just cheese)
@@ -125,6 +124,14 @@ for seed in range(20):
 
 # %% Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
-for label in labels: 
-    run_seed(0, hook, [1], label=label)
+# Interactive function to run all labels
+@interact
+def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
+    plt.show()
 
+# %% 
+# Print the structure of the network
+print(policy)
+
+# %%

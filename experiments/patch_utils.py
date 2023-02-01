@@ -197,7 +197,7 @@ def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHoo
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
     }
-    fig.suptitle(f"Level {seed} coeff {coeff}")
+    fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
 
