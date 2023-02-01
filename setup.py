@@ -15,6 +15,7 @@ setup(
         "matplotlib==3.6.3",
         "tqdm==4.64.1",
         "ipywidgets==7.*", # v8 causes vscode bug
-        "procgen==0.10.7"
+        "procgen==0.10.7",
+        "bidict==0.22.*"
     ]
 )

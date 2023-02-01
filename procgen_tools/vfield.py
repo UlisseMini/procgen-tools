@@ -47,6 +47,7 @@ def vector_field(venv, policy):
     """
     assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
     arrows = []
+    probs = []
 
     grid = maze.EnvState(venv.env.callmethod('get_state')[0]).inner_grid(with_mouse=False)
     legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
@@ -60,10 +61,11 @@ def vector_field(venv, policy):
         probs_dict = {k: v[0].item() for k, v in probs_dict.items()}
         deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
         arrows.append(_tadd(*deltas))
+        probs.append(tuple(probs_dict.values()))
 
 
     # make vfield object for returning
-    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid}
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs}
 
 
 

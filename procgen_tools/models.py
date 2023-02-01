@@ -8,6 +8,7 @@ https://gist.github.com/montemac/6ccf47f1e15349d82cff98f0ff5f30b1
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from bidict import bidict
 import torch
 
 # type ignores are because of bad/inconsistent typing on gain
@@ -137,8 +138,8 @@ class InterpretableImpalaModel(nn.Module):
         self.block3 = InterpretableImpalaBlock(in_channels=32*scale, out_channels=32*scale)
         self.relu3 = nn.ReLU()
         self.flatten = Flatten()
-        self.reluflatten = nn.ReLU()
         self.fc = nn.Linear(in_features=32*scale * 8 * 8, out_features=256)
+        self.relufc = nn.ReLU()
 
         self.output_dim = 256
         self.apply(xavier_uniform_init)
@@ -150,7 +151,7 @@ class InterpretableImpalaModel(nn.Module):
         x = self.relu3(x)
         x = self.flatten(x)
         x = self.fc(x)
-        x = self.reluflatten(x)
+        x = self.relufc(x)
         return x
 
 
@@ -181,6 +182,8 @@ class CategoricalPolicy(nn.Module):
 
 # TODO: We should probably move these to a separate file, this isn't model code.
 
+# DO NOT CHANGE ORDERING IN DICTS. ORDERING MATTERS. FILES DEPEND ON IT.
+
 MAZE_ACTION_INDICES = {
     'LEFT': [0, 1, 2],
     'DOWN': [3],
@@ -190,13 +193,13 @@ MAZE_ACTION_INDICES = {
 }
 
 # action deltas. we index from bottom left by (row, col)
-MAZE_ACTION_DELTAS = {
+MAZE_ACTION_DELTAS = bidict({
     'LEFT': (0, -1),
     'RIGHT': (0, 1),
     'UP': (1, 0),
     'DOWN': (-1, 0),
     'NOOP': (0, 0),
-}
+})
 
 
 def human_readable_action(act: int) -> str:

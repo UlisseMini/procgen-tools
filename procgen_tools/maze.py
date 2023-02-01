@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import numpy as np
 import heapq
+import networkx as nx
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -580,6 +581,54 @@ def venv_editor(venv, check_on_dist=True, **kwargs):
 
     return VBox(elements)
 
+# ================ Maze-as-graph tools ===================
+
+def maze_grid_to_graph(inner_grid):
+    '''Convert a provided maze inner grid to a networkX graph object'''
+    def nodes_where(cond):
+        return [(r, c) for r, c in zip(*np.where(cond))]
+    # Create edges: each node may have an edge up, down, left or right, check
+    # each direction for all nodes at the same time
+    edges = []
+    for dirs, g0, g1 in [
+            ['RL', inner_grid[:,:-1], inner_grid[:,1:]],
+            ['UD', inner_grid[:-1,:], inner_grid[1:,:]],]:
+        # Find squares that are open in both g0 and g1, and add an edge
+        node0s = nodes_where((g0!=BLOCKED)&(g1!=BLOCKED))
+        node1s = [(r, c+1) if dirs=='RL' else (r+1, c) 
+            for r, c in node0s]
+        edges.extend([(n0, n1) for n0, n1 in zip(node0s, node1s)])
+    graph = nx.Graph()
+    graph.add_edges_from(edges)
+    #nx.draw_networkx()
+    # colors_by_node = {(0, 0): 'green', get_cheese_pos(inner_grid): 'yellow',
+    #     (inner_grid.shape[0]-1, inner_grid.shape[1]-1): 'red'}
+    # node_colors = [colors_by_node.get(node, 'blue') for node in graph.nodes]
+    # nx.draw_kamada_kawai(graph, node_color=node_colors, node_size=10)
+    return graph
+
+def grid_graph_has_decision_square(inner_grid, graph):
+    cheese_node = get_cheese_pos(inner_grid)
+    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
+    pth = nx.shortest_path(graph, (0, 0), corner_node)
+    return (not cheese_node in pth)
+
+def get_decision_square_from_grid_graph(inner_grid, graph):
+    cheese_node = get_cheese_pos(inner_grid)
+    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
+    path_to_cheese = nx.shortest_path(graph, (0, 0), cheese_node)
+    path_to_corner = nx.shortest_path(graph, (0, 0), corner_node)
+    for ii, cheese_path_node in enumerate(path_to_cheese):
+        if ii >= len(path_to_corner):
+            return cheese_path_node
+        if cheese_path_node != path_to_corner[ii]:
+            return path_to_cheese[ii-1]
+
+def maze_has_decision_square(states_bytes):
+    maze_env_state = EnvState(states_bytes)
+    inner_grid = maze_env_state.inner_grid()
+    grid_graph = maze_grid_to_graph(inner_grid)
+    return grid_graph_has_decision_square(inner_grid, grid_graph)
 
 
 # ================ Venv Wrappers ===================

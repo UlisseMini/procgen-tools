@@ -11,9 +11,11 @@ scipy==1.10.0
 # einops # aspirational
 
 # Monte's code
-pandas==1.5.3
+pandas>=1.5.3
 circrl>=0.0.3
-plotly==5.13.0
+plotly>=5.13.0
+networkx>=3.0
+
 
 
 # Build procgenAISC, not needed for now

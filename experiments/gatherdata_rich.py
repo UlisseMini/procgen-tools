@@ -55,7 +55,7 @@ def get_maze_dataset(policy, policy_desc, num_episodes, num_timesteps, seed=42,
     cro.make_dataset(get_predict(policy), 
         f'Rich rollouts including maze state at each timestep, policy: {policy_desc}', 
         '../episode_data', num_episodes, env_setup_func, seq_mod_func=remove_renders_from_seq,
-        run_rollout_kwargs=dict(max_steps=num_timesteps,
+        run_rollout_kwargs=dict(max_steps=num_timesteps, show_pbar=False,
             custom_data_funcs=dict(state_bytes=get_maze_state, action_logits=get_action_logits)))
 
 # Generate a dataset
