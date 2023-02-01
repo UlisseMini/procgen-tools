@@ -33,6 +33,13 @@ import pickle as pkl
 from procgen import ProcgenGym3Env
 
 rand_region = 5
+# Check whether we're in jupyter
+try:
+    get_ipython()
+    in_jupyter = True
+except NameError:
+    in_jupyter = False
+
 path_prefix = '../' if in_jupyter else ''
 
 # %%
@@ -49,7 +56,7 @@ hook = cmh.ModuleHook(policy)
 # RUN ABOVE here
 # %% Interactive mode for taking cheese-diffs on one seed
 @interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=1)):
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
 
@@ -58,8 +65,8 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
 
-for seed in range(1):  
-    run_seed(seed, hook, interesting_coeffs, values_tup=values_tup)
+for seed in range(10):  
+    run_seed(seed, hook, [-1], values_tup=values_tup)
 
 # %% Save figures for a bunch of (seed, coeff) pairs
 seeds = range(10)
@@ -72,18 +79,27 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 # %% Custom value source via hand-edited maze
 @interact 
 def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
-    global v_env 
+    global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
     v_env = get_custom_venvs(seed=seed)
- 
 # %% Use these values in desired mazes
-# v_env = get_cheese_venv_pair(seed=0)
 # Assumes a fixed venv, hook, values, and label
 @interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-.5)):
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-1)):
     values = values_from_venv(v_env, hook, label)
-    render_venv = get_cheese_venv_pair(seed=seed)
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values, venv=render_venv)
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
+
+# %% Check behavior in custom target maze
+values = values_from_venv(v_env, hook, label)
+target_env = get_custom_venvs(seed=0)
+# %%
+fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
+plt.show()
+
+# %%
+
+fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
+
 
 # %% Try various off-distribution levels (e.g. with just cheese)
 
@@ -100,12 +116,12 @@ for seed in range(seeds.start, seeds.stop):
     values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
 
 for seed in range(20):
-    run_seed(seed, hook, interesting_coeffs, values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+    run_seed(seed, hook, [-1], values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
 
 # %% Generate a random values vector and then patch it in
 values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
 for seed in range(20):
-    run_seed(seed, hook, interesting_coeffs, values_tup=(values, 'garbage'))
+    run_seed(seed, hook, [-1], values_tup=(values, 'garbage'))
 
 # %% Try all labels for a fixed seed and diff_coeff
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
