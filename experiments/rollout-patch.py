@@ -109,8 +109,11 @@ for seed in range(seeds.start, seeds.stop):
     # Make values be rolling average of values from seeds
     values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
 
-for seed in range(20):
-    run_seed(seed, hook, [-1], values_tup=(values, f'avg from {seeds.start} to {seeds.stop}'))
+# Assumes a fixed venv, hook, values, and label
+@interact
+def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-10, max=10, step=0.1, value=-1)):
+    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
+    plt.show()
 
 # %% Generate a random values vector and then patch it in
 values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
@@ -138,4 +141,3 @@ convs = hook.get_value_by_label(label)
 
 # Display the first feature map as an image
 plt.imshow((convs[0,0,:,:] - convs[1,0,:,:]) != 0)
-# %%
