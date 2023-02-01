@@ -15,8 +15,7 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
-from ipywidgets import interact
-from ipywidgets import Text, interact, IntSlider, FloatSlider, Dropdown
+from ipywidgets import Text, interact, IntSlider, fixed, FloatSlider, Dropdown
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
@@ -39,7 +38,6 @@ try:
     in_jupyter = True
 except NameError:
     in_jupyter = False
-
 path_prefix = '../' if in_jupyter else ''
 
 # %%
@@ -99,9 +97,6 @@ plt.show()
 # %%
 fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=v_env)
 
-
-# %% Try various off-distribution levels (e.g. with just cheese)
-
 # %% Sweep all levels using patches gained from each level
 for seed in range(50):
     run_seed(seed, hook, interesting_coeffs)
@@ -130,8 +125,17 @@ def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSl
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
 
-# %% 
-# Print the structure of the network
-print(policy)
+# %% Show that conv layers can't communicate across image; locality is enforced
 
+dummy = t.zeros((2,3,64,64))
+dummy[0,:,0,0] = 1
+
+hook.probe_with_input(dummy.numpy(), func=forward_func_policy)
+
+# Get last conv values for a dummy input
+label = 'embedder.block3.conv_out'
+convs = hook.get_value_by_label(label)
+
+# Display the first feature map as an image
+plt.imshow((convs[0,0,:,:] - convs[1,0,:,:]) != 0)
 # %%
