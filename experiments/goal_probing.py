@@ -26,18 +26,20 @@ import glob
 
 import numpy as np
 import pandas as pd
+import scipy as sp
 import torch as t
 import xarray as xr
 import sklearn as sk
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import f_classif, mutual_info_classif
 import plotly.express as px
 import plotly as py
 import plotly.graph_objects as go
 from tqdm.auto import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
-import networkx as nx
 
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
@@ -51,63 +53,6 @@ import gatherdata_rich
 
 # %%
 # Functions
-
-def maze_grid_to_graph(inner_grid):
-    '''Convert a provided maze inner grid to a networkX graph object'''
-    def nodes_where(cond):
-        return [(r, c) for r, c in zip(*np.where(cond))]
-    # Create edges: each node may have an edge up, down, left or right, check
-    # each direction for all nodes at the same time
-    edges = []
-    for dirs, g0, g1 in [
-            ['RL', inner_grid[:,:-1], inner_grid[:,1:]],
-            ['UD', inner_grid[:-1,:], inner_grid[1:,:]],]:
-        # Find squares that are open in both g0 and g1, and add an edge
-        node0s = nodes_where((g0!=maze.BLOCKED)&(g1!=maze.BLOCKED))
-        node1s = [(r, c+1) if dirs=='RL' else (r+1, c) 
-            for r, c in node0s]
-        edges.extend([(n0, n1) for n0, n1 in zip(node0s, node1s)])
-    graph = nx.Graph()
-    graph.add_edges_from(edges)
-    #nx.draw_networkx()
-    # colors_by_node = {(0, 0): 'green', maze.get_cheese_pos(inner_grid): 'yellow',
-    #     (inner_grid.shape[0]-1, inner_grid.shape[1]-1): 'red'}
-    # node_colors = [colors_by_node.get(node, 'blue') for node in graph.nodes]
-    # nx.draw_kamada_kawai(graph, node_color=node_colors, node_size=10)
-    return graph
-
-def grid_graph_has_decision_square(inner_grid, graph):
-    cheese_node = maze.get_cheese_pos(inner_grid)
-    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
-    pth = nx.shortest_path(graph, (0, 0), corner_node)
-    return (not cheese_node in pth)
-
-def get_decision_square_from_grid_graph(inner_grid, graph):
-    cheese_node = maze.get_cheese_pos(inner_grid)
-    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
-    path_to_cheese = nx.shortest_path(graph, (0, 0), cheese_node)
-    path_to_corner = nx.shortest_path(graph, (0, 0), corner_node)
-    for ii, cheese_path_node in enumerate(path_to_cheese):
-        if ii >= len(path_to_corner):
-            return cheese_path_node
-        if cheese_path_node != path_to_corner[ii]:
-            return path_to_cheese[ii-1]
-
-def maze_has_decision_square(states_bytes):
-    maze_env_state = maze.EnvState(states_bytes)
-    inner_grid = maze_env_state.inner_grid()
-    grid_graph = maze_grid_to_graph(inner_grid)
-    return grid_graph_has_decision_square(inner_grid, grid_graph)
-
-def setup_env():
-    has_dec_sq = False
-    while not has_dec_sq:
-        start_level = random.randint(0, 1e6)
-        venv = gatherdata.create_venv(start_level=start_level)    
-        episode_metadata = dict(start_level=start_level, 
-            level_seed=int(venv.env.get_info()[0]["level_seed"]))
-        has_dec_sq = maze_has_decision_square(venv.env.callmethod('get_state')[0])
-    return venv, episode_metadata
 
 class NoDecisionSquareException(Exception):
     pass
@@ -126,11 +71,11 @@ def process_rollout(fn):
     # Get the decision square location
     maze_env_state = maze.EnvState(seq.custom['state_bytes'][0].values[()])
     inner_grid = maze_env_state.inner_grid()
-    grid_graph = maze_grid_to_graph(inner_grid)
+    grid_graph = maze.maze_grid_to_graph(inner_grid)
     #px.imshow(rearrange(episode_data['seq'].obs[0].values, 'c h w -> h w c')).show()
-    if not grid_graph_has_decision_square(inner_grid, grid_graph):
+    if not maze.grid_graph_has_decision_square(inner_grid, grid_graph):
         raise NoDecisionSquareException
-    dec_node = get_decision_square_from_grid_graph(inner_grid, grid_graph)
+    dec_node = maze.get_decision_square_from_grid_graph(inner_grid, grid_graph)
     # Get the decision square timestep
     dec_step = None
     for step in seq.obs.coords['step']:
@@ -146,6 +91,12 @@ def process_rollout(fn):
         obs = seq.obs.sel(step=dec_step).astype(np.float32),
     )
 
+def f_classif_fixed(X, y, **kwargs):
+    '''Handle columns with zero variance, hackily'''
+    X_fixed = X
+    X_fixed[0,:] += 1e-6
+    return f_classif(X_fixed, y, **kwargs)
+
 
 # %%
 # Set up some stuff
@@ -153,11 +104,6 @@ if __name__ == "__main__":
     model_file = '../trained_models/maze_I/model_rand_region_5.pth'
     policy = models.load_policy(model_file, action_size=15, device=t.device('cpu'))
     model_name = os.path.basename(model_file)
-
-# %%
-# Create a bunch of data
-if __name__ == "__main__":
-    gatherdata_rich.get_maze_dataset(policy, model_name, 10, 200, env_setup_func=setup_env)
     
 # %%
 # Load some data
@@ -175,23 +121,163 @@ if __name__ == "__main__":
 
 # %%
 # Run obs through model
-#value_labels = ['embedder.reluflatten_out', 'embedder.fc_out']
-value_label = 'embedder.fc_out'
 if __name__ == "__main__":
     batch_coords = np.arange(len(data_all))
     obs_all = xr.concat([dd['obs'] for dd in data_all], 
         dim='batch').assign_coords(dict(batch=batch_coords))
     hook = cmh.ModuleHook(policy)
     hook.probe_with_input(obs_all)
+
+# %%
+# Select a layer to probe over and do some fitting!
+if __name__ == "__main__":
+    # value_labels = ['embedder.flatten_out', 'embedder.relufc_out',
+    #   'embedder.block2.res2.resadd_out']
+    #value_label = 'embedder.block2.res2.resadd_out'
+    value_label = 'embedder.relufc_out'
     value = hook.get_value_by_label(value_label)
     did_get_cheese = xr.DataArray([dd['did_get_cheese'] for dd in data_all],
         dims=['batch'], coords=dict(batch=batch_coords))
 
+    X = rearrange(value.values, 'b ... -> b (...)')
+    y = did_get_cheese.values
+    scaler = StandardScaler()
+    X_scl = scaler.fit_transform(X)
+
+    D_act = X.shape[1]
+    K = 10 #int(0.01*D_act)
+    num_seeds = 10
+    f_test_checks = []
+    sort_inds_train_all = np.zeros((num_seeds, D_act), dtype=int)
+    ranks_train_all = np.zeros((num_seeds, D_act), dtype=int)
+    f_test_train_all = np.zeros((num_seeds, D_act))
+    for ii, random_state in enumerate(np.arange(num_seeds)):
+
+        # Split into train and test set
+        X_train, X_test, y_train, y_test = train_test_split(X_scl, y, 
+            test_size=0.5, random_state=random_state)
+        
+        # Get f-statisitcs
+        f_test_train, _ = f_classif_fixed(X_train, y_train)
+        f_test_test, _ = f_classif_fixed(X_test, y_test)
+        #px.scatter(x=f_test_train, y=f_test_test, opacity=0.3).show()
+
+        # Ranking
+        def get_ranks(x):
+            sort_inds = x.argsort()
+            ranks = np.empty_like(sort_inds)
+            ranks[sort_inds] = np.arange(len(x))
+            return ranks
+        ranks_train = get_ranks(f_test_train)
+        ranks_test = get_ranks(f_test_test)
+        sort_inds_train = f_test_train.argsort()       
+
+        sort_inds_train_all[ii,:] = sort_inds_train
+        f_test_train_all[ii,:] = f_test_train
+        ranks_train_all[ii,:] = ranks_train
+
+        top_K_inds_train = sort_inds_train[-K:]
+
+        # Try training classifier on top-K by f_test
+        X_top = X_train[:,top_K_inds_train]
+        clf = LogisticRegression(random_state=0).fit(X_top, y_train)
+        y_pred_train = clf.predict(X_top)
+        y_pred_test = clf.predict(X_test[:,top_K_inds_train])
+        def accur(y1, y2):
+            return (y1==y2).mean()
+        print(top_K_inds_train)
+        print('Train accurary: {:.3f}'.format(accur(y_pred_train, y_train)))
+        print('Test accurary: {:.3f}'.format(accur(y_pred_test, y_test)))
+        print('Test baseline: {:.3f}'.format(y_test.mean()))
+        print()
+
+        f_test_checks.append({
+            f'mean_traintopK_ftest_train': f_test_train[top_K_inds_train].mean(),
+            f'mean_traintopK_ftest_test': f_test_test[top_K_inds_train].mean(),
+            f'mean_ftest_test': f_test_test.mean(),
+            f'std_ftest_test': f_test_test.std(),
+            f'mean_traintopK_rank_train': ranks_train[top_K_inds_train].mean(),
+            f'mean_traintopK_rank_test': ranks_test[top_K_inds_train].mean(),
+            f'mean_rank_test': ranks_test.mean(),
+            f'std_rank_test': ranks_test.std(),
+        })
+        #px.scatter(x=ranks_train[top_K_inds_train], y=ranks_test[top_K_inds_train], 
+        #    opacity=0.3).show()
+        
+    f_test_checks = pd.DataFrame(f_test_checks)
+    display(f_test_checks)
+    
+    z_mean_ftest_test = (f_test_checks['mean_traintopK_ftest_test'] - 
+        f_test_checks['mean_ftest_test']) / \
+            (f_test_checks['std_ftest_test']/np.sqrt(K))
+    p_mean_ftest_test = sp.stats.norm.sf(z_mean_ftest_test)
+    display(p_mean_ftest_test)
+
+    # f_test_train_mean = f_test_train_all.mean(axis=0)
+    # sort_inds_train_mean = f_test_train_mean.argsort()
+    # f_test_train_all_sorted = f_test_train_all[:,sort_inds_train_mean]
+
+    # fig = go.Figure()
+    # for ii in range(f_test_train_all_sorted.shape[0]):
+    #     fig.add_trace(go.Scatter(y=f_test_train_all_sorted[ii,-K:]))
+    # fig.add_trace(go.Scatter(y=f_test_train_mean[sort_inds_train_mean][-K:]))
+    # fig.show()
+
+    # Find the indices with the maximin rank?
+    maximin_ranks_train = ranks_train_all.min(axis=0).argsort()
+
+    # clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+    # y_pred = clf.predict(X_test)
+
 # %%
-# Do some fitting!
+# Test some of these rankings
 if __name__ == "__main__":
-    X_train, X_test, y_train, y_test = train_test_split(
-        value, did_get_cheese, test_size=0.1, random_state=42)
-    clf = LogisticRegression(random_state=0).fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
+    for jj in range(1,5):
+        #act_ind = maximin_ranks_train[-jj]
+        act_ind = sort_inds_train_all[-1,-jj]
+        X_try = X[:,act_ind]
+        df = pd.DataFrame({'X_try': X_try, 'y': y})
+        px.histogram(df, x='X_try', color='y', 
+            title='{}: {}'.format(value_label, act_ind)).show()
+
+# %% 
+# A couple specific activations
+if __name__ == "__main__":
+    # act_inds = [1873, 24557]
+    # for act_ind in act_inds:
+    #     px.histogram(pd.DataFrame({'X_try': X[:,act_ind], 'y': y}), 
+    #         x='X_try', color='y', 
+    #         title='{}: {}'.format(value_label, act_ind)).show()
+    # px.scatter(x=X_scl[:,act_inds[0]], y=X_scl[:,act_inds[1]], color=y,
+    #     opacity=0.2).show()
+
+    act_ind = 24557
+    likely_true_range = [-0.38, -0.37]
+
+    # px.histogram(pd.DataFrame({'X_try': X[:,act_ind], 'y': y}), 
+    #         x='X_try', color='y', nbins=100, 
+    #         title='{}: {}'.format(value_label, act_ind)).show()
+
+    ch, row, col = np.unravel_index(act_ind, value.shape[1:])
+    v2o_scl = obs_all.shape[2] / value.shape[2]
+    obs_row, obs_col = np.array([row, col])*v2o_scl
+    
+    bis = (y & (X[:,act_ind] >= likely_true_range[0]) &
+        (X[:,act_ind] < likely_true_range[1])).nonzero()[0]
+
+    for bi in [9]: #[bis[4]]: #bis[:1]:
+        print(y[bi])
+        print((X[bi,act_ind] >= likely_true_range[0]) &
+            (X[bi,act_ind] < likely_true_range[1]))
+        fig = px.imshow(rearrange(obs_all[bi,:,:,:].values, 'c h w -> h w c'))
+        fig.add_shape(type="rect",
+            x0=obs_col, y0=obs_row, 
+            x1=obs_col+v2o_scl, y1=obs_row+v2o_scl,
+            line=dict(color="RoyalBlue"))
+        fig.show()
+        
+
+
+
+
 

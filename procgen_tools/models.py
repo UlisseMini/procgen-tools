@@ -138,8 +138,8 @@ class InterpretableImpalaModel(nn.Module):
         self.block3 = InterpretableImpalaBlock(in_channels=32*scale, out_channels=32*scale)
         self.relu3 = nn.ReLU()
         self.flatten = Flatten()
-        self.reluflatten = nn.ReLU()
         self.fc = nn.Linear(in_features=32*scale * 8 * 8, out_features=256)
+        self.relufc = nn.ReLU()
 
         self.output_dim = 256
         self.apply(xavier_uniform_init)
@@ -151,7 +151,7 @@ class InterpretableImpalaModel(nn.Module):
         x = self.relu3(x)
         x = self.flatten(x)
         x = self.fc(x)
-        x = self.reluflatten(x)
+        x = self.relufc(x)
         return x
 
 
