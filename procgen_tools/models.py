@@ -8,6 +8,7 @@ https://gist.github.com/montemac/6ccf47f1e15349d82cff98f0ff5f30b1
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from bidict import bidict
 import torch
 
 # type ignores are because of bad/inconsistent typing on gain
@@ -192,13 +193,13 @@ MAZE_ACTION_INDICES = {
 }
 
 # action deltas. we index from bottom left by (row, col)
-MAZE_ACTION_DELTAS = {
+MAZE_ACTION_DELTAS = bidict({
     'LEFT': (0, -1),
     'RIGHT': (0, 1),
     'UP': (1, 0),
     'DOWN': (-1, 0),
     'NOOP': (0, 0),
-}
+})
 
 
 def human_readable_action(act: int) -> str:
