@@ -7,6 +7,8 @@ matplotlib==3.6.3
 tqdm==4.64.1
 ipywidgets==7.7.2 # vscode bug on v8
 procgen==0.10.7
+scipy==1.10.0
+networkx==3.0
 # einops # aspirational
 
 # Monte's code

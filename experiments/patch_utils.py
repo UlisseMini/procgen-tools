@@ -50,15 +50,14 @@ def get_cheese_venv_pair(seed: int):
 
     return venv
 
-def get_custom_venv_pair(seed: int):
-    """ Allow the user to edit two levels from a seed. Return a venv containing both environments. """
-    venv = create_venv(num=2, start_level=seed)
-    display(maze.venv_editor(venv))
+def get_custom_venvs(seed: int, num_envs=2):
+    """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
+    venv = create_venv(num=num_envs, start_level=seed)
+    display(maze.venv_editor(venv, check_on_dist=False))
     return venv
 
 def load_venv_from_file(path: str):
     venv = create_venv(num=2)
-    path_prefix = '../' if in_jupyter else ''
     with open(path_prefix + path, 'rb') as f:
         state_bytes = pkl.load(f) 
     venv.env.callmethod('set_state', state_bytes)
@@ -173,11 +172,11 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
-def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook):
-    values = cheese_diff_values(seed, label, hook)
+def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None):
+    values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
 
-    venv = copy_venv(get_cheese_venv_pair(seed), 0) # Get env with cheese present
+    venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, ax = plt.subplots(1,2, figsize=(10,5))
     # remove axis ticks from images
@@ -198,7 +197,7 @@ def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHoo
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
     }
-    fig.suptitle(f"Level {seed} coeff {coeff}")
+    fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
 
