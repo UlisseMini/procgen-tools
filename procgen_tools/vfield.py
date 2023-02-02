@@ -105,9 +105,14 @@ if __name__ == '__main__':
     from tqdm import tqdm
 
     rand_region = 5
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     policy = models.load_policy(f'../trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, torch.device('cpu'))
+    policy.to(device)
+
     venv = ProcgenGym3Env(num=10, start_level=0, num_levels=0, env_name='maze', distribution_mode='hard', num_threads=1, render_mode='rgb_array')
     venv = maze.wrap_venv(venv)
+
     for i in tqdm(range(venv.num_envs)):
         plt.clf()
         plot_vector_field(venv, policy, env_num=i)
