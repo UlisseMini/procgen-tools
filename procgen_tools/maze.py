@@ -291,26 +291,16 @@ class EnvState():
         return int(ents['y'].val), int(ents['x'].val)
 
 
-    def set_mouse_pos(self, x: int, y: int, fast=True):
+    def set_mouse_pos(self, x: int, y: int):
         """
         Set the mouse position in the maze state bytes. Much more optimized than parsing and serializing the whole state.
         *WARNING*: This uses *outer coordinates*, not inner.
         """
-        if fast:
-            state_vals = self.state_vals
-            x_sv, y_sv = state_vals['ents'][0]['x'], state_vals['ents'][0]['y']
-
-            # flip again to get back to original orientation
-            sz = struct.calcsize('@f')
-            state_bytes = bytearray(self.state_bytes)
-            state_bytes[x_sv.idx:(x_sv.idx+sz)] = struct.pack('@f', float(y) + 0.5)
-            state_bytes[y_sv.idx:(y_sv.idx+sz)] = struct.pack('@f', float(x) + 0.5)
-            self.state_bytes = bytes(state_bytes)
-        else:
-            state_vals = self.state_vals
-            state_vals['ents'][0]['x'].val = float(y) + 0.5
-            state_vals['ents'][0]['y'].val = float(x) + 0.5
-            self.state_bytes = _serialize_maze_state(state_vals)
+        # FIXME(slow): grabbing state_vals requires a call to parse the state bytes.
+        state_vals = self.state_vals
+        state_vals['ents'][0]['x'].val = float(y) + 0.5
+        state_vals['ents'][0]['y'].val = float(x) + 0.5
+        self.state_bytes = _serialize_maze_state(state_vals)
 
 
     def set_grid(self, grid: np.ndarray, pad=False):
