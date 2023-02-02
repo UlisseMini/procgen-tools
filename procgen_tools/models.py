@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from bidict import bidict
 import torch
+import numpy as np
 
 # type ignores are because of bad/inconsistent typing on gain
 
@@ -211,13 +212,14 @@ def human_readable_action(act: int) -> str:
     return next(act_name for act_name, act_indexes in MAZE_ACTION_INDICES.items() if act in act_indexes)
 
 
-def human_readable_actions(c: Categorical) -> dict:
+def human_readable_actions(probs: np.ndarray) -> dict:
     """
     Convert a categorical distribution to a human-readable dict of actions, with probabilities.
     The original action space is 15 actions, but we only care about 5 of them in this maze environment.
     """
-    import numpy as np
-    probs: np.ndarray = c.probs # type: ignore
+    if isinstance(probs, Categorical): # backwards compat
+        probs = probs.probs
+
     return {act_name: probs[..., np.array(act_indexes)].sum(-1) for act_name, act_indexes in MAZE_ACTION_INDICES.items()}
 
 
