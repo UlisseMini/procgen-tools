@@ -604,6 +604,7 @@ def venv_editor(venv, check_on_dist=True, **kwargs):
     return VBox(elements)
 
 # ================ Maze-as-graph tools ===================
+# TODO: put all this inside EnvState object
 
 def maze_grid_to_graph(inner_grid):
     '''Convert a provided maze inner grid to a networkX graph object'''
@@ -651,6 +652,35 @@ def maze_has_decision_square(states_bytes):
     inner_grid = maze_env_state.inner_grid()
     grid_graph = maze_grid_to_graph(inner_grid)
     return grid_graph_has_decision_square(inner_grid, grid_graph)
+
+def get_node_value_at_offset(outer_grid, node, offset):
+    r, c = [n+off for n, off in zip(node, offset)]
+    if (np.array([r, c]) >= outer_grid.shape).any():
+        return BLOCKED
+    return outer_grid[r,c]
+
+NODE_TYPES = ['wall', 'unconn', 'end', 'path', 'branch2', 'branch3']
+def get_node_type_by_world_loc(states_bytes, world_node):
+    '''Return node type of the square referred to by world_node
+    (world_node should be in world coords, not inner coords).
+    Returns a tuple of (node_type, lrdu_open), where possible node types 
+    are: wall, unconn, end (only one open neighbour), path (two open),
+    branch2 (3 open), branch3 (4 open).  Second return enumerates
+    the possible (closed, open) states of all 4 neighbours, so 
+    16 possibilities.  Returned as a bool array, even for walls.'''
+    maze_env_state = EnvState(states_bytes)
+    outer_grid = maze_env_state.full_grid()
+    node_value = outer_grid[world_node[0], world_node[1]]
+    lrdu_open = np.array([
+        get_node_value_at_offset(outer_grid, world_node, ( 0, -1)),
+        get_node_value_at_offset(outer_grid, world_node, ( 0,  1)),
+        get_node_value_at_offset(outer_grid, world_node, (-1,  0)),
+        get_node_value_at_offset(outer_grid, world_node, ( 1,  0))]) != BLOCKED
+    if node_value == BLOCKED:
+        node_type = 'wall'
+    else:
+        node_type = NODE_TYPES[1:][lrdu_open.sum()]
+    return node_type, lrdu_open
 
 
 # ================ Venv Wrappers ===================
