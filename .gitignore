@@ -2,8 +2,12 @@
 *.pth
 episode_data/*
 trained_models/*
+data
 *.zip
 *.7z
+*.tgz
+*.gz
+*.tar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
