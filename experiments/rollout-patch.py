@@ -127,17 +127,3 @@ labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
-
-# %% Show that conv layers can't communicate across image; locality is enforced
-
-dummy = t.zeros((2,3,64,64))
-dummy[0,:,0,0] = 1
-
-hook.probe_with_input(dummy.numpy(), func=forward_func_policy)
-
-# Get last conv values for a dummy input
-label = 'embedder.block3.conv_out'
-convs = hook.get_value_by_label(label)
-
-# Display the first feature map as an image
-plt.imshow((convs[0,0,:,:] - convs[1,0,:,:]) != 0)
