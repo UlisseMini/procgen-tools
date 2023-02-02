@@ -19,7 +19,7 @@ import circrl.module_hook as cmh
 import circrl.rollouts as cro
 
 import procgen_tools.models as models
-import gatherdata
+from procgen_tools.maze import create_venv
 
 # %%
 # Demonstrate patching.  This should generate two sets of video + action logits heatmap,
@@ -29,8 +29,8 @@ import gatherdata
 
 # Load model and environment
 
-env = gatherdata.create_venv()
-policy = models.load_policy('../trained_models/maze_I/model_rand_region_15.pth', 15,
+env = create_venv(num=1)
+policy = models.load_policy('../trained_models/maze_I/model_rand_region_5.pth', 15,
     t.device('cpu'))
 
 # Hook the network and demonstrate a custom patching function on a rollout
@@ -70,3 +70,5 @@ action_logits_patched = hook.get_value_by_label(action_logits_label)
 vid_fn, fps = cro.make_video_from_renders(seq_patched.renders, fps=10)
 display(Video(vid_fn, embed=True))
 px.imshow(action_logits_patched.T).show()
+
+# %%
