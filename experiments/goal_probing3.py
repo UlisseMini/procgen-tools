@@ -131,7 +131,8 @@ clr = plotly.colors.DEFAULT_PLOTLY_COLORS[0]
 num_values = probe_results['L'].sizes['value_label']
 num_dirs = len(probe_results)
 # Make the figure
-fig = py.subplots.make_subplots(rows=num_values, cols=num_dirs, shared_yaxes='all',
+fig = py.subplots.make_subplots(rows=num_values, cols=num_dirs, 
+    shared_yaxes='all', shared_xaxes='all',
     subplot_titles=[f'{label}<br>dir={dir_}' for label in value_labels 
         for dir_ in probe_results.keys()])
 # Plot each set of scores
@@ -158,5 +159,7 @@ fig.update_layout(dict(
     font_size=10,
     showlegend=False,
     height=1000))
+fig.update_xaxes(title_text="num acts used")
+fig.update_yaxes(title_text="predict score")
 fig.update_annotations(font_size=8)
 fig.show()
