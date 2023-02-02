@@ -10,7 +10,6 @@ import circrl.rollouts as cro
 
 import procgen_tools.models as models
 import procgen_tools.maze as maze
-import gatherdata
 from argparse import ArgumentParser
 
 # Custom predict function to match rollout expected interface
@@ -26,8 +25,8 @@ def get_predict(policy):
     return predict
 
 def setup_env():
-    start_level = random.randint(0, 1e6)
-    venv = gatherdata.create_venv(start_level=start_level)
+    start_level = random.randint(0, int(1e6))
+    venv = maze.create_venv(num=1, start_level=start_level)
     episode_metadata = dict(start_level=start_level, 
         level_seed=int(venv.env.get_info()[0]["level_seed"]))
     return venv, episode_metadata
