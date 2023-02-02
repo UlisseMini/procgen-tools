@@ -167,7 +167,7 @@ MAZE_STATE_DICT_TEMPLATE = [
 
 
 @lru_cache(maxsize=100)
-def _parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
+def _parse_maze_state_bytes(state_bytes: bytes, assert_=False) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
         sz = struct.calcsize(fmt)
@@ -221,7 +221,7 @@ def _parse_maze_state_bytes(state_bytes: bytes, assert_=True) -> StateValues:
         assert _serialize_maze_state(vals, assert_=False) == state_bytes, 'serialize(deserialize(state_bytes)) != state_bytes'
     return vals
 
-def _serialize_maze_state(state_vals: StateValues, assert_=True) -> bytes:
+def _serialize_maze_state(state_vals: StateValues, assert_=False) -> bytes:
     # Serialize any value to a bytes object
     def serialize_val(val):
         if isinstance(val, StateValue):
@@ -289,6 +289,28 @@ class EnvState():
         ents = self.state_vals['ents'][0]
         # flipped turns out to be oriented right for grid.
         return int(ents['y'].val), int(ents['x'].val)
+
+
+    def set_mouse_pos(self, x: int, y: int, fast=True):
+        """
+        Set the mouse position in the maze state bytes. Much more optimized than parsing and serializing the whole state.
+        *WARNING*: This uses *outer coordinates*, not inner.
+        """
+        if fast:
+            state_vals = self.state_vals
+            x_sv, y_sv = state_vals['ents'][0]['x'], state_vals['ents'][0]['y']
+
+            # flip again to get back to original orientation
+            sz = struct.calcsize('@f')
+            state_bytes = bytearray(self.state_bytes)
+            state_bytes[x_sv.idx:(x_sv.idx+sz)] = struct.pack('@f', float(y) + 0.5)
+            state_bytes[y_sv.idx:(y_sv.idx+sz)] = struct.pack('@f', float(x) + 0.5)
+            self.state_bytes = bytes(state_bytes)
+        else:
+            state_vals = self.state_vals
+            state_vals['ents'][0]['x'].val = float(y) + 0.5
+            state_vals['ents'][0]['y'].val = float(x) + 0.5
+            self.state_bytes = _serialize_maze_state(state_vals)
 
 
     def set_grid(self, grid: np.ndarray, pad=False):
@@ -651,10 +673,11 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
 
 from procgen import ProcgenGym3Env
 
-def create_venv(num: int, start_level: int = 0, num_levels: int = 1):
+def create_venv(num: int, start_level: int = 0, num_levels: int = 1, num_threads: int = 1):
     venv = ProcgenGym3Env(
         num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
-        distribution_mode='hard', num_threads=1, render_mode="rgb_array",
+        distribution_mode='hard', num_threads=num_threads, render_mode="rgb_array",
+        # rand_region=5,
     )
     venv = wrap_venv(venv)
     return venv
