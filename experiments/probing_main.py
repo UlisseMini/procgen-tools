@@ -43,8 +43,35 @@ def get_node_probe_targets(data_all, world_loc):
         node_ngb = xr.DataArray(node_ngb, dims=['batch', 'dir']),
     )).assign_coords(dict(
         batch = np.arange(len(data_all)),
-        dir = ['L', 'R', 'D', 'U']
-    ))
+        dir = ['L', 'R', 'D', 'U']))
+
+def get_cheese_loc_targets(data_all):
+    cheese_y = []
+    cheese_x = []
+    for dd in tqdm(data_all):
+        env_state = maze.EnvState(dd['dec_state_bytes'])
+        y, x = np.argwhere(env_state.full_grid()==maze.CHEESE)[0]
+        cheese_y.append(y)
+        cheese_x.append(x)
+    return xr.Dataset(dict(
+        cheese_y = xr.DataArray(cheese_y, dims=['batch']),
+        cheese_x = xr.DataArray(cheese_x, dims=['batch']),
+    )).assign_coords(dict(
+        batch = np.arange(len(data_all))))
+
+def get_mouse_loc_targets(data_all):
+    mouse_y = []
+    mouse_x = []
+    for dd in tqdm(data_all):
+        env_state = maze.EnvState(dd['dec_state_bytes'])
+        y, x = np.argwhere(env_state.full_grid()==maze.MOUSE)[0]
+        mouse_y.append(y)
+        mouse_x.append(x)
+    return xr.Dataset(dict(
+        mouse_y = xr.DataArray(mouse_y, dims=['batch']),
+        mouse_x = xr.DataArray(mouse_x, dims=['batch']),
+    )).assign_coords(dict(
+        batch = np.arange(len(data_all))))
 
 
 # %%
@@ -84,6 +111,12 @@ obs_all = xr.concat([dd['obs'] for dd in data_all],
 # Neighbour open status of a particular cell
 probe_targets = get_node_probe_targets(data_all, maze_loc_to_probe)
 
+# Cheese location
+probe_targets = probe_targets.merge(get_cheese_loc_targets(data_all))
+
+# Mouse location
+probe_targets = probe_targets.merge(get_mouse_loc_targets(data_all))
+
 
 # %%
 # Set up model and hook it
@@ -115,7 +148,7 @@ probe_results = {}
 for dir_ in probe_targets['node_ngb'].coords['dir'].values:
     print(f'Probing to predict whether square to {dir_} is open')
     y = probe_targets['node_ngb'].sel(dir=dir_).values
-    probe_results[dir_] = cpr.run_probe(hook, y,
+    probe_results[dir_], _ = cpr.run_probe(hook, y,
         value_labels = value_labels,
         index_nums = index_nums)
 
@@ -163,3 +196,89 @@ fig.update_xaxes(title_text="num acts used")
 fig.update_yaxes(title_text="predict score")
 fig.update_annotations(font_size=8)
 fig.show()
+
+
+# %%
+# Try probing for mouse location
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+
+y = probe_targets['mouse_x'].values.astype(float)
+
+# value_labels = ['embedder.block1.conv_in0',
+#                 'embedder.block1.res1.resadd_out',
+#                 'embedder.block1.res2.resadd_out',
+#                 'embedder.block2.res1.resadd_out',
+#                 'embedder.block2.res2.resadd_out',
+#                 'embedder.block3.res1.resadd_out',
+#                 'embedder.block3.res2.resadd_out']
+
+#value_labels = ['embedder.block2.res1.conv1_out']
+
+# All the conv layers!
+value_labels = [
+    'embedder.block1.conv_out',
+    'embedder.block1.maxpool_out',
+    'embedder.block1.res1.relu1_out',
+    'embedder.block1.res1.conv1_out',
+    'embedder.block1.res1.relu2_out',
+    'embedder.block1.res1.conv2_out',
+    'embedder.block1.res1.resadd_out',
+    'embedder.block1.res2.relu1_out',
+    'embedder.block1.res2.conv1_out',
+    'embedder.block1.res2.relu2_out',
+    'embedder.block1.res2.conv2_out',
+    'embedder.block1.res2.resadd_out',
+    'embedder.block2.conv_out',
+    'embedder.block2.maxpool_out',
+    'embedder.block2.res1.relu1_out',
+    'embedder.block2.res1.conv1_out',
+    'embedder.block2.res1.relu2_out',
+    'embedder.block2.res1.conv2_out',
+    'embedder.block2.res1.resadd_out',
+    'embedder.block2.res2.relu1_out',
+    'embedder.block2.res2.conv1_out',
+    'embedder.block2.res2.relu2_out',
+    'embedder.block2.res2.conv2_out',
+    'embedder.block2.res2.resadd_out',
+    'embedder.block3.conv_out',
+    'embedder.block3.maxpool_out',
+    'embedder.block3.res1.relu1_out',
+    'embedder.block3.res1.conv1_out',
+    'embedder.block3.res1.relu2_out',
+    'embedder.block3.res1.conv2_out',
+    'embedder.block3.res1.resadd_out',
+    'embedder.block3.res2.relu1_out',
+    'embedder.block3.res2.conv1_out',
+    'embedder.block3.res2.relu2_out',
+    'embedder.block3.res2.conv2_out',
+    'embedder.block3.res2.resadd_out',
+    'embedder.relu3_out',
+]
+
+scores = []
+for value_label in tqdm(value_labels):
+
+    value = hook.get_value_by_label(value_label)
+
+    for ch_ind in tqdm(range(value.shape[1])):
+        ch = value[:,ch_ind]
+        X = rearrange(ch.values, 'b ... -> b (...)')
+        X_train, X_test, y_train, y_test = train_test_split(X, y, 
+                test_size=0.2)
+
+        mdl = Ridge(alpha=10)
+        mdl.fit(X_train, y_train)
+        y_pred = mdl.predict(X_test)
+
+        scores.append({
+            'value_label': value_label,
+            'channel': ch_ind,
+            'train_score': mdl.score(X_train, y_train),
+            'test_score':  mdl.score(X_test, y_test)
+        })
+        
+scores_df = pd.DataFrame(scores).set_index(['value_label', 'channel']).sort_values(
+    'test_score', ascending=False)
+
