@@ -5,8 +5,6 @@ import copy
 import torch as t
 from tqdm.auto import tqdm
 
-# NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
-# Install normally with: pip install circrl
 import circrl.module_hook as cmh
 import circrl.rollouts as cro
 
