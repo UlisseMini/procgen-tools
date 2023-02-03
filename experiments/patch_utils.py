@@ -53,7 +53,7 @@ def get_cheese_venv_pair(seed: int):
 def get_custom_venv_pair(seed: int, num_envs=2):
     """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
     venv = create_venv(num=num_envs, start_level=seed, num_levels=1)
-    display(maze.venv_editor(venv, check_on_dist=False))
+    display(maze._vbox_hr(maze.venv_editor(venv, check_on_dist=False)))
     return venv
 
 def load_venv_pair(path: str):
