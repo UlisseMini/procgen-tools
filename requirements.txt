@@ -1,4 +1,4 @@
-# Requirements for procgen-tools (also in setup.py)
+# Requirements for procgen-tools and notebooks (some are also in setup.py)
 gym==0.21.0
 gym3==0.3.3
 torch==1.13.1
@@ -13,7 +13,7 @@ networkx==3.0
 
 # Monte's code
 pandas>=1.5.3
-circrl>=0.0.4
+circrl
 plotly>=5.13.0
 networkx>=3.0
 
