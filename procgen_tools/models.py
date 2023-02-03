@@ -156,7 +156,6 @@ class InterpretableImpalaModel(nn.Module):
         return x
 
 
-
 class CategoricalPolicy(nn.Module):
     """
     Copied from train-procgen-pytorch, removed recurrent option as we're not using it.
