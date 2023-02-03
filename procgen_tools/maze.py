@@ -566,14 +566,13 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-
-def venv_editor(venv, check_on_dist=True, **kwargs):
+def venv_editor(venv, check_on_dist=True, env_nums=None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
+    if env_nums is None:
+        env_nums = range(venv.num_envs)
     # TODO: Hook venv so after reset it maintains the edited version
-
-    from ipywidgets import VBox, HTML
 
     def make_cb(i: int):
         def _cb(gridm: np.ndarray):
@@ -584,14 +583,21 @@ def venv_editor(venv, check_on_dist=True, **kwargs):
                 venv.env.callmethod("set_state", [vs.state_bytes for vs in env_states])
         return _cb
 
-    env_states = [EnvState(sb) for sb in venv.env.callmethod("get_state")]
-    editors = [grid_editor(vs.full_grid(), callback=make_cb(i), check_on_dist=check_on_dist, **kwargs) for i, vs in enumerate(env_states)]
-    elements = []
-    for i in range(len(editors)):
-        elements.append(editors[i])
-        elements.append(HTML('<hr>'))
+    env_states = [EnvState(sb) for i, sb in enumerate(venv.env.callmethod("get_state"))]
+    editors = [
+        grid_editor(vs.full_grid(), callback=make_cb(i), check_on_dist=check_on_dist, **kwargs)
+        for i, vs in enumerate(env_states)
+        if i in env_nums
+    ]
+    return editors
 
-    return VBox(elements)
+def _vbox_hr(elements):
+    from ipywidgets import VBox, HTML
+    els = []
+    for e in elements:
+        els.append(e)
+        els.append(HTML('<hr>'))
+    return VBox(els)
 
 # ================ Maze-as-graph tools ===================
 # TODO: put all this inside EnvState object
