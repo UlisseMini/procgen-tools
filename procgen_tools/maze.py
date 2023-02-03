@@ -693,7 +693,7 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
 
 from procgen import ProcgenGym3Env
 
-def create_venv(num: int, start_level: int = 0, num_levels: int = 1, num_threads: int = 1):
+def create_venv(num: int, start_level: int = 0, num_levels: int = 0, num_threads: int = 1):
     venv = ProcgenGym3Env(
         num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
         distribution_mode='hard', num_threads=num_threads, render_mode="rgb_array",
