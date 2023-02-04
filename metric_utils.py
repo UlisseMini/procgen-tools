@@ -135,3 +135,9 @@ def euc_dist_cheese_5x5(grid: np.ndarray, **kwargs) -> float:
 def euc_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
     "Shortest Euclidean distance between decision-square and a square in the top-right 5*5 region"
     return dist_cheese_nxn(grid, get_dsq(grid), n=5, **kwargs)
+
+@metric
+def cheese_coord (grid: np.ndarray, **kwargs) -> float:
+    "Outer grid coordinates of cheese"
+    return np.linalg.norm(maze.outer_grid_coords(len(grid), maze.get_cheese_pos(grid)))
+    # return   maze.get_cheese_pos(grid)

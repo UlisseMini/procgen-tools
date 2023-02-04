@@ -346,6 +346,12 @@ def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
     return outer
 
 
+def outer_grid_coords(inner_grid_len: int, pos: Square, world_dim: int = 25):
+    """
+    Get the coordinates of (x, y) in the outer grid.
+    """
+    bl = (world_dim - inner_grid_len) // 2
+    return pos[0] + bl, pos[1] + bl
 
 def _get_neighbors(x, y):
     "Get the neighbors of (x, y) in the grid"
