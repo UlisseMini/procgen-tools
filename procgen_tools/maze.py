@@ -566,7 +566,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-def venv_editor(venv, check_on_dist=True, env_nums=None, **kwargs):
+def venv_editor(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
@@ -581,6 +581,8 @@ def venv_editor(venv, check_on_dist=True, env_nums=None, **kwargs):
                 env_states[i].set_grid(gridm)
                 # FIXME: If the maze is edited externally this will break (state_vals_list is constant)
                 venv.env.callmethod("set_state", [vs.state_bytes for vs in env_states])
+                if callback:
+                    callback(gridm)
         return _cb
 
     env_states = [EnvState(sb) for i, sb in enumerate(venv.env.callmethod("get_state"))]
