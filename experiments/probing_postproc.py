@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import torch as t
+import xarray as xr
 from tqdm.auto import tqdm
 from einops import rearrange
 from argparse import ArgumentParser
@@ -17,16 +18,13 @@ import circrl.module_hook as cmh
 import circrl.rollouts as cro
 
 import procgen_tools.maze as maze
-import gatherdata
 import gatherdata_rich
 
 # %%
-# Functions
+# Functions and classes
 
+# Exceptions
 class PostprocException(Exception):
-    pass
-
-def proc_batch_of_obs(episode_data):
     pass
 
 class NoDecisionSquareException(PostprocException):
@@ -34,6 +32,57 @@ class NoDecisionSquareException(PostprocException):
 
 class NotReachedDecisionSquareException(PostprocException):
     pass
+
+# Get the decision square location
+def get_cheese_and_dec_nodes(seq):
+    maze_env_state = maze.EnvState(seq.custom['state_bytes'][0].values[()])
+    inner_grid = maze_env_state.inner_grid()
+    grid_graph = maze.maze_grid_to_graph(inner_grid)
+    #px.imshow(rearrange(episode_data['seq'].obs[0].values, 'c h w -> h w c')).show()
+    cheese_node = maze.get_cheese_pos(inner_grid)
+    dec_node = maze.get_decision_square_from_grid_graph(inner_grid, grid_graph)
+    return cheese_node, dec_node
+
+# Get the decision square timestep
+def get_dec_step(seq, dec_node):
+    dec_step = None
+    for step in seq.obs.coords['step']:
+        mst = maze.EnvState(seq.custom['state_bytes'][step].values[()])
+        if maze.get_mouse_pos(mst.inner_grid()) == dec_node:
+            dec_step = step
+    return dec_step
+
+def get_all_mouse_pos(seq):
+    step_coord = seq.custom['state_bytes'].coords['step']
+    mouse_pos_arr = maze.get_mouse_pos_from_seq_of_states(
+        seq.custom['state_bytes'].values)
+    mouse_pos = xr.DataArray(
+        data = mouse_pos_arr,
+        dims = ['step', 'axis'],
+        coords = {'step': step_coord, 'axis': ['y', 'x']})
+    return mouse_pos
+
+def proc_batch_of_obs(episode_data):
+    '''Extract a big bunch of observations, with some other interesting data:
+        - location of decision square, None if NA
+        - location of cheese square
+        - termination status of episode (just cheese or not for now)
+        - all observations
+        - all mouse locations
+        - maze state bytes at initial timestep
+        - level seed'''
+    seq = episode_data['seq']
+    cheese_node, dec_node = get_cheese_and_dec_nodes(seq)
+    mouse_pos = get_all_mouse_pos(seq)
+    return dict(
+        dec_node = dec_node,
+        cheese_node = cheese_node,
+        did_get_cheese = episode_data['seq'].rewards[-1].values[()]>0.,
+        obs = seq.obs.astype(np.float32),
+        mouse_pos = mouse_pos,
+        initial_state_bytes = seq.custom['state_bytes'].isel(step=0).values[()],
+        level_seed = episode_data['episode_metadata']['level_seed'],
+    )
 
 def proc_probe_data(episode_data):
     '''Extract quantities of interest from a rollout file:
@@ -44,24 +93,13 @@ def proc_probe_data(episode_data):
         - maze state bytes at decision square
         '''
     seq = episode_data['seq']
-    # Get the decision square location
-    maze_env_state = maze.EnvState(seq.custom['state_bytes'][0].values[()])
-    inner_grid = maze_env_state.inner_grid()
-    grid_graph = maze.maze_grid_to_graph(inner_grid)
-    #px.imshow(rearrange(episode_data['seq'].obs[0].values, 'c h w -> h w c')).show()
-    if not maze.grid_graph_has_decision_square(inner_grid, grid_graph):
+    cheese_node, dec_node = get_cheese_and_dec_nodes(seq)
+    if dec_node is None:
         raise NoDecisionSquareException
-    cheese_node = maze.get_cheese_pos(inner_grid)
-    dec_node = maze.get_decision_square_from_grid_graph(inner_grid, grid_graph)
-    # Get the decision square timestep
-    dec_step = None
-    for step in seq.obs.coords['step']:
-        mst = maze.EnvState(seq.custom['state_bytes'][step].values[()])
-        if maze.get_mouse_pos(mst.inner_grid()) == dec_node:
-            dec_step = step
+    dec_step = get_dec_step(seq, dec_node)
     if dec_step is None:
         raise NotReachedDecisionSquareException
-    # Probe the network
+    # Return stuff
     return dict(
         dec_node = dec_node,
         cheese_node = cheese_node,

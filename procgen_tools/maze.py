@@ -672,6 +672,33 @@ def get_node_type_by_world_loc(states_bytes, world_node):
         node_type = NODE_TYPES[1:][lrdu_open.sum()]
     return node_type, lrdu_open
 
+def get_object_pos_from_seq_of_states(state_bytes_seq, obj_value):
+    '''Extract object positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    mouse_pos = np.zeros((len(state_bytes_seq), 2), dtype=int)
+    for ii, state_bytes in enumerate(state_bytes_seq):
+        env_state = EnvState(state_bytes)
+        y, x = np.argwhere(env_state.full_grid()==obj_value)[0]
+        mouse_pos[ii,:] = np.array([y, x])
+    return mouse_pos
+
+def get_mouse_pos_from_seq_of_states(state_bytes_seq):
+    '''Extract mouse positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    get_object_pos_from_seq_of_states(state_bytes_seq, MOUSE)
+
+def get_cheese_pos_from_seq_of_states(state_bytes_seq):
+    '''Extract cheese positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
+    
+
 
 # ================ Venv Wrappers ===================
 
