@@ -13,7 +13,7 @@ networkx==3.0
 
 # Monte's code
 pandas>=1.5.3
-circrl
+git+https://github.com/UlisseMini/circrl # temp until fixed for python 3.8
 plotly>=5.13.0
 networkx>=3.0
 
