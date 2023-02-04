@@ -1,6 +1,6 @@
-# TODO: This should all be in a different file
+# TODO: This should all be in a different file, probably vfield.py
 
-from procgen_tools import maze, models, metrics
+from procgen_tools import maze, models, metrics, vfield
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -40,7 +40,7 @@ def get_decision_probs(vf):
     return probs_dict[cheese_dir], probs_dict[topright_dir]
 
 
-def get_decision_probs_patched_and_original(vfields, coeff: float):
+def get_decision_probs_original_and_patched(vfields, coeff: float):
     assert coeff in set(vf['coeff'] for vf in vfields)
 
     decision_probs_original = []
@@ -62,31 +62,29 @@ def plot_decision_probs(decision_probs_original, decision_probs_patched):
 
     for i, (a, label) in enumerate(zip(ax, ('cheese', 'top right', 'other'))):
         a.set_ylabel('count')
-        a.set_xlabel(f'(original - patched) {label} probability')
-        a.axvline(x=0, color='red')
-        prob_diff = dpo[:,i] - dpp[:,i]
-        a.hist(prob_diff, bins=20)
+        a.hist(dpo[:,i], bins=20, label='original', alpha=0.5)
+        a.hist(dpp[:,i], bins=20, label='patched', alpha=0.5)
+        a.legend()
         a.set_title(f'{label} probability')
+        # reverse axis direction so we start at 1 and go to 0 (like the probability)
+        a.invert_xaxis()
 
     return fig
 
 
-
-def plot_vfs(vfs):
+def plot_vfs(vfs: dict):
+    """
+    Plot the original and patched vfields for a data entry saved by gatherdata_vfields.py
+    """
     fig, ax = plt.subplots(1,2, figsize=(10,5))
     for a in ax:
         a.set_xticks([])
         a.set_yticks([])
 
     for i, vf in enumerate((vfs['original_vfield'], vfs['patched_vfield'])):
-        legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
-
+        vfield.plot_vf(vf, ax=ax[i])
         ax[i].set_xlabel("Original vfield" if i == 0 else "Patched vfield")
-        ax[i].quiver(
-            [x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions],
-            [x[1] for x in arrows], [x[0] for x in arrows], color='red',
-        )
-        ax[i].imshow(grid, origin='lower', dpi=300)
+        
 
     plt.title(f"Seed {vfs['seed']}, coeff {vfs['coeff']}")
     return fig
