@@ -78,7 +78,17 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 @interact 
 def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
     global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
-    v_env = get_custom_venvs(seed=seed)
+    v_env = get_custom_venv_pair(seed=seed)
+
+# %%
+# Get venv2 with a single maze which we can edit live
+single_venv = create_venv(num=1, start_level=5, num_levels=1)
+editors = maze.venv_editor(single_venv, check_on_dist=False, env_nums=range(1))
+from ipywidgets import HBox
+display(HBox(editors))
+# %%
+vfield.plot_vf(vfield.vector_field(single_venv, policy))
+
 # %% Use these values in desired mazes
 # Assumes a fixed venv, hook, values, and label
 @interact
@@ -89,7 +99,8 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
 
 # %% Check behavior in custom target maze
 values = values_from_venv(v_env, hook, label)
-target_env = get_custom_venvs(seed=0)
+target_env = get_custom_venv_pair(seed=0)
+
 # %%
 fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
 plt.show()
