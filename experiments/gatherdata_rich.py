@@ -26,7 +26,7 @@ def get_predict(policy):
 
 def setup_env():
     start_level = random.randint(0, int(1e6))
-    venv = maze.create_venv(num=1, start_level=start_level)
+    venv = maze.create_venv(num=1, start_level=start_level, num_levels=0)
     episode_metadata = dict(start_level=start_level, 
         level_seed=int(venv.env.get_info()[0]["level_seed"]))
     return venv, episode_metadata

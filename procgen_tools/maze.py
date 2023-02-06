@@ -566,7 +566,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-def venv_editor(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
+def venv_editors(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
@@ -601,6 +601,12 @@ def _vbox_hr(elements):
         els.append(HTML('<hr>'))
     return VBox(els)
 
+
+def venv_editor(venv, **kwargs):
+    "Wraps `venv_editors` in a VBox with a horizontal rule between each maze."
+    return _vbox_hr(venv_editors(venv, **kwargs))
+
+
 # ================ Maze-as-graph tools ===================
 # TODO: put all this inside EnvState object
 
@@ -634,11 +640,18 @@ def grid_graph_has_decision_square(inner_grid, graph):
     pth = nx.shortest_path(graph, (0, 0), corner_node)
     return (not cheese_node in pth)
 
-def get_decision_square_from_grid_graph(inner_grid, graph):
+def get_path_to_cheese(inner_grid, graph):
     cheese_node = get_cheese_pos(inner_grid)
+    return nx.shortest_path(graph, (0, 0), cheese_node)
+
+def get_path_to_corner(inner_grid, graph):
     corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
-    path_to_cheese = nx.shortest_path(graph, (0, 0), cheese_node)
-    path_to_corner = nx.shortest_path(graph, (0, 0), corner_node)
+    return nx.shortest_path(graph, (0, 0), corner_node)
+
+def get_decision_square_from_grid_graph(inner_grid, graph):
+    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
+    path_to_cheese = get_path_to_cheese(inner_grid, graph)
+    path_to_corner = get_path_to_corner(inner_grid, graph)
     for ii, cheese_path_node in enumerate(path_to_cheese):
         if ii >= len(path_to_corner):
             return cheese_path_node
@@ -680,6 +693,36 @@ def get_node_type_by_world_loc(states_bytes, world_node):
         node_type = NODE_TYPES[1:][lrdu_open.sum()]
     return node_type, lrdu_open
 
+def get_object_pos_in_grid(grid, obj_value):
+    return np.argwhere(grid==obj_value)[0]
+
+def get_object_pos_from_seq_of_states(state_bytes_seq, obj_value):
+    '''Extract object positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    mouse_pos = np.zeros((len(state_bytes_seq), 2), dtype=int)
+    for ii, state_bytes in enumerate(state_bytes_seq):
+        env_state = EnvState(state_bytes)
+        y, x = np.argwhere(env_state.full_grid()==obj_value)[0]
+        mouse_pos[ii,:] = np.array([y, x])
+    return mouse_pos
+
+def get_mouse_pos_from_seq_of_states(state_bytes_seq):
+    '''Extract mouse positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    get_object_pos_from_seq_of_states(state_bytes_seq, MOUSE)
+
+def get_cheese_pos_from_seq_of_states(state_bytes_seq):
+    '''Extract cheese positions from a sequence of state_bytes, returning
+    as a numpy array of shape (len(sequance), 2).  Note that the first
+    column is y-position to stay consistent with row/col matrix ordering
+    conventions.'''
+    get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
+    
+
 
 # ================ Venv Wrappers ===================
 
@@ -701,7 +744,7 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
 
 from procgen import ProcgenGym3Env
 
-def create_venv(num: int, start_level: int = 0, num_levels: int = 0, num_threads: int = 1):
+def create_venv(num: int, start_level: int, num_levels: int, num_threads: int = 1):
     venv = ProcgenGym3Env(
         num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
         distribution_mode='hard', num_threads=num_threads, render_mode="rgb_array",
@@ -714,6 +757,6 @@ def create_venv(num: int, start_level: int = 0, num_levels: int = 0, num_threads
 def copy_venv(venv, idx: int):
     "Return a copy of venv number idx. WARNING: After level is finished, the copy will be reset."
     sb = venv.env.callmethod("get_state")[idx]
-    env = create_venv(num=1)
+    env = create_venv(num=1, start_level=0, num_levels=1)
     env.env.callmethod("set_state", [sb])
     return env
