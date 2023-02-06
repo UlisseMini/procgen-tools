@@ -4,6 +4,7 @@
 from procgen_tools import models, maze
 import matplotlib.pyplot as plt
 from procgen import ProcgenGym3Env
+from warnings import warn
 import torch
 import os
 
@@ -66,7 +67,7 @@ def vector_field(venv, policy):
 
     venv_all = maze.create_venv(
         num=len(legal_mouse_positions),
-        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count() # total bullshit
+        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), num_levels=1 # total bullshit
     )
     venv_all.env.callmethod('set_state', state_bytes_list)
 
@@ -101,56 +102,23 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
+    warn('Deprecated in favor of calling vector_field and plot_vf directly.')
     venv = maze.copy_venv(venv, env_num)
-
     vf = vector_field(venv, policy)
-    arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
+    return plot_vf(vf, ax=ax)
 
-    ax = ax if ax is not None else plt.gca()
 
-    # ax.quiver(legal_mouse_positions, arrows, color='red')
-    ax.quiver([x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions], [x[1] for x in arrows], [x[0] for x in arrows], color='red')
+def plot_vf(vf: dict, ax=None):
+    "Plot the vector field given by vf"
+
+    ax = ax or plt.gca()
+    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
+    ax.quiver(
+        [x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions],
+        [x[1] for x in arrows], [x[0] for x in arrows], color='red',
+    )
     ax.imshow(grid, origin='lower')
-    # ax.imshow(venv.env.get_info()[0]['rgb'])
-
-    return vf
-
-# %%
-# Old vector field function for testing
-
-
-def _vector_field_old(venv, policy):
-    """
-    Plot the vector field induced by the policy on the maze in venv env number i.
-    """
-    assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
-
-    grid = maze.EnvState(venv.env.callmethod('get_state')[0]).inner_grid(with_mouse=False)
-    legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
-    obs_list = []
-    for pos in legal_mouse_positions:
-        set_mouse_pos(venv, pos)
-        obs = venv.reset()
-        obs_list.append(torch.tensor(obs[0], dtype=torch.float32))
-
-    # use stacked obs list as a tensor
-    with torch.no_grad():
-        c, _ = policy(torch.stack(obs_list).to(_device(policy)))
-
-    # FIXME: Vectorize this loop. It isn't as critical as the model though
-    arrows = []
-    probs = []
-    for i in range(len(legal_mouse_positions)):
-        probs_dict = models.human_readable_actions(c.probs[i])
-        probs_dict = {k: v.item() for k, v in probs_dict.items()}
-        deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
-        arrows.append(_tadd(*deltas))
-        probs.append(tuple(probs_dict.values()))
-
-    # make vfield object for returning
-    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs}
-
-
+    return plt.gcf()
 
 
 # %%

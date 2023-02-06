@@ -29,7 +29,7 @@ from procgen_tools.maze import create_venv
 
 # Load model and environment
 
-env = create_venv(num=1)
+env = create_venv(num=1, num_levels=1)
 policy = models.load_policy('../trained_models/maze_I/model_rand_region_5.pth', 15,
     t.device('cpu'))
 

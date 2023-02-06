@@ -37,7 +37,7 @@ rand_region = 5
 
 def get_cheese_venv_pair(seed: int):
     "Return a venv of 2 environments from a seed, one with cheese, one without cheese"
-    venv = create_venv(num=2, start_level=seed)
+    venv = create_venv(num=2, start_level=seed, num_levels=1)
     state_bytes_list = venv.env.callmethod("get_state")
     state = maze.EnvState(state_bytes_list[1])
 
@@ -50,13 +50,14 @@ def get_cheese_venv_pair(seed: int):
 
     return venv
 
-def get_custom_venvs(seed: int, num_envs=2):
+def get_custom_venv_pair(seed: int, num_envs=2):
     """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
-    venv = create_venv(num=num_envs, start_level=seed)
+    venv = create_venv(num=num_envs, start_level=seed, num_levels=1)
     display(maze.venv_editor(venv, check_on_dist=False))
     return venv
 
-def load_venv_from_file(path: str):
+def load_venv_pair(path: str):
+    """ Load a venv pair from a file. """
     venv = create_venv(num=2)
     with open(path_prefix + path, 'rb') as f:
         state_bytes = pkl.load(f) 
