@@ -34,7 +34,7 @@ def setup_env():
     has_dec_sq = False
     while not has_dec_sq:
         start_level = random.randint(0, 1e6)
-        venv = gatherdata.create_venv(start_level=start_level, num_levels=1)    
+        venv = gatherdata.create_venv(num=1, start_level=start_level, num_levels=1)    
         episode_metadata = dict(start_level=start_level, 
             level_seed=int(venv.env.get_info()[0]["level_seed"]))
         has_dec_sq = maze.maze_has_decision_square(

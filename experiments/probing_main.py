@@ -19,6 +19,10 @@ from einops import rearrange
 from IPython.display import Video, display
 from tqdm.auto import tqdm
 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn import metrics
+
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
 import circrl.module_hook as cmh
@@ -45,33 +49,65 @@ def get_node_probe_targets(data_all, world_loc):
         batch = np.arange(len(data_all)),
         dir = ['L', 'R', 'D', 'U']))
 
-def get_cheese_loc_targets(data_all):
-    cheese_y = []
-    cheese_x = []
-    for dd in tqdm(data_all):
-        env_state = maze.EnvState(dd['dec_state_bytes'])
-        y, x = np.argwhere(env_state.full_grid()==maze.CHEESE)[0]
-        cheese_y.append(y)
-        cheese_x.append(x)
-    return xr.Dataset(dict(
-        cheese_y = xr.DataArray(cheese_y, dims=['batch']),
-        cheese_x = xr.DataArray(cheese_x, dims=['batch']),
-    )).assign_coords(dict(
-        batch = np.arange(len(data_all))))
+def get_obj_loc_targets(data_all, obj_value):
+    pos_arr = maze.get_object_pos_from_seq_of_states(
+        [dd['dec_state_bytes'] for dd in data_all], obj_value)
+    pos = xr.DataArray(
+        data = pos_arr,
+        dims = ['batch', 'pos_axis'],
+        coords = {'batch': np.arange(len(data_all)), 'pos_axis': ['y', 'x']})
+    return pos
 
-def get_mouse_loc_targets(data_all):
-    mouse_y = []
-    mouse_x = []
-    for dd in tqdm(data_all):
-        env_state = maze.EnvState(dd['dec_state_bytes'])
-        y, x = np.argwhere(env_state.full_grid()==maze.MOUSE)[0]
-        mouse_y.append(y)
-        mouse_x.append(x)
-    return xr.Dataset(dict(
-        mouse_y = xr.DataArray(mouse_y, dims=['batch']),
-        mouse_x = xr.DataArray(mouse_x, dims=['batch']),
-    )).assign_coords(dict(
-        batch = np.arange(len(data_all))))
+def linear_probe(X_full, y, model_type='classifier', test_size=0.2, **regression_kwargs):
+    X = rearrange(X_full, 'b ... -> b (...)')
+    X_train, X_test, y_train, y_test = train_test_split(X, y, 
+            test_size=0.2, random_state=42)
+
+    if model_type == 'classifier':
+        mdl = LogisticRegression(**regression_kwargs)
+    elif model_type == 'ridge':
+        mdl = Ridge(**regression_kwargs)
+    mdl.fit(X_train, y_train)
+    y_pred = mdl.predict(X_test)
+
+    result = {
+        'train_score': mdl.score(X_train, y_train),
+        'test_score':  mdl.score(X_test, y_test),
+        'X': X,
+        'X_train': X_train,
+        'y_train': y_train,
+        'X_test': X_test,
+        'y_test': y_test,
+        'model': mdl
+    }
+
+    if model_type == 'classifier':
+        result['conf_matrix'] = metrics.confusion_matrix(y_test, y_pred)
+        result['report'] = metrics.classification_report(y_test, y_pred)
+
+    return result
+
+def linear_probe_multi_channels(hook, value_label, y, ch_inds, **regression_kwargs):
+    value = hook.get_value_by_label(value_label)
+    return linear_probe(value[:,ch_inds,:,:].values, y, **regression_kwargs)
+
+def linear_probe_single_channels(hook, value_labels, y, **regression_kwargs):
+    results = []
+    for value_label in tqdm(value_labels):
+
+        value = hook.get_value_by_label(value_label)
+
+        for ch_ind in tqdm(range(value.shape[1])):
+            ch = value[:,ch_ind,:,:]
+            results_this = linear_probe(ch.values, y, **regression_kwargs)
+            results_this.update({
+                'value_label': value_label,
+                'channel': ch_ind,})
+            results.append(results_this)
+            
+    results_df = pd.DataFrame(results).set_index(['value_label', 'channel']).sort_values(
+        'test_score', ascending=False)
+    return results_df
 
 
 # %%
@@ -86,36 +122,73 @@ maze_loc_to_probe = (12, 12)  # Center cell, inside mazes of any size
 
 
 # %%
-# Load postprocessed data and convert to required form
+# Load postprocessed data and convert to required form, including probe targets
+
+# 10k run, only mazes with dec square, obs saved on dec square
+dr = '../episode_data/20230131T224127/'
+fn = 'postproc_probe_data.pkl'
+
+# 1k run, normal full rollouts, cheese/mouse pos already processed out
+# dr = '../episode_data/20230131T183918/' 
+# fn = 'postproc_batch_of_obs.pkl'
 
 # Load data as list of dicts
-dr = '../episode_data/20230131T224127/' # 10k run
-with open(os.path.join(dr, 'postproc_probe_data.pkl'), 'rb') as fl:
-    data_all = pickle.load(fl)['data'][:num_batch]
+if 'postproc_probe_data' in fn:
+    with open(os.path.join(dr, fn), 'rb') as fl:
+        data_all = pickle.load(fl)['data'][:num_batch]
 
-# Pull out the observations into a single batch
-batch_coords = np.arange(len(data_all))
-obs_all = xr.concat([dd['obs'] for dd in data_all], 
-    dim='batch').assign_coords(dict(batch=batch_coords))
+    # Pull out the observations into a single batch
+    batch_coords = np.arange(len(data_all))
+    obs_all = xr.concat([dd['obs'] for dd in data_all], 
+        dim='batch').assign_coords(dict(batch=batch_coords))
+
+    # Did we get the cheese?  
+    # probe_targets = xr.Dataset(dict(
+    #     did_get_cheese = xr.DataArray([dd['did_get_cheese'] for dd in data_all]),
+    # ))
+
+    # Neighbour open status of a particular cell
+    probe_targets = get_node_probe_targets(data_all, maze_loc_to_probe)
+
+    # Cheese location
+    probe_targets['cheese'] = get_obj_loc_targets(data_all, maze.CHEESE)
+
+    # Mouse location
+    probe_targets['mouse'] = get_obj_loc_targets(data_all, maze.MOUSE)
+
+elif 'batch_of_obs' in fn:
+    pass
+    # TODO: fix this to work with big batch of obs, likely need to re-think
+    # this as the pkl file is 4Gb!!!
+    # with open(os.path.join(dr, fn), 'rb') as fl:
+    #     data_all = pickle.load(fl)['data']
+
+    # # Pull out data into a single batch, with (obs, cheese_pos, mouse_pos, level_seed)
+    # # at each data point
+    # batch_coords = np.arange(len(data_all))
+    # obs_all = xr.concat([dd['obs'] for dd in data_all], 
+    #     dim='batch').assign_coords(dict(batch=batch_coords))
+
+    # # Did we get the cheese?  
+    # # probe_targets = xr.Dataset(dict(
+    # #     did_get_cheese = xr.DataArray([dd['did_get_cheese'] for dd in data_all]),
+    # # ))
+
+    # # Neighbour open status of a particular cell
+    # probe_targets = get_node_probe_targets(data_all, maze_loc_to_probe)
+
+    # # Cheese location
+    # probe_targets = probe_targets.merge(get_cheese_loc_targets(data_all))
+
+    # # Mouse location
+    # probe_targets = probe_targets.merge(get_mouse_loc_targets(data_all))
 
 
 # %%
 # Pull out / create probe targets of interest
 # Can take a while for a large dataset)
 
-# Did we get the cheese?  
-# probe_targets = xr.Dataset(dict(
-#     did_get_cheese = xr.DataArray([dd['did_get_cheese'] for dd in data_all]),
-# ))
 
-# Neighbour open status of a particular cell
-probe_targets = get_node_probe_targets(data_all, maze_loc_to_probe)
-
-# Cheese location
-probe_targets = probe_targets.merge(get_cheese_loc_targets(data_all))
-
-# Mouse location
-probe_targets = probe_targets.merge(get_mouse_loc_targets(data_all))
 
 
 # %%
@@ -199,13 +272,9 @@ fig.show()
 
 
 # %%
-# Try probing for mouse location
+# Pick values to use
 
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import Ridge
-
-y = probe_targets['mouse_x'].values.astype(float)
-
+# Some resadd outs
 # value_labels = ['embedder.block1.conv_in0',
 #                 'embedder.block1.res1.resadd_out',
 #                 'embedder.block1.res2.resadd_out',
@@ -214,71 +283,137 @@ y = probe_targets['mouse_x'].values.astype(float)
 #                 'embedder.block3.res1.resadd_out',
 #                 'embedder.block3.res2.resadd_out']
 
-#value_labels = ['embedder.block2.res1.conv1_out']
+# The layer Peli highlighted on 2023-02-03, and it's relu 
+value_labels = ['embedder.block2.res1.conv1_out', 'embedder.block2.res1.relu2_out']
 
-# All the conv layers!
-value_labels = [
-    'embedder.block1.conv_out',
-    'embedder.block1.maxpool_out',
-    'embedder.block1.res1.relu1_out',
-    'embedder.block1.res1.conv1_out',
-    'embedder.block1.res1.relu2_out',
-    'embedder.block1.res1.conv2_out',
-    'embedder.block1.res1.resadd_out',
-    'embedder.block1.res2.relu1_out',
-    'embedder.block1.res2.conv1_out',
-    'embedder.block1.res2.relu2_out',
-    'embedder.block1.res2.conv2_out',
-    'embedder.block1.res2.resadd_out',
-    'embedder.block2.conv_out',
-    'embedder.block2.maxpool_out',
-    'embedder.block2.res1.relu1_out',
-    'embedder.block2.res1.conv1_out',
-    'embedder.block2.res1.relu2_out',
-    'embedder.block2.res1.conv2_out',
-    'embedder.block2.res1.resadd_out',
-    'embedder.block2.res2.relu1_out',
-    'embedder.block2.res2.conv1_out',
-    'embedder.block2.res2.relu2_out',
-    'embedder.block2.res2.conv2_out',
-    'embedder.block2.res2.resadd_out',
-    'embedder.block3.conv_out',
-    'embedder.block3.maxpool_out',
-    'embedder.block3.res1.relu1_out',
-    'embedder.block3.res1.conv1_out',
-    'embedder.block3.res1.relu2_out',
-    'embedder.block3.res1.conv2_out',
-    'embedder.block3.res1.resadd_out',
-    'embedder.block3.res2.relu1_out',
-    'embedder.block3.res2.conv1_out',
-    'embedder.block3.res2.relu2_out',
-    'embedder.block3.res2.conv2_out',
-    'embedder.block3.res2.resadd_out',
-    'embedder.relu3_out',
-]
+# # All the conv layers!
+# value_labels = [
+#     'embedder.block1.conv_out',
+#     'embedder.block1.maxpool_out',
+#     'embedder.block1.res1.relu1_out',
+#     'embedder.block1.res1.conv1_out',
+#     'embedder.block1.res1.relu2_out',
+#     'embedder.block1.res1.conv2_out',
+#     'embedder.block1.res1.resadd_out',
+#     'embedder.block1.res2.relu1_out',
+#     'embedder.block1.res2.conv1_out',
+#     'embedder.block1.res2.relu2_out',
+#     'embedder.block1.res2.conv2_out',
+#     'embedder.block1.res2.resadd_out',
+#     'embedder.block2.conv_out',
+#     'embedder.block2.maxpool_out',
+#     'embedder.block2.res1.relu1_out',
+#     'embedder.block2.res1.conv1_out',
+#     'embedder.block2.res1.relu2_out',
+#     'embedder.block2.res1.conv2_out',
+#     'embedder.block2.res1.resadd_out',
+#     'embedder.block2.res2.relu1_out',
+#     'embedder.block2.res2.conv1_out',
+#     'embedder.block2.res2.relu2_out',
+#     'embedder.block2.res2.conv2_out',
+#     'embedder.block2.res2.resadd_out',
+#     'embedder.block3.conv_out',
+#     'embedder.block3.maxpool_out',
+#     'embedder.block3.res1.relu1_out',
+#     'embedder.block3.res1.conv1_out',
+#     'embedder.block3.res1.relu2_out',
+#     'embedder.block3.res1.conv2_out',
+#     'embedder.block3.res1.resadd_out',
+#     'embedder.block3.res2.relu1_out',
+#     'embedder.block3.res2.conv1_out',
+#     'embedder.block3.res2.relu2_out',
+#     'embedder.block3.res2.conv2_out',
+#     'embedder.block3.res2.resadd_out',
+#     'embedder.relu3_out',
+# ]
 
-scores = []
-for value_label in tqdm(value_labels):
+# The input observation
+# value_labels = ['embedder.block1.conv_in0']
 
-    value = hook.get_value_by_label(value_label)
+# Final conv layer output
+# value_labels = ['embedder.relu3_out']
 
-    for ch_ind in tqdm(range(value.shape[1])):
-        ch = value[:,ch_ind]
-        X = rearrange(ch.values, 'b ... -> b (...)')
-        X_train, X_test, y_train, y_test = train_test_split(X, y, 
-                test_size=0.2)
+# %%
+# Probe for location as scalar value (mouse or cheese)
 
-        mdl = Ridge(alpha=10)
-        mdl.fit(X_train, y_train)
-        y_pred = mdl.predict(X_test)
+#y = probe_targets['cheese'].sel(pos_axis='x').values.astype(float)
+y = probe_targets['mouse'].sel(pos_axis='x').values.astype(float)
 
-        scores.append({
-            'value_label': value_label,
-            'channel': ch_ind,
-            'train_score': mdl.score(X_train, y_train),
-            'test_score':  mdl.score(X_test, y_test)
-        })
-        
-scores_df = pd.DataFrame(scores).set_index(['value_label', 'channel']).sort_values(
-    'test_score', ascending=False)
+results_df = linear_probe_single_channels(hook, value_labels, y, 
+    model_type='ridge', alpha=30)
+print(results_df[['train_score', 'test_score']])
+
+best_mdl = results_df.iloc[0]['model']
+best_X = results_df.iloc[0]['X']
+y_pred_best_all = best_mdl.predict(best_X)
+px.scatter(x=y, y=y_pred_best_all)
+
+# Explore the best regression from a PCA perspective
+px.imshow(rearrange(best_mdl.coef_, '(h w) -> h w', h=16)).show()
+
+# Plot test score over layers in order, max over channels
+test_score_max_by_value = results_df['test_score'].groupby('value_label').max()[
+    value_labels]
+display(test_score_max_by_value)
+# fig = px.line(test_score_max_by_value)
+# fig.update_layout(width=1200, height=800)
+# fig.show()
+
+# %%
+# Try the cheese!
+
+# # The input observation
+# value_labels = ['embedder.block1.conv_in0']
+
+# y = probe_targets['cheese'].sel(pos_axis='x').values.astype(float)
+# results = linear_probe_multi_channels(hook, value_labels[0], y, [0,1,2],
+#     alpha=100)
+# print(results['train_score'])
+# print(results['test_score'])
+
+# %%
+# Try with ranked sparse probing, for specific location true/false
+
+obj_x = probe_targets['cheese'].sel(pos_axis='x')
+y = (obj_x >= 9) & (obj_x <= 13)
+
+# probe_results, scaler = cpr.run_probe(hook, y,
+#     model_type = 'classifier',
+#     value_labels = value_labels,
+#     index_nums = [10, 50, 200, 400],
+#     regression_kwargs = dict(max_iter=1000))
+# probe_results['conf_matrix']
+
+results_df = linear_probe_single_channels(hook, value_labels, y, 
+    model_type='classifier', max_iter=300, test_size=0.4)
+display(results_df[['train_score', 'test_score']])
+display(results_df.iloc[0]['conf_matrix'])
+y_pred_best_all = results_df.iloc[0]['model'].predict(results_df.iloc[0]['X'])
+
+# %%
+# Look at the layer Peli highlighted on 2023-02-03
+value_label = 'embedder.block2.res1.conv1_out'
+ch_ind = 123
+
+value = hook.get_value_by_label(value_label)
+ch = value[:,ch_ind]
+X = rearrange(ch.values, 'b ... -> b (...)')
+X_train, X_test, y_train, y_test = train_test_split(X, y, 
+        test_size=0.2, random_state=42)
+
+mdl = Ridge(alpha=10)
+mdl.fit(X_train, y_train)
+y_pred = mdl.predict(X_test)
+train_score = mdl.score(X_train, y_train),
+test_score = mdl.score(X_test, y_test)
+
+y_pred_all = mdl.predict(X)
+
+ind_max_error = np.abs(y - y_pred_all).argmax()
+
+fn = os.path.join(dr, f'{ind_max_error}.dat')
+ep_data_max_error = cro.load_saved_rollout(fn)
+
+
+
 
