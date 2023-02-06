@@ -58,7 +58,7 @@ def get_custom_venv_pair(seed: int, num_envs=2):
 
 def load_venv_pair(path: str):
     """ Load a venv pair from a file. """
-    venv = create_venv(num=2)
+    venv = create_venv(num=2, start_level=1, num_levels=1)
     with open(path_prefix + path, 'rb') as f:
         state_bytes = pkl.load(f) 
     venv.env.callmethod('set_state', state_bytes)

@@ -566,7 +566,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-def venv_editor(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
+def venv_editors(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
@@ -600,6 +600,12 @@ def _vbox_hr(elements):
         els.append(e)
         els.append(HTML('<hr>'))
     return VBox(els)
+
+
+def venv_editor(venv, **kwargs):
+    "Wraps `venv_editors` in a VBox with a horizontal rule between each maze."
+    return _vbox_hr(venv_editors(venv, **kwargs))
+
 
 # ================ Maze-as-graph tools ===================
 # TODO: put all this inside EnvState object
@@ -738,7 +744,7 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
 
 from procgen import ProcgenGym3Env
 
-def create_venv(num: int, start_level: int = 0, num_levels: int = 0, num_threads: int = 1):
+def create_venv(num: int, start_level: int, num_levels: int, num_threads: int = 1):
     venv = ProcgenGym3Env(
         num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
         distribution_mode='hard', num_threads=num_threads, render_mode="rgb_array",
@@ -751,6 +757,6 @@ def create_venv(num: int, start_level: int = 0, num_levels: int = 0, num_threads
 def copy_venv(venv, idx: int):
     "Return a copy of venv number idx. WARNING: After level is finished, the copy will be reset."
     sb = venv.env.callmethod("get_state")[idx]
-    env = create_venv(num=1)
+    env = create_venv(num=1, start_level=0, num_levels=1)
     env.env.callmethod("set_state", [sb])
     return env

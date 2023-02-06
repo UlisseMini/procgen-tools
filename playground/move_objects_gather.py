@@ -28,7 +28,7 @@ import procgen_tools.maze as maze
 def make_maze_and_move_object():
     # Pick a random maze
     start_level = random.randint(0, 1e6)
-    venv = maze.create_venv(start_level=start_level, num_levels=1)    
+    venv = maze.create_venv(num=1, start_level=start_level, num_levels=1)    
     # Put the mouse on a random square chosen from the set of squares that are on either path-to-cheese, path-to-corner or both
     env_state = maze.EnvState(venv.env.callmethod('get_state')[0])
     inner_grid = env_state.inner_grid()
