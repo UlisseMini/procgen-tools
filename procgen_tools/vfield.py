@@ -66,7 +66,7 @@ def vector_field(venv, policy):
         env_state.state_bytes = sb_back
 
     venv_all = maze.create_venv(
-        num=len(legal_mouse_positions),
+        num=len(legal_mouse_positions), start_level=0,
         num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), num_levels=1 # total bullshit
     )
     venv_all.env.callmethod('set_state', state_bytes_list)
@@ -112,13 +112,38 @@ def plot_vf(vf: dict, ax=None):
     "Plot the vector field given by vf"
 
     ax = ax or plt.gca()
+    # The "or" means that if ax is None, then plt.gca() is used.
     legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
     ax.quiver(
         [x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions],
         [x[1] for x in arrows], [x[0] for x in arrows], color='red',
     )
     ax.imshow(grid, origin='lower')
-    return plt.gcf()
+    #return plt.gcf()
+
+# Rewrite the above plot_vf to use plotly
+import plotly as py
+def plot_vf_plotly(vf: dict, fig: go.Figure = None):
+    "Plot the vector field given by vf"
+
+    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
+    if fig is None:
+        fig = go.Figure()
+    else: # clear the figure
+        fig.data = []
+    fig.add_trace(go.Heatmap(z=grid))
+    fig.add_trace(go.Scatter(
+        x=[x[1] for x in legal_mouse_positions],
+        y=[x[0] for x in legal_mouse_positions],
+        mode='markers',
+        marker=dict(
+            size=12,
+            color=[x[1] for x in arrows], # set color equal to a variable
+            colorscale='Viridis', # one of plotly colorscales
+            showscale=True
+        )
+    ))
+    return fig 
 
 
 # %%

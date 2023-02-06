@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from tqdm import tqdm
 from einops import rearrange
 from IPython.display import Video, display, clear_output
-from ipywidgets import Text, interact, IntSlider, fixed, FloatSlider, Dropdown
+from ipywidgets import *
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt
@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 import circrl.module_hook as cmh
 import procgen_tools.models as models
 from patch_utils import *
+from procgen_tools.vfield import *
 
 # %% 
 # Load two levels and get values
@@ -80,15 +81,33 @@ def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
     global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
     v_env = get_custom_venv_pair(seed=seed)
 
-# %%
-# Get venv2 with a single maze which we can edit live
-single_venv = create_venv(num=1, start_level=5, num_levels=1)
-editors = maze.venv_editor(single_venv, check_on_dist=False, env_nums=range(1))
-from ipywidgets import HBox
-display(HBox(editors))
-# %%
-vfield.plot_vf(vfield.vector_field(single_venv, policy))
+# %% Get a single maze which we can edit live
+# Enable GUI mode for matplotlib
+# Render the vfield for the current maze
+seed = 1
+single_venv = create_venv(num=1, start_level=seed, num_levels=1)
 
+# Use the plotly variant of the plot_vf 
+fig = go.Figure()
+
+# fig, ax = plt.subplots()
+# # Remove ticks 
+# ax.set_xticks([])
+# ax.set_yticks([])
+
+# update_plot(ax, single_venv, policy)
+
+
+# We want to update ax whenever the maze is edited
+def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
+    vfield = vector_field(venv, policy)
+    plot_vf_plotly(vfield, fig=fig)
+    # Show the updated fig 
+    plt.show(fig)
+
+# Then make a callback which updates the render in-place when the maze is edited
+editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
+display(HBox(editors))
 # %% Use these values in desired mazes
 # Assumes a fixed venv, hook, values, and label
 @interact
@@ -115,6 +134,7 @@ for seed in range(50):
 # %% Average diff over a bunch of seeds
 values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
+
 # Iterate over range specified by slice
 for seed in range(seeds.start, seeds.stop):
     # Make values be rolling average of values from seeds
