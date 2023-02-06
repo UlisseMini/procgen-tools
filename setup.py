@@ -17,7 +17,7 @@ setup(
         "ipywidgets==7.*", # v8 causes vscode bug
         "procgen==0.10.7",
         "bidict==0.22.*",
-        "requests==2.28.*"
+        "requests==2.28.*",
         "pandas>=1.5.3",
         "circrl>=0.0.4",
         "plotly>=5.13.0",
