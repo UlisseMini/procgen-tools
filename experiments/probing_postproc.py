@@ -41,7 +41,7 @@ def get_cheese_and_dec_nodes(seq):
     #px.imshow(rearrange(episode_data['seq'].obs[0].values, 'c h w -> h w c')).show()
     cheese_node = maze.get_cheese_pos(inner_grid)
     dec_node = maze.get_decision_square_from_grid_graph(inner_grid, grid_graph)
-    return cheese_node, dec_node
+    return cheese_node, dec_node, inner_grid, grid_graph
 
 # Get the decision square timestep
 def get_dec_step(seq, dec_node):
@@ -72,7 +72,7 @@ def proc_batch_of_obs(episode_data):
         - maze state bytes at initial timestep
         - level seed'''
     seq = episode_data['seq']
-    cheese_node, dec_node = get_cheese_and_dec_nodes(seq)
+    cheese_node, dec_node, inner_grid, grid_graph = get_cheese_and_dec_nodes(seq)
     mouse_pos = get_all_mouse_pos(seq)
     return dict(
         dec_node = dec_node,
@@ -93,7 +93,7 @@ def proc_probe_data(episode_data):
         - maze state bytes at decision square
         '''
     seq = episode_data['seq']
-    cheese_node, dec_node = get_cheese_and_dec_nodes(seq)
+    cheese_node, dec_node, inner_grid, grid_graph = get_cheese_and_dec_nodes(seq)
     if dec_node is None:
         raise NoDecisionSquareException
     dec_step = get_dec_step(seq, dec_node)
@@ -108,9 +108,37 @@ def proc_probe_data(episode_data):
         dec_state_bytes = seq.custom['state_bytes'].sel(step=dec_step).values[()]
     )
 
+def proc_probe_data_initial(episode_data):
+    '''Extract quantities of interest from a rollout file:
+        - level_seed
+        - decision step
+        - location of decision square
+        - location of cheese square
+        - termination status of episode (just cheese or not for now)
+        - observations at initial square
+        - maze state bytes at initial square
+        - paths to cheese and top-right corner
+        '''
+    seq = episode_data['seq']
+    cheese_node, dec_node, inner_grid, grid_graph = get_cheese_and_dec_nodes(seq)
+    dec_step = get_dec_step(seq, dec_node)
+    # Return stuff
+    return dict(
+        level_seed = episode_data['episode_metadata']['level_seed'],
+        dec_step = dec_step,
+        dec_node = dec_node,
+        cheese_node = cheese_node,
+        did_get_cheese = episode_data['seq'].rewards[-1].values[()]>0.,
+        obs = seq.obs.isel(step=0).astype(np.float32),
+        init_state_bytes = seq.custom['state_bytes'].isel(step=0).values[()],
+        path_to_cheese = maze.get_path_to_cheese(inner_grid, grid_graph),
+        path_to_corner = maze.get_path_to_corner(inner_grid, grid_graph),
+    )
+
 POSTPROC_FUNCS_BY_TYPE = {
     'batch_of_obs': proc_batch_of_obs,
     'probe_data':   proc_probe_data,
+    'probe_data_initial': proc_probe_data_initial,
 }
 
 if __name__ == "__main__":

@@ -68,8 +68,9 @@ def vector_field(venv, policy):
         env_state.state_bytes = sb_back
 
     venv_all = maze.create_venv(
-        num=len(legal_mouse_positions), start_level=0,
-        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), num_levels=1 # total bullshit
+        num=len(legal_mouse_positions),
+        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), # total bullshit
+        num_levels=1, start_level=1
     )
     venv_all.env.callmethod('set_state', state_bytes_list)
 

@@ -1,5 +1,3 @@
-# TODO: This should all be in a different file, probably vfield.py
-
 from procgen_tools import maze, models, metrics, vfield
 import numpy as np
 import matplotlib.pyplot as plt
