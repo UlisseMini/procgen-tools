@@ -1,1 +1,1 @@
-from . import maze, metrics, models, procgen_wrappers, utils, vfield
+from . import maze, metrics, models, procgen_wrappers, utils, vfield, vfield_stats
