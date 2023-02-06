@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 def _extract_tgz(path):
     "Extracts a .tar.gz or .tgz file."
+    assert path.endswith('.tgz') or url.endswith('.tar.gz')
     with tarfile.open(path, 'r:gz') as tar:
         members = tar.getmembers()
         t = tqdm(members)
@@ -20,7 +21,6 @@ def _extract_tgz(path):
 
 def _fetch(url, filepath: str = None, force: bool = False):
     "Fetches a file from a URL and extracts it."
-    assert url.endswith('.tgz') or url.endswith('.tar.gz')
     filepath = filepath or url.split('/')[-1]
     if not force and Path(filepath).exists():
         print(f'Already downloaded {url}')
