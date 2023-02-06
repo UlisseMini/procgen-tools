@@ -82,28 +82,51 @@ def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
     v_env = get_custom_venv_pair(seed=seed)
 
 # %% Get a single maze which we can edit live
-# Enable GUI mode for matplotlib
 # Render the vfield for the current maze
+
 seed = 1
 single_venv = create_venv(num=1, start_level=seed, num_levels=1)
 
-# Use the plotly variant of the plot_vf 
-fig = go.Figure()
+def plot_vfield_live(venv: ProcgenGym3Env, policy: t.nn.Module):
+    """ Spawn a custom maze editor for venv, assuming venv has a single environment. Each time the editor is updated, the vfield is re-rendered. """
+    # Render the vfield for the current maze
+    fig = go.Figure()
+    
+    # We want to update ax whenever the maze is edited
+    def update_plot_plotly(fig, venv: ProcgenGym3Env, policy: t.nn.Module):
+        vfield = vector_field(venv, policy)
+        plot_vf_plotly(vfield, fig=fig)
+        # Show the updated fig 
+        fig.show()
 
-# fig, ax = plt.subplots()
-# # Remove ticks 
-# ax.set_xticks([])
-# ax.set_yticks([])
+    # Then make a callback which updates the render in-place when the maze is edited
+    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot_plotly(fig, single_venv, policy))
+    display(HBox(editors))
 
-# update_plot(ax, single_venv, policy)
+plot_vfield_live(single_venv, policy)
 
+# %%
+%matplotlib inline
+seed = 1
+single_venv = create_venv(num=1, start_level=seed, num_levels=1)
+
+fig, ax = plt.subplots(1,1, figsize=(5,5))
+
+# Remove ticks 
+ax.set_xticks([])
+ax.set_yticks([])
 
 # We want to update ax whenever the maze is edited
 def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
     vfield = vector_field(venv, policy)
-    plot_vf_plotly(vfield, fig=fig)
+    plot_vf(vfield, ax=venv_ax)
     # Show the updated fig 
     plt.show(fig)
+
+update_plot(ax, single_venv, policy)
+# Plot y=x
+print(ax)
+ax.plot([0,1], [0,1], color='black', linestyle='--')
 
 # Then make a callback which updates the render in-place when the maze is edited
 editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
