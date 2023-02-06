@@ -634,11 +634,18 @@ def grid_graph_has_decision_square(inner_grid, graph):
     pth = nx.shortest_path(graph, (0, 0), corner_node)
     return (not cheese_node in pth)
 
-def get_decision_square_from_grid_graph(inner_grid, graph):
+def get_path_to_cheese(inner_grid, graph):
     cheese_node = get_cheese_pos(inner_grid)
+    return nx.shortest_path(graph, (0, 0), cheese_node)
+
+def get_path_to_corner(inner_grid, graph):
     corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
-    path_to_cheese = nx.shortest_path(graph, (0, 0), cheese_node)
-    path_to_corner = nx.shortest_path(graph, (0, 0), corner_node)
+    return nx.shortest_path(graph, (0, 0), corner_node)
+
+def get_decision_square_from_grid_graph(inner_grid, graph):
+    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
+    path_to_cheese = get_path_to_cheese(inner_grid, graph)
+    path_to_corner = get_path_to_corner(inner_grid, graph)
     for ii, cheese_path_node in enumerate(path_to_cheese):
         if ii >= len(path_to_corner):
             return cheese_path_node
@@ -679,6 +686,9 @@ def get_node_type_by_world_loc(states_bytes, world_node):
     else:
         node_type = NODE_TYPES[1:][lrdu_open.sum()]
     return node_type, lrdu_open
+
+def get_object_pos_in_grid(grid, obj_value):
+    return np.argwhere(grid==obj_value)[0]
 
 def get_object_pos_from_seq_of_states(state_bytes_seq, obj_value):
     '''Extract object positions from a sequence of state_bytes, returning
