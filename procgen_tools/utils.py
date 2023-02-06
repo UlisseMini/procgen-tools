@@ -60,6 +60,7 @@ def setup_dir():
         os.chdir('..')
 
     if Path.cwd().name != 'procgen-tools':
+        Path('procgen-tools').mkdir(parents=True, exist_ok=True)
         os.chdir('procgen-tools')
 
 
