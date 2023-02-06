@@ -745,9 +745,15 @@ def wrap_venv(venv) -> ToBaselinesVecEnv:
 from procgen import ProcgenGym3Env
 
 def create_venv(num: int, start_level: int, num_levels: int, num_threads: int = 1):
-    """ num_levels=0 - The number of unique levels that can be generated. Set to 0 to use unlimited levels.
+    """
+    Create a wrapped venv. See https://github.com/openai/procgen#environment-options for params
 
-    start_level=0 - The lowest seed that will be used to generated levels. 'start_level' and 'num_levels' fully specify the set of possible levels. """
+    num=1 - The number of parallel environments to create in the vectorized env.
+
+    num_levels=0 - The number of unique levels that can be generated. Set to 0 to use unlimited levels.
+
+    start_level=0 - The lowest seed that will be used to generated levels. 'start_level' and 'num_levels' fully specify the set of possible levels.
+    """
     venv = ProcgenGym3Env(
         num=num, env_name='maze', num_levels=num_levels, start_level=start_level,
         distribution_mode='hard', num_threads=num_threads, render_mode="rgb_array",
