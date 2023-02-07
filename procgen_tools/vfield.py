@@ -100,7 +100,6 @@ def vector_field(venv, policy):
 # %%
 # Plot vector field for every mouse position
 
-
 def plot_vector_field(venv, policy, ax=None, env_num=0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
@@ -110,17 +109,40 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     vf = vector_field(venv, policy)
     return plot_vf(vf, ax=ax)
 
-
-def plot_vf(vf: dict, ax=None):
-    "Plot the vector field given by vf"
+WORLD_DIM = 25 # TODO automatically retrieve
+def plot_vf(vf: dict, ax=None, venv = None):
+    "Plot the vector field given by vf. If venv is given, plot the human view instead of the raw grid np.ndarray."
 
     ax = ax or plt.gca()
     legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
+
+    if venv is not None:
+        human_view = venv.env.get_info()[0]['rgb']
+
+        # Cut out the padding from the view. The padding is the walls around the maze. 
+        # We assume that the maze is centered in the view.
+        padding = WORLD_DIM - grid.shape[0] 
+        assert padding % 2 == 0
+        padding //= 2
+        rescale = human_view.shape[0] / WORLD_DIM
+        
+        human_view = human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)]
+
+        # rescale = human_view.shape[0] / grid.shape[0]
+        legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions]
+        legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
+        arrows = [_tmul(arr, rescale) for arr in arrows]
+
     ax.quiver(
-        [x[1] for x in legal_mouse_positions], [x[0] for x in legal_mouse_positions],
-        [x[1] for x in arrows], [x[0] for x in arrows], color='red',
+        [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='red', 
     )
-    ax.imshow(grid, origin='lower')
+
+    if venv is not None:
+        ax.imshow(human_view)
+    else: 
+        ax.imshow(grid, origin='lower')
+
     return plt.gcf()
 
 

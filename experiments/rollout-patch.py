@@ -1,6 +1,26 @@
-# %% Don't have to restart kernel and reimport each time you modify a dependency
+# %%
 %reload_ext autoreload
 %autoreload 2
+
+# Install procgen tools if needed
+try:
+  import procgen_tools
+except ImportError:
+  get_ipython().run_line_magic(magic_name='pip', line='install git+https://github.com/ulissemini/procgen-tools')
+
+# %%
+# Download data and create directory structure
+
+import os, sys
+from pathlib import Path
+from procgen_tools.utils import setup
+
+setup() # create directory structure and download data
+
+# path this notebook expects to be in
+if 'experiments' not in os.getcwd():
+    Path('experiments').mkdir(exist_ok=True)
+    os.chdir('experiments')
 
 # %%
 # Imports
@@ -26,88 +46,97 @@ import circrl.module_hook as cmh
 import procgen_tools.models as models
 from patch_utils import *
 from procgen_tools.vfield import *
-
-# %% 
-# Load two levels and get values
-import pickle as pkl
 from procgen import ProcgenGym3Env
 
-rand_region = 5
+# %%
 # Check whether we're in jupyter
 try:
     get_ipython()
     in_jupyter = True
 except NameError:
     in_jupyter = False
-path_prefix = '../' if in_jupyter else ''
 
 # %%
 # Load model
+rand_region = 5
+policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, t.device('cpu'))
 
-policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15,
-    t.device('cpu'))
-
-# %% Experiment parameters
+# %%
 label = 'embedder.block2.res1.resadd_out'
 interesting_coeffs = np.linspace(-2/3,2/3,10) 
 hook = cmh.ModuleHook(policy)
 
 # RUN ABOVE here
-# %% Interactive mode for taking cheese-diffs on one seed
+
+# %%
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
 
-
-# %% Try using one patch for many levels at different strengths
+# %%
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
 
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
 
-# %% Save figures for a bunch of (seed, coeff) pairs
+
+# %%
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-    fig, _ = plot_patched_vfield(seed, coeff)
+    fig, _, _ = plot_patched_vfield(seed, coeff, label=label, hook=hook)
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
     plt.clf()
     plt.close()
-# %% Custom value source via hand-edited maze
+
+# %%
 @interact 
 def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
     global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
     v_env = get_custom_venv_pair(seed=seed)
 
+
 # %%
+""" Edit a maze and see how that changes the vector field representing the action probabilities. """
+
 %matplotlib inline
-seed = 1
+%matplotlib widget
+
+fig, ax = plt.subplots(1,1, figsize=(3,3))
+output = Output()
+
+# @interact 
+# def custom_vfield(seed=IntSlider(min=0, max=100, step=1, value=0)):
+seed = 2
 single_venv = create_venv(num=1, start_level=seed, num_levels=1)
-
-fig, ax = plt.subplots(1,1, figsize=(5,5))
-
-# Remove ticks 
-ax.set_xticks([])
-ax.set_yticks([])
 
 # We want to update ax whenever the maze is edited
 def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
-    vfield = vector_field(venv, policy)
-    plot_vf(vfield, ax=venv_ax)
-    # Show the updated fig 
-    plt.show(fig)
+    # Clear the existing plot
+    with output:
+        venv_ax.clear()
+        
+        # Remove ticks 
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        vfield = vector_field(venv, policy)
+        plot_vf(vfield, ax=venv_ax, venv=single_venv)
+        # Update the existing figure in place 
+        clear_output(wait=True)
+        display(fig)
 
 update_plot(ax, single_venv, policy)
-# Plot y=x
-print(ax)
-ax.plot([0,1], [0,1], color='black', linestyle='--')
 
 # Then make a callback which updates the render in-place when the maze is edited
 editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
-display(HBox(editors))
-# %% Use these values in desired mazes
+
+# Display the maze editor and the plot in an HBox
+display(VBox(editors + [output]))
+
+# %%
 # Assumes a fixed venv, hook, values, and label
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-1)):
@@ -115,22 +144,27 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
     plt.show()
 
-# %% Check behavior in custom target maze
+
+# %%
 values = values_from_venv(v_env, hook, label)
 target_env = get_custom_venv_pair(seed=0)
+
 
 # %%
 fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
 plt.show()
 
+
 # %%
 fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=v_env)
 
-# %% Sweep all levels using patches gained from each level
+
+# %%
 for seed in range(50):
     run_seed(seed, hook, interesting_coeffs)
 
-# %% Average diff over a bunch of seeds
+
+# %%
 values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 
@@ -145,15 +179,20 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
     plt.show()
 
-# %% Generate a random values vector and then patch it in
+
+# %%
 values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
 for seed in range(20):
     run_seed(seed, hook, [-1], values_tup=(values, 'garbage'))
 
-# %% Try all labels for a fixed seed and diff_coeff
+
+# %%
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 # Interactive function to run all labels
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
+
+
+
