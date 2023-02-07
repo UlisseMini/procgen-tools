@@ -66,15 +66,18 @@ label = 'embedder.block2.res1.resadd_out'
 interesting_coeffs = np.linspace(-2/3,2/3,10) 
 hook = cmh.ModuleHook(policy)
 
-# RUN ABOVE here
-
-# %%
+# RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
+# %% Vfields on each maze
+""" The vector field is a plot of the action probabilities for each state in the maze. Let's see what the vector field looks like for a given seed. We'll compare the vector field for the original and patched networks. 
+"""
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
 
-# %%
+# %% Patching from a fixed seed
+""" Let's see what happens when we patch the network from a fixed seed. We'll compare the vector field for the original and patched networks.
+"""
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
 
@@ -82,7 +85,7 @@ for seed in range(10):
     run_seed(seed, hook, [-1], values_tup=values_tup)
 
 
-# %%
+# %% We can patch a range of coefficients and seeds, saving figures from each one for later reference. This is somewhat deprecated due to the interactive plotting above.
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
@@ -91,50 +94,17 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     plt.clf()
     plt.close()
 
-# %%
-@interact 
-def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
-    global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
-    v_env = get_custom_venv_pair(seed=seed)
-
-
-# %%
-""" Edit a maze and see how that changes the vector field representing the action probabilities. """
-
-%matplotlib inline
-%matplotlib widget
-
-fig, ax = plt.subplots(1,1, figsize=(3,3))
-output = Output()
-
+# # %%
 # @interact 
-# def custom_vfield(seed=IntSlider(min=0, max=100, step=1, value=0)):
-seed = 2
-single_venv = create_venv(num=1, start_level=seed, num_levels=1)
+# def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
+#     global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
+#     v_env = get_custom_venv_pair(seed=seed)
 
-# We want to update ax whenever the maze is edited
-def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
-    # Clear the existing plot
-    with output:
-        venv_ax.clear()
-        
-        # Remove ticks 
-        ax.set_xticks([])
-        ax.set_yticks([])
-        
-        vfield = vector_field(venv, policy)
-        plot_vf(vfield, ax=venv_ax, venv=single_venv)
-        # Update the existing figure in place 
-        clear_output(wait=True)
-        display(fig)
 
-update_plot(ax, single_venv, policy)
-
-# Then make a callback which updates the render in-place when the maze is edited
-editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
-
-# Display the maze editor and the plot in an HBox
-display(VBox(editors + [output]))
+# %% Live vfield probability visualization
+""" Edit a maze and see how that changes the vector field representing the action probabilities. """
+vbox = custom_vfield(0)
+display(vbox)
 
 # %%
 # Assumes a fixed venv, hook, values, and label

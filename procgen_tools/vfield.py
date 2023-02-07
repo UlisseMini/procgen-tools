@@ -145,6 +145,37 @@ def plot_vf(vf: dict, ax=None, venv = None):
 
     return plt.gcf()
 
+def custom_vfield(seed : int = 0):
+    """ Create a maze editor and a vector field plot, and update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
+    fig, ax = plt.subplots(1,1, figsize=(3,3))
+    output = Output()
+    single_venv = create_venv(num=1, start_level=seed, num_levels=1)
+
+    # We want to update ax whenever the maze is edited
+    def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
+        # Clear the existing plot
+        with output:
+            venv_ax.clear()
+            
+            # Remove ticks 
+            ax.set_xticks([])
+            ax.set_yticks([])
+            
+            vfield = vector_field(venv, policy)
+            plot_vf(vfield, ax=venv_ax, venv=single_venv)
+            # Update the existing figure in place 
+            clear_output(wait=True)
+            display(fig)
+
+    update_plot(ax, single_venv, policy)
+
+    # Then make a callback which updates the render in-place when the maze is edited
+    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
+
+    # Display the maze editor and the plot in an HBox
+    widget_vbox = VBox(editors + [output])
+    return widget_vbox
+
 
 # %%
 # Load policy and maze, then plot vector field for a bunch of mazes
