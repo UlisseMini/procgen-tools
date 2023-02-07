@@ -100,7 +100,7 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 
 # %% Live vfield probability visualization
 """ Edit a maze and see how that changes the vector field representing the action probabilities. """
-vbox = custom_vfield(policy, seed=0)
+vbox = custom_vfield(policy, seed=2) # TODO showing two images
 display(vbox)
 
 # %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)

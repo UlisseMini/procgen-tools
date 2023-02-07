@@ -136,7 +136,7 @@ def plot_vf(vf: dict, ax=None, venv = None):
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='red', 
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='white' if venv is not None else 'red', 
     )
 
     if venv is not None:
@@ -148,6 +148,7 @@ def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(3,3))
+    plt.close()
     single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
 
     # We want to update ax whenever the maze is edited

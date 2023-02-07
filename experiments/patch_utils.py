@@ -186,10 +186,13 @@ def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHoo
         a.set_yticks([])
 
     ax[0].set_xlabel("Original vfield")
-    original_vfield = vfield.plot_vector_field(venv, hook.network, ax=ax[0])
+    original_vfield = vfield.vector_field(venv, hook.network)
+    vfield.plot_vf(original_vfield, ax=ax[0], venv=venv)
+
     with hook.use_patches(patches):
         ax[1].set_xlabel("Patched vfield")
-        patched_vfield = vfield.plot_vector_field(venv, hook.network, ax=ax[1])
+        patched_vfield = vfield.vector_field(venv, hook.network)
+        vfield.plot_vf(patched_vfield, ax=ax[1], venv=venv)
 
     obj = {
         'seed': seed,
