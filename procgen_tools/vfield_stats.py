@@ -65,7 +65,7 @@ def plot_decision_probs(decision_probs_original, decision_probs_patched):
         a.legend()
         a.set_title(f'{label} probability')
         # reverse axis direction so we start at 1 and go to 0 (like the probability)
-        a.invert_xaxis()
+        # a.invert_xaxis()
 
     return fig
 
