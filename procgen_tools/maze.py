@@ -521,7 +521,8 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
-    CELL_TO_COLOR = {EMPTY: '#fde724', BLOCKED: '#24938b', CHEESE: '#440154', MOUSE: '#3c4d8a'}
+    # Hex dark yellow is 
+    CELL_TO_COLOR = {EMPTY: '#D9D9D6', BLOCKED: '#A47449', CHEESE: '#EAAA00', MOUSE: '#393D47'}
     CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀', MOUSE: '🐭'}
 
     num_mice = (grid==MOUSE).sum()
