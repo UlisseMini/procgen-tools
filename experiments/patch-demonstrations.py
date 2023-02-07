@@ -106,35 +106,7 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 vbox = custom_vfield(0)
 display(vbox)
 
-# %%
-# Assumes a fixed venv, hook, values, and label
-@interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.05, value=-1)):
-    values = values_from_venv(v_env, hook, label)
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
-    plt.show()
-
-
-# %%
-values = values_from_venv(v_env, hook, label)
-target_env = get_custom_venv_pair(seed=0)
-
-
-# %%
-fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=target_env)
-plt.show()
-
-
-# %%
-fig, _, _ = plot_patched_vfield(0, -1, label, hook, values=values, venv=v_env)
-
-
-# %%
-for seed in range(50):
-    run_seed(seed, hook, interesting_coeffs)
-
-
-# %%
+# %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)
 values = np.zeros_like(cheese_diff_values(0, label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 
@@ -150,19 +122,19 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
     plt.show()
 
 
-# %%
+# %% Patching with a random vector 
+""" Are we just seeing noise? Let's try patching with a random vector and see if that works. """
 values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
 for seed in range(20):
     run_seed(seed, hook, [-1], values_tup=(values, 'garbage'))
 
+# It doesn't work, and destroys performance. In contrast, the cheese vector has a targeted and constrained effect on the network (when not transferring to other mazes), and does little when attempting transfer. This seems intriguing.
 
-# %%
+# %% Patching different layers
+""" We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
+
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
-# Interactive function to run all labels
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
-
-
-
