@@ -55,6 +55,7 @@ try:
     in_jupyter = True
 except NameError:
     in_jupyter = False
+path_prefix = '../' if in_jupyter else ''
 
 # %%
 # Load model
@@ -80,6 +81,9 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
 """
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
+# Get the norm of values_tup[0]
+values_norm = np.linalg.norm(values_tup[0])
+print(values_norm)
 
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
@@ -94,16 +98,9 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
     plt.clf()
     plt.close()
 
-# # %%
-# @interact 
-# def custom_values(seed=IntSlider(min=0, max=100, step=1, value=0)):
-#     global v_env # TODO this seems to not play nicely if you change original seed? Other mazes are negligibly affected
-#     v_env = get_custom_venv_pair(seed=seed)
-
-
 # %% Live vfield probability visualization
 """ Edit a maze and see how that changes the vector field representing the action probabilities. """
-vbox = custom_vfield(0)
+vbox = custom_vfield(policy, seed=0)
 display(vbox)
 
 # %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)
@@ -123,8 +120,24 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
 
 
 # %% Patching with a random vector 
-""" Are we just seeing noise? Let's try patching with a random vector and see if that works. """
-values = t.rand_like(t.from_numpy(cheese_diff_values(0, label, hook))).numpy()
+""" Are we just seeing noise? Let's try patching with a random vector and see if that works. First, let's find appropriate-magnitude random vectors."""
+rand_magnitude = .25
+for mode in ['random', 'cheese']:
+    vectors = []
+    for value_seed in range(100):
+        if mode == 'random':
+            vectors.append(np.random.randn(*cheese_diff_values(0, label, hook).shape, ) * rand_magnitude)
+        else:
+            vectors.append(cheese_diff_values(value_seed, label, hook))
+        
+    norms = [np.linalg.norm(v) for v in vectors]
+    print(f'For {mode}-vectors, the norm is {np.mean(norms):.2f} with std {np.std(norms):.2f}. Max absolute-value difference of {np.max(np.abs(vectors)):.2f}.')
+
+# %% Run the patches
+values = np.random.randn(*cheese_diff_values(0, label, hook).shape) * rand_magnitude
+# Cast this to float32
+values = values.astype(np.float32)
+print(np.max(values).max())
 for seed in range(20):
     run_seed(seed, hook, [-1], values_tup=(values, 'garbage'))
 

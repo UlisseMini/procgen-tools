@@ -3,7 +3,8 @@
 
 from procgen_tools import models, maze
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+from ipywidgets import *
+from IPython.display import display, clear_output
 
 from procgen import ProcgenGym3Env
 from warnings import warn
@@ -117,6 +118,7 @@ def plot_vf(vf: dict, ax=None, venv = None):
     legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
 
     if venv is not None:
+        # We need to transform the arrows to the human view coordinate system
         human_view = venv.env.get_info()[0]['rgb']
 
         # Cut out the padding from the view. The padding is the walls around the maze. 
@@ -128,7 +130,6 @@ def plot_vf(vf: dict, ax=None, venv = None):
         
         human_view = human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)]
 
-        # rescale = human_view.shape[0] / grid.shape[0]
         legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions]
         legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
         arrows = [_tmul(arr, rescale) for arr in arrows]
@@ -143,34 +144,33 @@ def plot_vf(vf: dict, ax=None, venv = None):
     else: 
         ax.imshow(grid, origin='lower')
 
-    return plt.gcf()
-
-def custom_vfield(seed : int = 0):
-    """ Create a maze editor and a vector field plot, and update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
-    fig, ax = plt.subplots(1,1, figsize=(3,3))
+def custom_vfield(policy : torch.nn.Module, seed : int = 0):
+    """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
-    single_venv = create_venv(num=1, start_level=seed, num_levels=1)
+    fig, ax = plt.subplots(1,1, figsize=(3,3))
+    single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
 
     # We want to update ax whenever the maze is edited
-    def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
+    def update_plot():
         # Clear the existing plot
         with output:
-            venv_ax.clear()
+            ax.clear()
             
             # Remove ticks 
             ax.set_xticks([])
             ax.set_yticks([])
             
-            vfield = vector_field(venv, policy)
-            plot_vf(vfield, ax=venv_ax, venv=single_venv)
+            vfield = vector_field(single_venv, policy)
+            plot_vf(vfield, ax=ax, venv=single_venv)
+
             # Update the existing figure in place 
             clear_output(wait=True)
             display(fig)
 
-    update_plot(ax, single_venv, policy)
+    update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
+    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot())
 
     # Display the maze editor and the plot in an HBox
     widget_vbox = VBox(editors + [output])
