@@ -23,5 +23,6 @@ setup(
         "plotly>=5.13.0",
         "networkx>=3.0",
         "scipy==1.10.0",
+        "mistune==0.8.4", # intermediate dependency issue with ndconvert?
     ]
 )
