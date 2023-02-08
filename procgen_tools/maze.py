@@ -758,7 +758,26 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     conventions.'''
     get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
     
+def get_cheese_pos_from_seed(seed : int):
+    seed_env = create_venv(num=1, start_level=seed, num_levels=1)
+    state_bytes = seed_env.env.callmethod("get_state")[0]
+    state = EnvState(state_bytes)
+    grid = state.full_grid()
+    return get_cheese_pos(grid)
 
+def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 2, skip_seed : int = -1):
+    """ Generate a list of maze seeds with cheese at the specified location. """
+    assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
+    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+
+    mazes = []
+    seed = 0
+    while len(mazes) < num_mazes:
+        if seed != skip_seed and (get_cheese_pos_from_seed(seed) == cheese_location):
+            print(f'Found a maze with cheese at the same location: {seed}.')
+            mazes.append(seed)
+        seed += 1
+    return mazes
 
 # ================ Venv Wrappers ===================
 

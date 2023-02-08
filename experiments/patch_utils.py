@@ -173,7 +173,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
-def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, render_padding: bool = False):
+def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False):
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
@@ -181,9 +181,6 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, ax = plt.subplots(1,3, figsize=(10,5))
-    for a in ax:
-        a.set_xticks([])
-        a.set_yticks([])
 
     ax[0].set_xlabel("Original")
     original_vfield = vfield.vector_field(venv, hook.network)
@@ -205,7 +202,7 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         'patched_vfield': patched_vfield,
     }
     if show_title:
-        fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
+        fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
 

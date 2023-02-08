@@ -159,7 +159,7 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     assert vf1['legal_mouse_positions'] == vf2['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
     assert (vf1['grid'] == vf2['grid']).all(), "Grids must be the same to render the vf."
 
-    arrow_diffs = [(a1[0] - a2[0], a1[1] - a2[1]) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] 
+    arrow_diffs = [_tmul((a1[0] - a2[0], a1[1] - a2[1]), 1) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] # Halve the difference so it's easier to see
     
     # Check if any of the diffs have components greater than 2 (which would be a bug)
     assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
