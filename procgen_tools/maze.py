@@ -758,7 +758,47 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     conventions.'''
     get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
     
+def get_full_grid_from_seed(seed : int):
+    seed_env = create_venv(num=1, start_level=seed, num_levels=1)
+    state_bytes = seed_env.env.callmethod("get_state")[0]
+    state = EnvState(state_bytes)
+    return state.full_grid()
 
+def get_cheese_pos_from_seed(seed : int):
+    """ Get the cheese position from a maze seed. """
+    grid = get_full_grid_from_seed(seed)
+    return get_cheese_pos(grid)
+
+def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
+    """ Generate a list of maze seeds with cheese at the specified location. """
+    assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
+    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+
+    seeds = []
+    seed = 0
+    while len(seeds) < num_mazes:
+        if seed != skip_seed and (get_cheese_pos_from_seed(seed) == cheese_location):
+            seeds.append(seed)
+        seed += 1
+    return seeds
+
+def generate_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 50, skip_seed : int = -1):
+    """ Generate the first num_mazes seeds which have an empty/cheese square at cheese_location, except the mazes are modified to instead have cheese at cheese_location. Returns a list of full grids. """
+    assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
+    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+
+    grids = []
+    seed = 0
+    while len(grids) < num_mazes:
+        if seed != skip_seed:
+            grid = get_full_grid_from_seed(seed)
+            if (grid[cheese_location] == EMPTY or grid[cheese_location] == CHEESE):
+                old_cheese = get_cheese_pos(grid)
+                grid[old_cheese] = EMPTY
+                grid[cheese_location] = CHEESE
+                grids.append(grid)
+        seed += 1
+    return grids
 
 # ================ Venv Wrappers ===================
 

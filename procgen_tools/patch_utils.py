@@ -119,7 +119,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
         env = copy_venv(venv, 1 if vanished else 0)
         with hook.use_patches(patches):
             seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
-        hook.probe_with_input(seq.obs.astype(np.float32))
+        hook.run_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label('fc_policy_out')
         logits_to_action_plot(action_logits, title=activation_label)
         
@@ -150,7 +150,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
 def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, label: str):
     """ Get the values of the activations at label for the given venv. """
     obs = venv.reset().astype(np.float32) # TODO why reset?
-    hook.probe_with_input(obs, func=forward_func_policy)
+    hook.run_with_input(obs, func=forward_func_policy)
     return hook.get_value_by_label(label)
 
 def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
@@ -173,28 +173,16 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
-<<<<<<< Updated upstream:experiments/patch_utils.py
-def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, render_padding: bool = False):
-=======
-def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
->>>>>>> Stashed changes:procgen_tools/patch_utils.py
+def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False):
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
-    # New structure: take venv pair, get values from them if values not provided; require passing in venv pair (so you preprocess from seed if you want)
-    # Now this requires 
     values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
-<<<<<<< Updated upstream:experiments/patch_utils.py
-    fig, ax = plt.subplots(1,3, figsize=(10,5))
-    for a in ax:
-        a.set_xticks([])
-        a.set_yticks([])
-=======
+    size = 5
     num_cols = 3
-    fig, ax = plt.subplots(1, num_cols, figsize=(ax_size*num_cols,ax_size))
->>>>>>> Stashed changes:procgen_tools/patch_utils.py
+    fig, ax = plt.subplots(1, num_cols, figsize=(size*num_cols,size))
 
     ax[0].set_xlabel("Original")
     original_vfield = vfield.vector_field(venv, hook.network)
@@ -205,7 +193,7 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         patched_vfield = vfield.vector_field(venv, hook.network)
         vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
 
-    ax[2].set_xlabel("Patched – Original")
+    ax[2].set_xlabel("Patched minus original")
     vfield.plot_vf_diff(vf1=patched_vfield, vf2=original_vfield, ax=ax[2], render_padding=render_padding)
 
     obj = {
@@ -216,7 +204,7 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         'patched_vfield': patched_vfield,
     }
     if show_title:
-        fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
+        fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
 
