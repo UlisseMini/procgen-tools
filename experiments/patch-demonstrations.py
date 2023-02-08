@@ -81,10 +81,6 @@ def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=F
 """
 value_seed = 0
 values_tup = cheese_diff_values(value_seed, label, hook), value_seed
-# Get the norm of values_tup[0]
-values_norm = np.linalg.norm(values_tup[0])
-print(values_norm)
-
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
 

@@ -110,7 +110,6 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     vf = vector_field(venv, policy)
     return plot_vf(vf, ax=ax)
 
-WORLD_DIM = 25 # TODO automatically retrieve
 def plot_vf(vf: dict, ax=None, human_render : bool = True):
     "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
     ax = ax or plt.gca()
@@ -119,17 +118,12 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True):
 
     if human_render:
         # We need to transform the arrows to the human view coordinate system
-        human_render = maze.venv_from_grid(grid)
-        human_view = human_render.env.get_info()[0]['rgb']
+        human_view = maze.render_inner_grid(grid)
 
-        # Cut out the padding from the view. The padding is the walls around the maze. 
-        # We assume that the maze is centered in the view.
-        padding = WORLD_DIM - grid.shape[0] 
+        padding = maze.WORLD_DIM - grid.shape[0] 
         assert padding % 2 == 0
         padding //= 2
-        rescale = human_view.shape[0] / WORLD_DIM
-        
-        human_view = human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)]
+        rescale = human_view.shape[0] / grid.shape[0]
 
         legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions]
         legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
