@@ -732,6 +732,10 @@ def get_node_type_by_world_loc(states_bytes, world_node):
 def get_object_pos_in_grid(grid, obj_value):
     return np.argwhere(grid==obj_value)[0]
 
+def get_legal_mouse_positions(grid : np.ndarray):
+    '''Return a list of legal mouse positions in the grid, returned as a list of tuples.'''
+    return [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == EMPTY]
+
 def get_object_pos_from_seq_of_states(state_bytes_seq, obj_value):
     '''Extract object positions from a sequence of state_bytes, returning
     as a numpy array of shape (len(sequance), 2).  Note that the first
@@ -758,6 +762,7 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     conventions.'''
     get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
     
+<<<<<<< HEAD
 def get_full_grid_from_seed(seed : int):
     seed_env = create_venv(num=1, start_level=seed, num_levels=1)
     state_bytes = seed_env.env.callmethod("get_state")[0]
@@ -770,10 +775,21 @@ def get_cheese_pos_from_seed(seed : int):
     return get_cheese_pos(grid)
 
 def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
+=======
+def get_cheese_pos_from_seed(seed : int):
+    seed_env = create_venv(num=1, start_level=seed, num_levels=1)
+    state_bytes = seed_env.env.callmethod("get_state")[0]
+    state = EnvState(state_bytes)
+    grid = state.full_grid()
+    return get_cheese_pos(grid)
+
+def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 2, skip_seed : int = -1):
+>>>>>>> main
     """ Generate a list of maze seeds with cheese at the specified location. """
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
     assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
 
+<<<<<<< HEAD
     seeds = []
     seed = 0
     while len(seeds) < num_mazes:
@@ -799,6 +815,16 @@ def generate_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], nu
                 grids.append(grid)
         seed += 1
     return grids
+=======
+    mazes = []
+    seed = 0
+    while len(mazes) < num_mazes:
+        if seed != skip_seed and (get_cheese_pos_from_seed(seed) == cheese_location):
+            print(f'Found a maze with cheese at the same location: {seed}.')
+            mazes.append(seed)
+        seed += 1
+    return mazes
+>>>>>>> main
 
 # ================ Venv Wrappers ===================
 

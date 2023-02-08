@@ -51,7 +51,7 @@ def vector_field(venv, policy):
 
     env_state = maze.EnvState(venv.env.callmethod('get_state')[0])
     grid = env_state.inner_grid(with_mouse=False)
-    legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
+    legal_mouse_positions = maze.get_legal_mouse_positions(grid) 
 
     # convert coords from inner to outer grid coordinates
     assert (env_state.world_dim - grid.shape[0]) % 2 == 0
@@ -159,14 +159,14 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     assert vf1['legal_mouse_positions'] == vf2['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
     assert (vf1['grid'] == vf2['grid']).all(), "Grids must be the same to render the vf."
 
-    arrow_diffs = [(a1[0] - a2[0], a1[1] - a2[1]) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] 
+    arrow_diffs = [_tmul((a1[0] - a2[0], a1[1] - a2[1]), 1) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] # Halve the difference so it's easier to see
     
     # Check if any of the diffs have components greater than 2 (which would be a bug)
     assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
 
     vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf1['legal_mouse_positions'], 'grid': vf1['grid']}
 
-    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='red' if human_render else 'blue')
+    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
