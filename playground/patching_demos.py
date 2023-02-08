@@ -66,7 +66,7 @@ def run_and_show_rollout(desc, patches={}):
     obs = seq.obs.astype(np.float32)
     # Note: this call has to happen outside the with block, since it also
     # sets patches (this is a bit confusing and should prob trigger a warning.)
-    hook.probe_with_input(obs, patches=patches)  
+    hook.run_with_input(obs, patches=patches)  
     action_logits = hook.get_value_by_label(action_logits_label)
     # Make a video of the renders so we can see what it looks like
     vid_fn, fps = cro.make_video_from_renders(seq.renders, fps=10)

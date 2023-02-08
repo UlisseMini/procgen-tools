@@ -119,7 +119,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
         env = copy_venv(venv, 1 if vanished else 0)
         with hook.use_patches(patches):
             seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
-        hook.probe_with_input(seq.obs.astype(np.float32))
+        hook.run_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label('fc_policy_out')
         logits_to_action_plot(action_logits, title=activation_label)
         
@@ -150,7 +150,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
 def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, label: str):
     """ Get the values of the activations at label for the given venv. """
     obs = venv.reset().astype(np.float32) # TODO why reset?
-    hook.probe_with_input(obs, func=forward_func_policy)
+    hook.run_with_input(obs, func=forward_func_policy)
     return hook.get_value_by_label(label)
 
 def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):

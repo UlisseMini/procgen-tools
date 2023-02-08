@@ -126,7 +126,7 @@ if __name__ == "__main__":
     obs_all = xr.concat([dd['obs'] for dd in data_all], 
         dim='batch').assign_coords(dict(batch=batch_coords))
     hook = cmh.ModuleHook(policy)
-    hook.probe_with_input(obs_all)
+    hook.run_with_input(obs_all)
 
 # %%
 # Select a layer to probe over and do some fitting!
