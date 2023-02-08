@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 
 import circrl.module_hook as cmh
 import procgen_tools.models as models
-from patch_utils import *
+from procgen_tools.patch_utils import *
 from procgen_tools.vfield import *
 from procgen import ProcgenGym3Env
 

@@ -191,7 +191,7 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         patched_vfield = vfield.vector_field(venv, hook.network)
         vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
 
-    ax[2].set_xlabel("Patched – Original")
+    ax[2].set_xlabel("Patched minus original")
     vfield.plot_vf_diff(vf1=patched_vfield, vf2=original_vfield, ax=ax[2], render_padding=render_padding)
 
     obj = {
