@@ -114,13 +114,11 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
     """ Render the arrows in the vector field. """
     ax = ax or plt.gca()
 
-    test_slice = slice(0, 10)
-    print(vf['arrows'][test_slice])
-    arrows, legal_mouse_positions, grid = vf['arrows'][test_slice], vf['legal_mouse_positions'][test_slice], vf['grid']
+    arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, 
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy'
     )
 
     if human_render:
