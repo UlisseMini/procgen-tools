@@ -78,7 +78,7 @@ hook = cmh.ModuleHook(policy)
 # Run obs through model to get all the activations
 num_batch = 1000
 obs_sub = obs_all[:num_batch]
-hook.probe_with_input(obs_sub)
+hook.run_with_input(obs_sub)
 
 probe_targets_sub = probe_targets.isel(batch=slice(num_batch))
 

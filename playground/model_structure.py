@@ -56,7 +56,7 @@ for rr in range(n_rows):
         obs_full[rr,cc,:,rr,cc] = 1.
 
 obs = rearrange(obs_full, 'r1 c1 ch r2 c2 -> (r1 c1) ch r2 c2')
-hook.probe_with_input(obs)
+hook.run_with_input(obs)
 results_by_value = {}
 for label in values_to_check:
     value = hook.get_value_by_label(label)

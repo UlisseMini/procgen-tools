@@ -732,6 +732,10 @@ def get_node_type_by_world_loc(states_bytes, world_node):
 def get_object_pos_in_grid(grid, obj_value):
     return np.argwhere(grid==obj_value)[0]
 
+def get_legal_mouse_positions(grid : np.ndarray):
+    '''Return a list of legal mouse positions in the grid, returned as a list of tuples.'''
+    return [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == EMPTY]
+
 def get_object_pos_from_seq_of_states(state_bytes_seq, obj_value):
     '''Extract object positions from a sequence of state_bytes, returning
     as a numpy array of shape (len(sequance), 2).  Note that the first

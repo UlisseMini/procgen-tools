@@ -10,7 +10,7 @@ import procgen_tools.models as models
 
 # %% 
 # Load two levels and get values
-from patch_utils import *
+from procgen_tools.patch_utils import *
 # %%
 # Save vector fields and figures for a bunch of (seed, coeff) pairs
 
