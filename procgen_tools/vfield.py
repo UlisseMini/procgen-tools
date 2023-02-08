@@ -164,11 +164,8 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     # Check if any of the diffs have components greater than 2 (which would be a bug)
     assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
 
-    # Print the maximal component
-    print(max(max(abs(a[0]), abs(a[1])) for a in arrow_diffs))
     vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf1['legal_mouse_positions'], 'grid': vf1['grid']}
 
-    # render_arrows(vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='red' if human_render else 'blue')
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='red' if human_render else 'blue')
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
