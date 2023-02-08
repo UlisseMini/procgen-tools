@@ -75,6 +75,9 @@ def setup():
     _fetch('https://nerdsniper.net/mats/data.tgz')
     _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth')
 
+
+def _device(policy):
+    return next(policy.parameters()).device
     
 
 # %%

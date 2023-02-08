@@ -2,6 +2,7 @@
 # Imports
 
 from procgen_tools import models, maze
+from procgen_tools.utils import _device
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
@@ -40,8 +41,6 @@ def _tmul(tup: tuple, s: float):
     return tuple(s * x for x in tup)
 def _tadd(*tups):
     return tuple(sum(axis) for axis in zip(*tups))
-def _device(policy):
-    return next(policy.parameters()).device
 
 def vector_field(venv, policy):
     """

@@ -18,6 +18,7 @@ import circrl.rollouts as cro
 from procgen_tools import maze, vfield
 import procgen_tools.models as models
 from procgen_tools.maze import copy_venv, create_venv
+from procgen_tools.utils import _device
 
 # %% 
 # Load two levels and get values
@@ -66,14 +67,6 @@ def load_venv_pair(path: str):
         raise NotImplementedError('This venv is only used as a template for copy_env')
     venv.step = _step
     return venv
-
-# %%
-# Load model
-
-def forward_func_policy(network, inp):
-    hidden = network.embedder(inp)
-    return network.fc_policy(hidden)
-
 
 # %% 
 def logits_to_action_plot(logits, title=''):
@@ -150,7 +143,9 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
 def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, label: str):
     """ Get the values of the activations at label for the given venv. """
     obs = venv.reset().astype(np.float32) # TODO why reset?
-    hook.probe_with_input(obs, func=forward_func_policy)
+    # hook.probe_with_input(t.tensor(obs, dtype=t.float32, device=_device(hook.network)))
+    with hook.set_hook_should_get_custom_data():
+        hook.network(t.tensor(obs, dtype=t.float32, device=_device(hook.network)))
     return hook.get_value_by_label(label)
 
 def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
