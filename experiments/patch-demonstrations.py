@@ -73,7 +73,7 @@ hook = cmh.ModuleHook(policy)
 """
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
     plt.show()
 
 # %% Patching from a fixed seed
@@ -89,7 +89,7 @@ for seed in range(10):
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-    fig, _, _ = plot_patched_vfield(seed, coeff, label=label, hook=hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, label=label, hook=hook)
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
     plt.clf()
     plt.close()
@@ -111,7 +111,7 @@ for seed in range(seeds.start, seeds.stop):
 # Assumes a fixed venv, hook, values, and label
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-10, max=10, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook, values=values)
+    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook, values=values)
     plt.show()
 
 
@@ -145,7 +145,7 @@ for seed in range(5):
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
-    fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
     plt.show()
 
 # %% Transfer to same cheese locations
@@ -175,11 +175,19 @@ def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_maz
         seed += 1
     return mazes
 
-mazes_with_cheese_at_location = get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) # Skip the first one, since it's the same as the value seed.
+# Check if we've already saved this list of mazes.
+try:
+    mazes_with_cheese_at_location = np.load('mazes_with_cheese_at_location.npy')
+except FileNotFoundError:
+    # If not, generate it.
+    mazes_with_cheese_at_location = get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) 
+    # np.save('mazes_with_cheese_at_{cheese_location}.npy', mazes_with_cheese_at_location) # TODO implement or delete
 
 # %% Now we can see how well the patch transfers to mazes with cheese at the same location.
 assert len(mazes_with_cheese_at_location) > 0, "No mazes with cheese at the specified location."
 @interact
 def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_cheese_at_location)):
-    fig, _, _ = plot_patched_vfield(seed, -1, label, hook, values=values, render_padding=True)
+    fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values, render_padding=True)
     plt.show()
+    
+# %%

@@ -180,19 +180,22 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
-    fig, ax = plt.subplots(1,2, figsize=(10,5))
+    fig, ax = plt.subplots(1,3, figsize=(10,5))
     for a in ax:
         a.set_xticks([])
         a.set_yticks([])
 
-    ax[0].set_xlabel("Original vfield")
+    ax[0].set_xlabel("Original")
     original_vfield = vfield.vector_field(venv, hook.network)
     vfield.plot_vf(original_vfield, ax=ax[0], render_padding=render_padding)
 
     with hook.use_patches(patches):
-        ax[1].set_xlabel("Patched vfield")
+        ax[1].set_xlabel("Patched")
         patched_vfield = vfield.vector_field(venv, hook.network)
         vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
+
+    ax[2].set_xlabel("Patched – Original")
+    vfield.plot_vf_diff(vf1=patched_vfield, vf2=original_vfield, ax=ax[2], render_padding=render_padding)
 
     obj = {
         'seed': seed,
