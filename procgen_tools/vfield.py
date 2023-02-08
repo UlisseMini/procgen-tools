@@ -111,15 +111,16 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     return plot_vf(vf, ax=ax)
 
 WORLD_DIM = 25 # TODO automatically retrieve
-def plot_vf(vf: dict, ax=None, venv = None):
-    "Plot the vector field given by vf. If venv is given, plot the human view instead of the raw grid np.ndarray."
-
+def plot_vf(vf: dict, ax=None, human_render : bool = True):
+    "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
     ax = ax or plt.gca()
+
     legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
 
-    if venv is not None:
+    if human_render:
         # We need to transform the arrows to the human view coordinate system
-        human_view = venv.env.get_info()[0]['rgb']
+        human_render = maze.venv_from_grid(grid)
+        human_view = human_render.env.get_info()[0]['rgb']
 
         # Cut out the padding from the view. The padding is the walls around the maze. 
         # We assume that the maze is centered in the view.
@@ -136,13 +137,16 @@ def plot_vf(vf: dict, ax=None, venv = None):
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='white' if venv is not None else 'red', 
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='white' if human_render else 'red', 
     )
 
-    if venv is not None:
+    if human_render:
         ax.imshow(human_view)
     else: 
         ax.imshow(grid, origin='lower')
+
+    ax.set_xticks([])
+    ax.set_yticks([])
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
@@ -155,14 +159,8 @@ def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     def update_plot():
         # Clear the existing plot
         with output:
-            ax.clear()
-            
-            # Remove ticks 
-            ax.set_xticks([])
-            ax.set_yticks([])
-            
             vfield = vector_field(single_venv, policy)
-            plot_vf(vfield, ax=ax, venv=single_venv)
+            plot_vf(vfield, ax=ax)
 
             # Update the existing figure in place 
             clear_output(wait=True)

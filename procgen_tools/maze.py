@@ -517,6 +517,22 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
     return True
 
 
+def venv_from_grid(grid: np.ndarray):
+    "Get a venv with the given inner grid"
+    n_mice = (grid==MOUSE).sum()
+    if n_mice == 0:
+        grid = grid.copy()
+        assert grid[0,0] == EMPTY, 'grid[0,0] is not empty'
+        grid[0,0] = MOUSE
+    assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
+
+    venv = create_venv(num=1, num_levels=1, start_level=0)
+    state = EnvState(venv.env.callmethod("get_state")[0])
+    state.set_grid(grid, pad=True)
+    venv.env.callmethod("set_state", [state.state_bytes])
+    return venv
+
+
 def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time

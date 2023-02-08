@@ -100,7 +100,7 @@ for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
 
 # %% Live vfield probability visualization
 """ Edit a maze and see how that changes the vector field representing the action probabilities. """
-vbox = custom_vfield(policy, seed=2) # TODO showing two images
+vbox = custom_vfield(policy, seed=2)
 display(vbox)
 
 # %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)
@@ -138,7 +138,7 @@ values = np.random.randn(*cheese_diff_values(0, label, hook).shape) * rand_magni
 # Cast this to float32
 values = values.astype(np.float32)
 print(np.max(values).max())
-for seed in range(20):
+for seed in range(5):
     run_seed(seed, hook, [-1], values_tup=(values, 'garbage'))
 
 # It doesn't work, and destroys performance. In contrast, the cheese vector has a targeted and constrained effect on the network (when not transferring to other mazes), and does little when attempting transfer. This seems intriguing.

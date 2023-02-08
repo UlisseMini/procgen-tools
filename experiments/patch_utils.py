@@ -173,26 +173,26 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
-def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None):
+def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = True):
+    """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, ax = plt.subplots(1,2, figsize=(10,5))
-    # remove axis ticks from images
     for a in ax:
         a.set_xticks([])
         a.set_yticks([])
 
     ax[0].set_xlabel("Original vfield")
     original_vfield = vfield.vector_field(venv, hook.network)
-    vfield.plot_vf(original_vfield, ax=ax[0], venv=venv)
+    vfield.plot_vf(original_vfield, ax=ax[0])
 
     with hook.use_patches(patches):
         ax[1].set_xlabel("Patched vfield")
         patched_vfield = vfield.vector_field(venv, hook.network)
-        vfield.plot_vf(patched_vfield, ax=ax[1], venv=venv)
+        vfield.plot_vf(patched_vfield, ax=ax[1])
 
     obj = {
         'seed': seed,
@@ -201,7 +201,8 @@ def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHoo
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
     }
-    fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
+    if show_title:
+        fig.suptitle(f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
 
