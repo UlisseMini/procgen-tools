@@ -22,6 +22,8 @@ EMPTY = 100
 BLOCKED = 51
 MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
 
+WORLD_DIM = 25
+
 # Types and things
 
 @dataclass
@@ -516,6 +518,39 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
 
     return True
 
+
+def venv_from_grid(grid: np.ndarray):
+    "Get a venv with the given inner grid"
+    n_mice = (grid==MOUSE).sum()
+    if n_mice == 0:
+        grid = grid.copy()
+        assert grid[0,0] == EMPTY, 'grid[0,0] is not empty'
+        grid[0,0] = MOUSE
+    assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
+
+    venv = create_venv(num=1, num_levels=1, start_level=0)
+    state = EnvState(venv.env.callmethod("get_state")[0])
+    state.set_grid(grid, pad=True)
+    venv.env.callmethod("set_state", [state.state_bytes])
+    return venv
+
+def render_inner_grid(grid: np.ndarray):
+    """ Extract the human-sensible view given grid, assumed to be an inner_grid. Return the human view."""
+    venv = venv_from_grid(grid)
+    human_view = venv.env.get_info()[0]['rgb']
+
+    # Cut out the padding from the view. The padding is the walls around the maze. 
+    padding = WORLD_DIM - grid.shape[0] 
+    assert padding % 2 == 0
+    padding //= 2
+    rescale = human_view.shape[0] / WORLD_DIM
+    
+    return human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)] if padding > 0 else human_view
+
+def render_outer_grid(grid: np.ndarray):
+    """ Extract the human-sensible view given grid, assumed to be an outer_grid. Return the human view."""
+    venv = venv_from_grid(grid)
+    return venv.env.get_info()[0]['rgb']
 
 def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output

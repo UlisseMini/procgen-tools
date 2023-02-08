@@ -3,7 +3,8 @@
 
 from procgen_tools import models, maze
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+from ipywidgets import *
+from IPython.display import display, clear_output
 
 from procgen import ProcgenGym3Env
 from warnings import warn
@@ -109,68 +110,86 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     vf = vector_field(venv, policy)
     return plot_vf(vf, ax=ax)
 
-WORLD_DIM = 25 # TODO automatically retrieve
-def plot_vf(vf: dict, ax=None, venv = None):
-    "Plot the vector field given by vf. If venv is given, plot the human view instead of the raw grid np.ndarray."
-
+def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding : bool = False, color : str = 'white'):
+    """ Render the arrows in the vector field. """
     ax = ax or plt.gca()
-    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
 
-    if venv is not None:
-        human_view = venv.env.get_info()[0]['rgb']
-
-        # Cut out the padding from the view. The padding is the walls around the maze. 
-        # We assume that the maze is centered in the view.
-        padding = WORLD_DIM - grid.shape[0] 
-        assert padding % 2 == 0
-        padding //= 2
-        rescale = human_view.shape[0] / WORLD_DIM
-        
-        human_view = human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)]
-
-        # rescale = human_view.shape[0] / grid.shape[0]
-        legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions]
-        legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
-        arrows = [_tmul(arr, rescale) for arr in arrows]
+    arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='red', 
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy'
     )
 
-    if venv is not None:
+    if human_render:
+        human_view = maze.render_outer_grid(grid) if render_padding else maze.render_inner_grid(grid)
         ax.imshow(human_view)
     else: 
         ax.imshow(grid, origin='lower')
 
-    return plt.gcf()
+    ax.set_xticks([])
+    ax.set_yticks([])
 
-def custom_vfield(seed : int = 0):
-    """ Create a maze editor and a vector field plot, and update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
-    fig, ax = plt.subplots(1,1, figsize=(3,3))
+def map_vf_to_human(vf : dict, render_padding : bool = False):
+    "Map the vector field vf to the human view coordinate system."
+    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
+
+    # We need to transform the arrows to the human view coordinate system
+    human_view = maze.render_outer_grid(grid)
+
+    padding = maze.WORLD_DIM - grid.shape[0] 
+    assert padding % 2 == 0
+    padding //= 2
+    rescale = human_view.shape[0] / maze.WORLD_DIM
+
+    legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions] # flip y axis
+    if render_padding: 
+        legal_mouse_positions = [(row + padding, col + padding) for row, col in legal_mouse_positions]
+    legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
+    arrows = [_tmul(arr, rescale) for arr in arrows]
+
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid}
+
+def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool = False):
+    "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
+    render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
+
+def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
+    """ Render the difference between two vector fields. """
+    assert vf1['legal_mouse_positions'] == vf2['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
+    assert (vf1['grid'] == vf2['grid']).all(), "Grids must be the same to render the vf."
+
+    arrow_diffs = [(a1[0] - a2[0], a1[1] - a2[1]) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] 
+    
+    # Check if any of the diffs have components greater than 2 (which would be a bug)
+    assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
+
+    vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf1['legal_mouse_positions'], 'grid': vf1['grid']}
+
+    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='red' if human_render else 'blue')
+
+def custom_vfield(policy : torch.nn.Module, seed : int = 0):
+    """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
-    single_venv = create_venv(num=1, start_level=seed, num_levels=1)
+    fig, ax = plt.subplots(1,1, figsize=(3,3))
+    plt.close()
+    single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
 
     # We want to update ax whenever the maze is edited
-    def update_plot(venv_ax, venv: ProcgenGym3Env, policy: t.nn.Module):
+    def update_plot():
         # Clear the existing plot
         with output:
-            venv_ax.clear()
-            
-            # Remove ticks 
-            ax.set_xticks([])
-            ax.set_yticks([])
-            
-            vfield = vector_field(venv, policy)
-            plot_vf(vfield, ax=venv_ax, venv=single_venv)
+            vfield = vector_field(single_venv, policy)
+            plot_vf(vfield, ax=ax)
+
             # Update the existing figure in place 
             clear_output(wait=True)
             display(fig)
 
-    update_plot(ax, single_venv, policy)
+    update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot(ax, single_venv, policy))
+    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot())
 
     # Display the maze editor and the plot in an HBox
     widget_vbox = VBox(editors + [output])

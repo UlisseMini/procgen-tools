@@ -36,7 +36,7 @@ if __name__ == '__main__':
     hook = cmh.ModuleHook(policy)
 
     for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-        fig, _, obj = plot_patched_vfield(seed, coeff, label, hook)
+        fig, _, obj = plot_patched_vfields(seed, coeff, label, hook)
         name = f"seed-{seed}_coeff-{coeff}_rr-{rand_region}_label-{label}"
         with open(f'{path_prefix}data/vfields/{name}.pkl', 'wb') as fp:
             pickle.dump(obj, fp)
