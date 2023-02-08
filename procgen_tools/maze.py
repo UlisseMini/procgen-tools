@@ -547,6 +547,11 @@ def render_inner_grid(grid: np.ndarray):
     
     return human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)] if padding > 0 else human_view
 
+def render_outer_grid(grid: np.ndarray):
+    """ Extract the human-sensible view given grid, assumed to be an outer_grid. Return the human view."""
+    venv = venv_from_grid(grid)
+    return venv.env.get_info()[0]['rgb']
+
 def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time

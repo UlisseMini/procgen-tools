@@ -147,3 +147,39 @@ labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
     fig, _, _ = plot_patched_vfield(seed, coeff, label, hook)
     plt.show()
+
+# %% Transfer to same cheese locations
+""" Let's see what happens when we transfer the patches to the same cheese locations. """
+def get_cheese_pos_from_seed(seed : int):
+    seed_env = create_venv(num=1, start_level=seed, num_levels=1)
+    state_bytes = seed_env.env.callmethod("get_state")[0]
+    state = maze.EnvState(state_bytes)
+    grid = state.full_grid()
+    return maze.get_cheese_pos(grid)
+
+value_seed = 0
+cheese_location = get_cheese_pos_from_seed(value_seed)
+print(f'The cheese vector is taken from a seed with cheese at {cheese_location}.')
+
+def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 2, skip_seed : int = -1):
+    """ Generate a list of maze seeds with cheese at the specified location. """
+    assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
+    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+
+    mazes = []
+    seed = 0
+    while len(mazes) < num_mazes:
+        if seed != skip_seed and (get_cheese_pos_from_seed(seed) == cheese_location):
+            print(f'Found a maze with cheese at the same location: {seed}.')
+            mazes.append(seed)
+        seed += 1
+    return mazes
+
+mazes_with_cheese_at_location = get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) # Skip the first one, since it's the same as the value seed.
+
+# %% Now we can see how well the patch transfers to mazes with cheese at the same location.
+assert len(mazes_with_cheese_at_location) > 0, "No mazes with cheese at the specified location."
+@interact
+def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_cheese_at_location)):
+    fig, _, _ = plot_patched_vfield(seed, -1, label, hook, values=values, render_padding=True)
+    plt.show()

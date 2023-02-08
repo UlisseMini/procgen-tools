@@ -110,37 +110,58 @@ def plot_vector_field(venv, policy, ax=None, env_num=0):
     vf = vector_field(venv, policy)
     return plot_vf(vf, ax=ax)
 
-def plot_vf(vf: dict, ax=None, human_render : bool = True):
-    "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
+def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding : bool = False, color : str = 'white'):
+    """ Render the arrows in the vector field. """
     ax = ax or plt.gca()
-
-    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
-
-    if human_render:
-        # We need to transform the arrows to the human view coordinate system
-        human_view = maze.render_inner_grid(grid)
-
-        padding = maze.WORLD_DIM - grid.shape[0] 
-        assert padding % 2 == 0
-        padding //= 2
-        rescale = human_view.shape[0] / grid.shape[0]
-
-        legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions]
-        legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
-        arrows = [_tmul(arr, rescale) for arr in arrows]
+    arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color='white' if human_render else 'red', 
+        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, 
     )
 
     if human_render:
+        human_view = maze.render_outer_grid(grid) if render_padding else maze.render_inner_grid(grid)
         ax.imshow(human_view)
     else: 
         ax.imshow(grid, origin='lower')
 
     ax.set_xticks([])
     ax.set_yticks([])
+
+def map_vf_to_human(vf : dict):
+    "Map the vector field vf to the human view coordinate system."
+    legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
+
+    # We need to transform the arrows to the human view coordinate system
+    human_view = maze.render_outer_grid(grid)
+
+    padding = maze.WORLD_DIM - grid.shape[0] 
+    assert padding % 2 == 0
+    padding //= 2
+    rescale = human_view.shape[0] / maze.WORLD_DIM
+
+    legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions] # flip y axis
+    legal_mouse_positions = [(row + padding, col + padding) for row, col in legal_mouse_positions]
+    legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
+    arrows = [_tmul(arr, rescale) for arr in arrows]
+
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid}
+
+def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool = False):
+    "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
+    render_arrows(map_vf_to_human(vf) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
+
+def render_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
+    """ Render the difference between two vector fields. """
+    assert vf1['legal_mouse_positions'] == vf2['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
+    assert vf1['grid'] == vf2['grid'], "Grids must be the same to render the vf."
+
+    vf1, vf2 = (map_vf_to_human(vf) for vf in (vf1, vf2)) if human_render else (vf1, vf2)
+    arrow_diffs = [(a1[0] - a2[0], a1[1] - a2[1]) for a1, a2 in zip(arrows1, arrows2)]
+    vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf1['legal_mouse_positions'], 'grid': vf1['grid']}
+
+    render_arrows(vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='limegreen' if human_render else 'blue')
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """

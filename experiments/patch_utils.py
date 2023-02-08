@@ -158,7 +158,7 @@ def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(venv, hook, label)
 
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150):
+def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150, render_padding : bool = False):
     """ Run a single seed, with the given hook and diff_coeffs. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = get_cheese_venv_pair(seed) 
 
@@ -173,7 +173,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 
-def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = True):
+def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, render_padding: bool = False):
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
@@ -187,12 +187,12 @@ def plot_patched_vfield(seed: int, coeff: float, label: str, hook: cmh.ModuleHoo
 
     ax[0].set_xlabel("Original vfield")
     original_vfield = vfield.vector_field(venv, hook.network)
-    vfield.plot_vf(original_vfield, ax=ax[0])
+    vfield.plot_vf(original_vfield, ax=ax[0], render_padding=render_padding)
 
     with hook.use_patches(patches):
         ax[1].set_xlabel("Patched vfield")
         patched_vfield = vfield.vector_field(venv, hook.network)
-        vfield.plot_vf(patched_vfield, ax=ax[1])
+        vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
 
     obj = {
         'seed': seed,
