@@ -180,7 +180,9 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
-    fig, ax = plt.subplots(1,3, figsize=(10,5))
+    size = 5
+    num_cols = 3
+    fig, ax = plt.subplots(1, num_cols, figsize=(size*num_cols,size))
 
     ax[0].set_xlabel("Original")
     original_vfield = vfield.vector_field(venv, hook.network)

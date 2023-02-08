@@ -153,11 +153,38 @@ values = cheese_diff_values(value_seed, label, hook)
 cheese_location = maze.get_cheese_pos_from_seed(value_seed)
 print(f'The cheese vector is taken from a seed with cheese at {cheese_location}.')
 
-maze.mazes_with_cheese_at_location = get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) 
+mazes_with_cheese_at_location = maze.get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) 
 
 # %% Now we can see how well the patch transfers to mazes with cheese at the same location.
-assert len(mazes_with_cheese_at_location) > 0, "No mazes with cheese at the specified location."
 @interact
 def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_cheese_at_location)):
     fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values, render_padding=True)
     plt.show()
+
+# %% Synthetic transfer to same cheese locations
+""" Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
+value_seed = 0
+values = cheese_diff_values(value_seed, label, hook)
+cheese_location = maze.get_cheese_pos_from_seed(value_seed)
+print(f'The cheese vector is taken from a seed with cheese at row {cheese_location[0]}, column {cheese_location[1]+1}.')
+
+# %% Find levels with an open spot at the cheese location
+
+# %% Check if off-by-one cheese location allows the patch to transfer
+value_seed = 0
+values = cheese_diff_values(value_seed, label, hook)
+cheese_location = maze.get_cheese_pos_from_seed(value_seed)
+
+col_translation = -1
+# Weak transfer for 2 columns right, but strong transfer for 1/0 column right? None for 5 columns right.
+
+assert cheese_location[1] < maze.WORLD_DIM - col_translation, f"Cheese is too close to the right for it to be translated by {col_translation}."
+
+print(f'We will consider the cheese to be {col_translation} column{"s" if col_translation != 1 else ""} right of the true location {cheese_location}; the new location is row {cheese_location[0]}, column {cheese_location[1]+col_translation}.')
+mazes_with_cheese_at_fake_location = maze.get_mazes_with_cheese_at_location((cheese_location[0], cheese_location[1]+col_translation), 5, skip_seed = value_seed)
+# %%
+@interact
+def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_cheese_at_fake_location)):
+    fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values)
+    plt.show()
+# %%

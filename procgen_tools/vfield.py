@@ -51,7 +51,7 @@ def vector_field(venv, policy):
 
     env_state = maze.EnvState(venv.env.callmethod('get_state')[0])
     grid = env_state.inner_grid(with_mouse=False)
-    legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == maze.EMPTY]
+    legal_mouse_positions = maze.get_legal_mouse_positions(grid) 
 
     # convert coords from inner to outer grid coordinates
     assert (env_state.world_dim - grid.shape[0]) % 2 == 0
@@ -166,7 +166,7 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
 
     vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf1['legal_mouse_positions'], 'grid': vf1['grid']}
 
-    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='red' if human_render else 'blue')
+    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
