@@ -15,6 +15,7 @@ from functools import lru_cache
 import numpy as np
 import heapq
 import networkx as nx
+import os
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -859,10 +860,7 @@ def venv_with_all_mouse_positions(venv):
         state_bytes_list.append(env_state.state_bytes)
         env_state.state_bytes = sb_back
 
-    venv_all = create_venv(
-        num=len(legal_mouse_positions),
-        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), # total bullshit
-        num_levels=1, start_level=1
-    )
+    threads = 1 if len(legal_mouse_positions) < 100 else os.cpu_count() # bullshit
+    venv_all = create_venv(num=len(legal_mouse_positions), num_threads=threads, num_levels=1, start_level=1)
     venv_all.env.callmethod('set_state', state_bytes_list)
     return venv_all, (legal_mouse_positions, grid)
