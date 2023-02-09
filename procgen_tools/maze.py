@@ -828,3 +828,41 @@ def copy_venv(venv, idx: int):
     env = create_venv(num=1, start_level=0, num_levels=1)
     env.env.callmethod("set_state", [sb])
     return env
+
+
+def venv_with_all_mouse_positions(venv):
+    """
+    From a venv with a single env, create a new venv with one env for each legal mouse position.
+
+    Returns venv_all, (legal_mouse_positions, grid_without_mouse)
+    Typically you'd call this with `venv_all, _ = venv_with_all_mouse_positions(venv)`,
+    The extra return values are useful for conciseness sometimes.
+    """
+    assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
+
+    env_state = EnvState(venv.env.callmethod('get_state')[0])
+    grid = env_state.inner_grid(with_mouse=False)
+    legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == EMPTY]
+
+    # convert coords from inner to outer grid coordinates
+    assert (env_state.world_dim - grid.shape[0]) % 2 == 0
+    padding = (env_state.world_dim - grid.shape[0]) // 2
+
+    # create a venv for each legal mouse position
+    state_bytes_list = []
+    for (mx, my) in legal_mouse_positions:
+        # we keep a backup of the state bytes for efficiency, as calling set_mouse_pos
+        # implicitly calls _parse_state_bytes, which is slow. this is a hack.
+        # NOTE: Object orientation hurts us here. It would be better to have functions.
+        sb_back = env_state.state_bytes
+        env_state.set_mouse_pos(mx+padding, my+padding)
+        state_bytes_list.append(env_state.state_bytes)
+        env_state.state_bytes = sb_back
+
+    venv_all = create_venv(
+        num=len(legal_mouse_positions),
+        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), # total bullshit
+        num_levels=1, start_level=1
+    )
+    venv_all.env.callmethod('set_state', state_bytes_list)
+    return venv_all, (legal_mouse_positions, grid)

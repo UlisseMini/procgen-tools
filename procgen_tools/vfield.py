@@ -43,45 +43,22 @@ def _tadd(*tups):
 def _device(policy):
     return next(policy.parameters()).device
 
+
+# TODO: with the right APIs, this should be a few lines
 def vector_field(venv, policy):
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
     """
     assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
-
-    env_state = maze.EnvState(venv.env.callmethod('get_state')[0])
-    grid = env_state.inner_grid(with_mouse=False)
-    legal_mouse_positions = maze.get_legal_mouse_positions(grid) 
-
-    # convert coords from inner to outer grid coordinates
-    assert (env_state.world_dim - grid.shape[0]) % 2 == 0
-    padding = (env_state.world_dim - grid.shape[0]) // 2
-
-    # create a venv for each legal mouse position
-    state_bytes_list = []
-    for (mx, my) in legal_mouse_positions:
-        # we keep a backup of the state bytes for efficiency, as calling set_mouse_pos
-        # implicitly calls _parse_state_bytes, which is slow. this is a hack.
-        # NOTE: Object orientation hurts us here. It would be better to have functions.
-        sb_back = env_state.state_bytes
-        env_state.set_mouse_pos(mx+padding, my+padding)
-        state_bytes_list.append(env_state.state_bytes)
-        env_state.state_bytes = sb_back
-
-    venv_all = maze.create_venv(
-        num=len(legal_mouse_positions),
-        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), # total bullshit
-        num_levels=1, start_level=1
-    )
-    venv_all.env.callmethod('set_state', state_bytes_list)
+    venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
 
     # TODO: Hypothetically, this step could run in parallel to the others (cpu vs. gpu)
-    batched_obs = torch.tensor(venv_all.reset(), dtype=torch.float32)
+    batched_obs = torch.tensor(venv_all.reset(), dtype=torch.float32, device=_device(policy))
     del venv_all
 
     # use stacked obs list as a tensor
     with torch.no_grad():
-        c, _ = policy(batched_obs.to(_device(policy)))
+        c, _ = policy(batched_obs)
 
     # FIXME: Vectorize this loop. It isn't as critical as the model though
     arrows = []
