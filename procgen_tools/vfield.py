@@ -49,7 +49,7 @@ def vector_field(venv, policy):
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
     """
-    assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
+    venv = maze.copy_venv(venv, 0)
     venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
 
     # TODO: Hypothetically, this step could run in parallel to the others (cpu vs. gpu)

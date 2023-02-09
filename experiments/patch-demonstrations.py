@@ -139,9 +139,26 @@ for seed in range(5):
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
 
 labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
+# Remove '_out' from labels
+labels.remove('_out')
+
+# NOTE conv_in0 doesn't have effect, but shouldn't that literally make agent not see cheese?
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
     fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
+    plt.show()
+
+# %% Try all patches at once 
+values = values_from_venv(venv, hook, label)
+patches = {}
+for label in labels:
+    patches[label] = get_patches(values, label, hook)
+
+# Show result
+@interact 
+def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
+    venv = make_venv(seed)
+    fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
 
 # %% Check how patch transferability changes with cheese location 
@@ -169,7 +186,7 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     else: 
         seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=SEARCH_NUM, skip_seed = source_seed)
 
-    if generate:  # TODO clear axes
+    if generate:  
         venv = maze.venv_from_grid(grid=grids[target_index])
         patches = get_patches(values, -1, label)
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
