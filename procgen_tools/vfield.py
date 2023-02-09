@@ -180,6 +180,7 @@ def custom_vfield(policy : torch.nn.Module, seed : int = 0):
         # Clear the existing plot
         with output:
             vfield = vector_field(single_venv, policy)
+            ax.clear()
             plot_vf(vfield, ax=ax)
 
             # Update the existing figure in place 

@@ -791,7 +791,7 @@ def generate_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], nu
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
     assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
 
-    grids = []
+    seeds, grids = [], []
     seed = 0
     while len(grids) < num_mazes:
         if seed != skip_seed:
@@ -800,12 +800,12 @@ def generate_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], nu
                 old_cheese = get_cheese_pos(grid)
                 grid[old_cheese] = EMPTY
                 grid[cheese_location] = CHEESE
-                grids.append(grid)
+                grids.append(inner_grid(grid)) # venv_from_grid expects inner grid
+                seeds.append(seed)
         seed += 1
-    return grids
+    return seeds, grids
 
 # ================ Venv Wrappers ===================
-
 
 from .procgen_wrappers import TransposeFrame, ScaledFloatFrame, VecExtractDictObs
 from gym3 import ToBaselinesVecEnv

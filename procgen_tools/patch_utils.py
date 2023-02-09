@@ -172,10 +172,41 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         # display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
+def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 5, reuse_first : bool = True):
+    """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. """
 
-def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False):
+    assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
+    venv1, venv2 = copy_venv(venv, 0), copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
+
+    num_cols = 3
+    fig, ax = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
+
+    ax[0].set_xlabel("Original")
+    original_vfield = vfield.vector_field(venv, hook.network)
+    vfield.plot_vf(original_vfield, ax=ax[0], render_padding=render_padding)
+
+    ax[1].set_xlabel("Patched")
+    with hook.use_patches(patches):
+        patched_vfield = vfield.vector_field(venv2, hook.network)
+    vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
+
+    ax[2].set_xlabel("Patched vfield minus original")
+    vfield.plot_vector_field_diff(original_vfield, patched_vfield, ax=ax[2], render_padding=render_padding)
+
+    obj = {
+        'seed': seed,
+        'coeff': coeff,
+        'patch_label': label,
+        'original_vfield': original_vfield,
+        'patched_vfield': patched_vfield,
+    }
+
+    return fig, ax, obj
+
+
+def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False): # TODO make this function call the above one
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
-    values = values_from_venv(venv, hook, label) if values is None else values
+    values = cheese_diff_values(seed, label, hook) if values is None else values
     patches = get_patches(values, coeff, label) 
 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
@@ -207,4 +238,3 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, ax, obj
-
