@@ -163,8 +163,9 @@ def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_chees
     fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values, render_padding=True)
     plt.show()
 
-# %% Check if off-by-one cheese location allows the patch to transfer
+# %% Check how patch transferability changes with cheese location
 def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False):
+    """ Test if  """
     values = cheese_diff_values(source_seed, label, hook)
     cheese_location = maze.get_cheese_pos_from_seed(source_seed)
 

@@ -12,6 +12,7 @@ import typing
 from typing import Tuple, Dict, Callable, List
 from dataclasses import dataclass
 from functools import lru_cache
+import os 
 import numpy as np
 import heapq
 import networkx as nx

@@ -191,12 +191,10 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     vfield.plot_vf(patched_vfield, ax=ax[1], render_padding=render_padding)
 
     ax[2].set_xlabel("Patched vfield minus original")
-    vfield.plot_vector_field_diff(original_vfield, patched_vfield, ax=ax[2], render_padding=render_padding)
+    vfield.plot_vf_diff(vf1=patched_vfield, vf2=original_vfield, ax=ax[2], render_padding=render_padding)
 
     obj = {
-        'seed': seed,
-        'coeff': coeff,
-        'patch_label': label,
+        'patches': patches,
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
     }
