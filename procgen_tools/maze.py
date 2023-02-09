@@ -864,7 +864,7 @@ def venv_with_all_mouse_positions(venv):
 
     env_state = EnvState(venv.env.callmethod('get_state')[0])
     grid = env_state.inner_grid(with_mouse=False)
-    legal_mouse_positions = [(x, y) for x in range(grid.shape[0]) for y in range(grid.shape[1]) if grid[x, y] == EMPTY]
+    legal_mouse_positions = get_legal_mouse_positions(grid)
 
     # convert coords from inner to outer grid coordinates
     assert (env_state.world_dim - grid.shape[0]) % 2 == 0

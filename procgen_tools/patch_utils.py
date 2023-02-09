@@ -35,18 +35,21 @@ path_prefix = '../' if in_jupyter else ''
 rand_region = 5
 
 
-def get_cheese_venv_pair(seed: int, reversed : bool = False):
-    "Return a venv of 2 environments from a seed, one with cheese, one without cheese. If reversed, make the first one not have cheese and the second one have cheese."
+def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
+    "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
     venv = create_venv(num=2, start_level=seed, num_levels=1)
     state_bytes_list = venv.env.callmethod("get_state")
-    state = maze.EnvState(state_bytes_list[1])
+    
+    for idx in range(2):
+        if not has_cheese_tup[idx]: continue # Skip if we don't want cheese in this environment
+        state = maze.EnvState(state_bytes_list[idx])
 
-    # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
-    grid = state.full_grid()
-    grid[grid == maze.CHEESE] = maze.EMPTY
-    state.set_grid(grid)
-    state_bytes_list[0 if reversed else 1] = state.state_bytes
-    venv.env.callmethod("set_state", state_bytes_list)
+        # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
+        grid = state.full_grid()
+        grid[grid == maze.CHEESE] = maze.EMPTY
+        state.set_grid(grid)
+        state_bytes_list[idx] = state.state_bytes
+        venv.env.callmethod("set_state", state_bytes_list)
 
     return venv
 
