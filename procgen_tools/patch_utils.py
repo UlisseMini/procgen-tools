@@ -135,12 +135,14 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
         # Make the subplots 
         plt.subplot(1, 2, 1)
         plt.gca().set_title("Original")
-        vfield.plot_vector_field(venv, hook.network)
+        vf1 = vfield.vector_field(venv, hook.network)
+        vfield.plot_vf(vf)
 
         plt.subplot(1, 2, 2)
         with hook.use_patches(patches):
             plt.gca().set_title("Patched")
-            vfield.plot_vector_field(venv, hook.network)
+            vf2 = vfield.vector_field(venv, hook.network)
+            vfield.plot_vf(vf)
         # Make a figure title above the two subplots
         fig.suptitle(f"Vector fields for layer {activation_label} with coeff={coeff:.2f} and level={seed_str}") 
         plt.show()

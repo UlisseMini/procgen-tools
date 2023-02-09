@@ -39,6 +39,7 @@ from ipywidgets import *
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import matplotlib.pyplot as plt 
+plt.ioff() # disable interactive plotting, so that we can control where figures show up when refreshed by an ipywidget
 
 import circrl.module_hook as cmh
 import procgen_tools.models as models
