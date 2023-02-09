@@ -182,10 +182,10 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=seeds)):
         if generate: 
             venv = maze.venv_from_grid(grid=grids[seeds.index(seed)])
-            patches = get_patches(values, hook, label)
+            patches = get_patches(values, -1, label)
             fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=True)
         else:
-            fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values) # TODO update to use patches?
+            fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values) 
         plt.show()
 
 # %%
@@ -195,7 +195,7 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
 value_seed = 0
 values = cheese_diff_values(value_seed, label, hook)
-patches = get_patches(values, -1, label)
+patches = get_patches(values=values, coeff=-1, label=label)
 
 cheese_location = maze.get_cheese_pos_from_seed(value_seed)
 print(f'The cheese vector is taken from a seed with cheese at row {cheese_location[0]}, column {cheese_location[1]+1}.')
