@@ -146,26 +146,19 @@ def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSl
     fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
     plt.show()
 
-# %% Transfer to same cheese locations
-""" Let's see what happens when we transfer the patches to the same cheese locations. """
-value_seed = 0
-values = cheese_diff_values(value_seed, label, hook)
-patches = get_patches(values, -1, label)
-
-cheese_location = maze.get_cheese_pos_from_seed(value_seed)
-print(f'The cheese vector is taken from a seed with cheese at {cheese_location}.')
-
-mazes_with_cheese_at_location = maze.get_mazes_with_cheese_at_location(cheese_location, 5, skip_seed = value_seed) 
-
-# %% Now we can see how well the patch transfers to mazes with cheese at the same location.
-@interact
-def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=mazes_with_cheese_at_location)):
-    fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values, render_padding=True)
-    plt.show()
-
-# %% Check how patch transferability changes with cheese location
-def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False):
-    """ Test if  """
+# %% Check how patch transferability changes with cheese location # TODO move this above 
+GENERATE_NUM = 50 # Number of seeds to generate, if generate is True
+SEARCH_NUM = 2 # Number of seeds to search for, if generate is False
+def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False, target_index : int = 0):
+    """ Visualize what happens if the patch is transferred to a maze with the cheese translated by the given amount. 
+    
+    Args:
+        source_seed (int): The seed from which the patch was generated.
+        col_translation (int): The number of columns to translate the cheese by.
+        row_translation (int): The number of rows to translate the cheese by.
+        generate (bool): Whether to modify existing mazes or search for existing ones.
+        target_index (int): The index of the target maze to use, among the seeds generated or searched for. 
+    """
     values = cheese_diff_values(source_seed, label, hook)
     cheese_location = maze.get_cheese_pos_from_seed(source_seed)
 
@@ -175,22 +168,22 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     print(f'We will consider the cheese to be {col_translation} column{"s" if col_translation != 1 else ""} right of the true location {cheese_location}; the new location is row {cheese_location[0]}, column {cheese_location[1]+col_translation}.')
 
     if generate: 
-        seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = 50, skip_seed=source_seed) # TODO venv from grid expects an inner grid, not outer; fix this with a flag
+        seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = GENERATE_NUM, skip_seed=source_seed)
     else: 
-        seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=5, skip_seed = source_seed)
+        seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=SEARCH_NUM, skip_seed = source_seed)
 
-    @interact
-    def run_all_mazes_with_cheese_at_location(seed=Dropdown(options=seeds)):
-        if generate: 
-            venv = maze.venv_from_grid(grid=grids[seeds.index(seed)])
-            patches = get_patches(values, -1, label)
-            fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=True)
-        else:
-            fig, _, _ = plot_patched_vfields(seed, -1, label, hook, values=values) 
-        plt.show()
+    print(f'Rendered seed: {seeds[target_index]}.')
+    if generate:  # TODO clear axes, show current seed
+        venv = maze.venv_from_grid(grid=grids[target_index])
+        patches = get_patches(values, -1, label)
+        fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
+    else:
+        fig, _, _ = plot_patched_vfields(seeds[target_index], -1, label, hook, values=values)
+    plt.show()
 
-# %%
-_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(False))
+# %% Natural cheese_location target mazes TODO is this same 
+# Transfers to mazes with cheese at the same location, using SEARCH_NUM real seeds found via rejection sampling.
+_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(False), target_index=IntSlider(min=0, max=SEARCH_NUM-1, step=1, value=0))
 
 # %% Synthetic transfer to same cheese locations
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
@@ -201,5 +194,5 @@ patches = get_patches(values=values, coeff=-1, label=label)
 cheese_location = maze.get_cheese_pos_from_seed(value_seed)
 print(f'The cheese vector is taken from a seed with cheese at row {cheese_location[0]}, column {cheese_location[1]+1}.')
 
-_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True))
+_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 # %%
