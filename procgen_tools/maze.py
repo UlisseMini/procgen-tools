@@ -169,7 +169,7 @@ MAZE_STATE_DICT_TEMPLATE = [
 
 
 
-@lru_cache(maxsize=100)
+@lru_cache(maxsize=10)
 def _parse_maze_state_bytes(state_bytes: bytes, assert_=False) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
@@ -831,6 +831,9 @@ def copy_venv(venv, idx: int):
     return env
 
 
+from procgen_tools.stats import timeit
+
+@timeit('venv_with_all_mouse_positions')
 def venv_with_all_mouse_positions(venv):
     """
     From a venv with a single env, create a new venv with one env for each legal mouse position.
@@ -860,7 +863,7 @@ def venv_with_all_mouse_positions(venv):
         state_bytes_list.append(env_state.state_bytes)
         env_state.state_bytes = sb_back
 
-    threads = 1 if len(legal_mouse_positions) < 100 else os.cpu_count() # bullshit
+    threads = 0
     venv_all = create_venv(num=len(legal_mouse_positions), num_threads=threads, num_levels=1, start_level=1)
     venv_all.env.callmethod('set_state', state_bytes_list)
     return venv_all, (legal_mouse_positions, grid)

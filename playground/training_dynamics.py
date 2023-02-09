@@ -6,17 +6,10 @@ from procgen_tools import vfield, maze, models
 from tqdm import tqdm
 from glob import glob
 from IPython.display import HTML, display, clear_output
+from value_fn import plot_value_vfield
 
 # %%
 # Plot vector fields for a bunch of models over time
-
-for model_file in glob('/home/uli/2023-02-02__17-29-21__seed_870/*.pth'):
-    policy = models.load_policy(model_file, 15, 'cpu')
-    venv = maze.create_venv(num=1, start_level=0, num_levels=1)
-
-    vf = vfield.vector_field(venv, policy)
-    vfield.plot_vf(vf)
-    plt.show()
 
 # %%
 # Create animated video of vector field using imageio
@@ -25,17 +18,19 @@ import imageio
 from procgen_tools import vfield, maze, models
 import numpy as np
 
-with imageio.get_writer('vfield.mp4', fps=30) as writer:
+with imageio.get_writer('vfield.mp4', fps=10) as writer:
     def _get_timestep(checkpoint: str):
         return int(checkpoint.split('_')[-1].split('.')[0])
     files = sorted(glob('/home/uli/2023-02-02__17-29-21__seed_870/*.pth'), key=lambda x: int(_get_timestep(x)))
+    files = files[::10]
 
     for model_file in tqdm(files):
         policy = models.load_policy(model_file, 15, 'cpu')
         venv = maze.create_venv(num=1, start_level=4, num_levels=1)
 
-        vf = vfield.vector_field(venv, policy)
-        vfield.plot_vf(vf)
+        plot_value_vfield(venv, policy)
+        # vf = vfield.vector_field(venv, policy)
+        # vfield.plot_vf(vf)
         plt.axis('off')
 
         # preemptive fix for 'FigureCanvasAgg' object has no attribute 'renderer'
@@ -45,6 +40,14 @@ with imageio.get_writer('vfield.mp4', fps=30) as writer:
         writer.append_data(np.frombuffer(im_bytes, dtype=np.uint8).reshape(plt.gcf().canvas.get_width_height()[::-1] + (3,)))
         plt.clf()
         plt.close()
+
+
+# %%
+# Look at perf stats
+
+import procgen_tools.stats as stats
+print(stats.counts, stats.times)
+
 # %%
 # Show video in notebook
 
