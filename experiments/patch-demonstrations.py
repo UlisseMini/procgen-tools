@@ -61,7 +61,11 @@ rand_region = 5
 policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, t.device('cpu'))
 hook = cmh.ModuleHook(policy)
 
-label = 'embedder.block2.res1.resadd_out'
+main_label = 'embedder.block2.res1.resadd_out'
+
+hook.run_with_input(np.zeros((1,3, 64, 64), dtype=np.float32))
+labels = list(hook.values_by_label.keys()) # all labels in the model
+if '_out' in labels: labels.remove('_out')
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Vfields on each maze
@@ -69,14 +73,14 @@ label = 'embedder.block2.res1.resadd_out'
 """
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook)
     plt.show()
 
 # %% Patching from a fixed seed
 """ Let's see what happens when we patch the network from a fixed seed. We'll compare the vector field for the original and patched networks.
 """
 value_seed = 0
-values_tup = cheese_diff_values(value_seed, label, hook), value_seed
+values_tup = cheese_diff_values(value_seed, main_label, hook), value_seed
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
 
@@ -85,7 +89,7 @@ for seed in range(10):
 seeds = range(10)
 coeffs = [-2, -1, -0.5, 0.5, 1, 2]
 for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-    fig, _, _ = plot_patched_vfields(seed, coeff, label=label, hook=hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, main_label=main_label, hook=hook)
     fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
     plt.clf()
     plt.close()
@@ -96,18 +100,18 @@ vbox = custom_vfield(policy, seed=2)
 display(vbox)
 
 # %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)
-values = np.zeros_like(cheese_diff_values(0, label, hook))
+values = np.zeros_like(cheese_diff_values(0, main_label, hook))
 seeds = slice(int(10e5),int(10e5+100))
 
 # Iterate over range specified by slice
 for seed in range(seeds.start, seeds.stop):
     # Make values be rolling average of values from seeds
-    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
+    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, main_label, hook)/(seed-seeds.start+1)
 
-# Assumes a fixed venv, hook, values, and label
+# Assumes a fixed venv, hook, values, and main_label
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-10, max=10, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook, values=values)
+    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook, values=values)
     plt.show()
 
 
@@ -118,15 +122,15 @@ for mode in ['random', 'cheese']:
     vectors = []
     for value_seed in range(100):
         if mode == 'random':
-            vectors.append(np.random.randn(*cheese_diff_values(0, label, hook).shape, ) * rand_magnitude)
+            vectors.append(np.random.randn(*cheese_diff_values(0, main_label, hook).shape, ) * rand_magnitude)
         else:
-            vectors.append(cheese_diff_values(value_seed, label, hook))
+            vectors.append(cheese_diff_values(value_seed, main_label, hook))
         
     norms = [np.linalg.norm(v) for v in vectors]
     print(f'For {mode}-vectors, the norm is {np.mean(norms):.2f} with std {np.std(norms):.2f}. Max absolute-value difference of {np.max(np.abs(vectors)):.2f}.')
 
 # %% Run the patches
-values = np.random.randn(*cheese_diff_values(0, label, hook).shape) * rand_magnitude
+values = np.random.randn(*cheese_diff_values(0, main_label, hook).shape) * rand_magnitude
 # Cast this to float32
 values = values.astype(np.float32)
 print(np.max(values).max())
@@ -138,28 +142,34 @@ for seed in range(5):
 # %% Patching different layers
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
 
-labels = list(hook.values_by_label.keys()) # TODO this dict was changing in size during the loop, but why?
 # Remove '_out' from labels
-labels.remove('_out')
 
-# NOTE conv_in0 doesn't have effect, but shouldn't that literally make agent not see cheese?
+# NOTE conv_in0 doesn't have effect, but shouldn't that literally make agent not see cheese? And why don't all bottleneck layers completely change agent computation so that it doesn't see cheese, at least at the relevant square? 
 @interact
-def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=labels):
-    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
+def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), main_label=labels):
+    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook)
+    plt.show()    
+    print(f'Patching {main_label} layer')
+
+# %%
+for label in labels:
+    fig, _, _ = plot_patched_vfields(0, -1, label, hook)
     plt.show()
+    print(f'^ Patching {label} layer')
 
 # %% Try all patches at once 
-values = values_from_venv(venv, hook, label)
-patches = {}
-for label in labels:
-    patches[label] = get_patches(values, label, hook)
-
-# Show result
 @interact 
-def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
-    venv = make_venv(seed)
+def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-1, max=1, step=0.025, value=-.05)):
+    venv = get_cheese_venv_pair(seed) 
+    patches = {}
+    for label in labels:
+        if label == 'fc_value_out': continue
+        values = values_from_venv(venv, hook, label)
+        patches.update(get_patches(values=values, coeff=coeff, label=label))
+        
     fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
+
 
 # %% Check how patch transferability changes with cheese location 
 GENERATE_NUM = 50 # Number of seeds to generate, if generate is True
@@ -175,7 +185,7 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
         generate (bool): Whether to modify existing mazes or search for existing ones.
         target_index (int): The index of the target maze to use, among the seeds generated or searched for. 
     """
-    values = cheese_diff_values(source_seed, label, hook)
+    values = cheese_diff_values(source_seed, main_label, hook)
     cheese_location = maze.get_cheese_pos_from_seed(source_seed)
 
     assert cheese_location[0] < maze.WORLD_DIM - row_translation, f"Cheese is too close to the bottom for it to be translated by {row_translation}."
@@ -188,10 +198,10 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
 
     if generate:  
         venv = maze.venv_from_grid(grid=grids[target_index])
-        patches = get_patches(values, -1, label)
+        patches = get_patches(values, -1, main_label)
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
     else:
-        fig, _, _ = plot_patched_vfields(seeds[target_index], -1, label, hook, values=values)
+        fig, _, _ = plot_patched_vfields(seeds[target_index], -1, main_label, hook, values=values)
     display(fig)
     print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}. Rendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target location.')
 

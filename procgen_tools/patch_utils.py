@@ -35,8 +35,8 @@ path_prefix = '../' if in_jupyter else ''
 rand_region = 5
 
 
-def get_cheese_venv_pair(seed: int):
-    "Return a venv of 2 environments from a seed, one with cheese, one without cheese"
+def get_cheese_venv_pair(seed: int, reversed : bool = False):
+    "Return a venv of 2 environments from a seed, one with cheese, one without cheese. If reversed, make the first one not have cheese and the second one have cheese."
     venv = create_venv(num=2, start_level=seed, num_levels=1)
     state_bytes_list = venv.env.callmethod("get_state")
     state = maze.EnvState(state_bytes_list[1])
@@ -45,7 +45,7 @@ def get_cheese_venv_pair(seed: int):
     grid = state.full_grid()
     grid[grid == maze.CHEESE] = maze.EMPTY
     state.set_grid(grid)
-    state_bytes_list[1] = state.state_bytes
+    state_bytes_list[0 if reversed else 1] = state.state_bytes
     venv.env.callmethod("set_state", state_bytes_list)
 
     return venv
