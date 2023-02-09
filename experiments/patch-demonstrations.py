@@ -38,7 +38,7 @@ from IPython.display import Video, display, clear_output
 from ipywidgets import *
 import itertools
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
 
 import circrl.module_hook as cmh
 import procgen_tools.models as models
@@ -55,15 +55,12 @@ except NameError:
     in_jupyter = False
 path_prefix = '../' if in_jupyter else ''
 
-# %%
 # Load model
 rand_region = 5
 policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, t.device('cpu'))
-
-# %%
-label = 'embedder.block2.res1.resadd_out'
-interesting_coeffs = np.linspace(-2/3,2/3,10) 
 hook = cmh.ModuleHook(policy)
+
+label = 'embedder.block2.res1.resadd_out'
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Vfields on each maze
@@ -149,6 +146,7 @@ def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSl
 # %% Check how patch transferability changes with cheese location 
 GENERATE_NUM = 50 # Number of seeds to generate, if generate is True
 SEARCH_NUM = 2 # Number of seeds to search for, if generate is False
+
 def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False, target_index : int = 0):
     """ Visualize what happens if the patch is transferred to a maze with the cheese translated by the given amount. 
     
@@ -165,21 +163,19 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     assert cheese_location[0] < maze.WORLD_DIM - row_translation, f"Cheese is too close to the bottom for it to be translated by {row_translation}."
     assert cheese_location[1] < maze.WORLD_DIM - col_translation, f"Cheese is too close to the right for it to be translated by {col_translation}."
 
-    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}.')
-
     if generate: 
         seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = GENERATE_NUM, skip_seed=source_seed)
     else: 
         seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=SEARCH_NUM, skip_seed = source_seed)
 
-    print(f'Rendering seed: {seeds[target_index]}, where the cheese was {"" if generated else "not"} moved to the target location.')
     if generate:  # TODO clear axes
         venv = maze.venv_from_grid(grid=grids[target_index])
         patches = get_patches(values, -1, label)
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
     else:
         fig, _, _ = plot_patched_vfields(seeds[target_index], -1, label, hook, values=values)
-    plt.show()
+    display(fig)
+    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}. Rendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target location.')
 
 # %% Natural cheese_location target mazes 
 # TODO is this the same -- are natural mazes first generated and _then_ cheese is placed? Or is cheese placed and then the maze built around it, or something else?
@@ -189,12 +185,5 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 
 # %% Synthetic transfer to same cheese locations
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
-value_seed = 0
-values = cheese_diff_values(value_seed, label, hook)
-patches = get_patches(values=values, coeff=-1, label=label)
-
-cheese_location = maze.get_cheese_pos_from_seed(value_seed)
-print(f'The cheese vector is taken from a seed with cheese at row {cheese_location[0]}, column {cheese_location[1]+1}.')
-
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 # %%
