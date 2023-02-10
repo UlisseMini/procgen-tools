@@ -132,7 +132,7 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
-    """ Render the difference between two vector fields. """
+    """ Render the difference "vf1 - vf2" between two vector fields. """
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
@@ -166,6 +166,23 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf2['legal_mouse_positions'], 'grid': vf2['grid']}
 
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
+
+def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False):
+    """ Plot two vector fields and their difference vf2 - vf1. """
+    num_cols = 3
+    ax_size = 5
+    fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
+
+    axs[0].set_xlabel("Original")
+    plot_vf(vf1, ax=axs[0], human_render=human_render, render_padding=render_padding)
+    
+    axs[1].set_xlabel("Patched")
+    plot_vf(vf2, ax=axs[1], human_render=human_render, render_padding=render_padding)
+    
+    axs[2].set_xlabel("Patched vfield minus original")
+    # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
+    plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
+    return fig, axs
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """

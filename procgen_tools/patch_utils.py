@@ -183,20 +183,10 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
     venv1, venv2 = copy_venv(venv, 0), copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
 
-    num_cols = 3
-    fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
-
-    axs[0].set_xlabel("Original")
     original_vfield = vfield.vector_field(venv, hook.network)
-    vfield.plot_vf(original_vfield, ax=axs[0], render_padding=render_padding)
-
-    axs[1].set_xlabel("Patched")
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
-    vfield.plot_vf(patched_vfield, ax=axs[1], render_padding=render_padding)
-
-    axs[2].set_xlabel("Patched vfield minus original")
-    vfield.plot_vf_diff(vf1=patched_vfield, vf2=original_vfield, ax=axs[2], render_padding=render_padding)
+    fig, axs = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding)
 
     obj = {
         'patches': patches,
@@ -224,3 +214,5 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, axs, obj
+
+# %%
