@@ -30,7 +30,7 @@ def xavier_uniform_init(module, gain=1.0):
 
 class Flatten(nn.Module):
     def forward(self, x):
-        return torch.flatten(x, start_dim=1)
+        return torch.flatten(x, start_dim=1) # Skip batch dimension
 
 
 class MlpModel(nn.Module):
