@@ -214,11 +214,13 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 # %% Synthetic transfer to same cheese locations
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
+
 # %%
 @interact 
 def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
     cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
     values = cheese_diff_values(seed, main_label, hook)
     patches = get_patches(values, coeff=-1, label=main_label)
-    fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) # TODO not showing cheese 
+    fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
+    plt.show()
 # %%
