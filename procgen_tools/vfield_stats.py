@@ -52,7 +52,7 @@ def get_decision_probs_original_and_patched(vfields, coeff: float):
 
 
 def plot_decision_probs(decision_probs_original, decision_probs_patched):
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+    fig, ax = plt.subplots(1, 3, figsize=(12, 4))
     dpo, dpp = decision_probs_original, decision_probs_patched
 
     dpo = np.stack([dpo[:,0], dpo[:,1], 1-dpo[:,0]-dpo[:,1]], axis=1)
@@ -64,8 +64,6 @@ def plot_decision_probs(decision_probs_original, decision_probs_patched):
         a.hist(dpp[:,i], bins=20, label='patched', alpha=0.5)
         a.legend()
         a.set_title(f'{label} probability')
-        # reverse axis direction so we start at 1 and go to 0 (like the probability)
-        # a.invert_xaxis()
 
     return fig
 
