@@ -214,5 +214,3 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, axs, obj
-
-# %%

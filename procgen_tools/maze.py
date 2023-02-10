@@ -765,11 +765,18 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     conventions.'''
     get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
     
-def get_full_grid_from_seed(seed : int):
+def get_envstate_from_seed(seed : int):
     seed_env = create_venv(num=1, start_level=seed, num_levels=1)
     state_bytes = seed_env.env.callmethod("get_state")[0]
-    state = EnvState(state_bytes)
+    return EnvState(state_bytes)
+
+def get_full_grid_from_seed(seed : int):
+    state = get_envstate_from_seed(seed)
     return state.full_grid()
+
+def get_inner_grid_from_seed(seed : int):
+    state = get_envstate_from_seed(seed)
+    return state.inner_grid()
 
 def get_cheese_pos_from_seed(seed : int):
     """ Get the cheese position from a maze seed. """
