@@ -16,6 +16,7 @@ import os
 import numpy as np
 import heapq
 import networkx as nx
+import os
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -686,7 +687,6 @@ def get_path_to_corner(inner_grid, graph):
     return nx.shortest_path(graph, (0, 0), corner_node)
 
 def get_decision_square_from_grid_graph(inner_grid, graph):
-    corner_node = (inner_grid.shape[0]-1, inner_grid.shape[1]-1)
     path_to_cheese = get_path_to_cheese(inner_grid, graph)
     path_to_corner = get_path_to_corner(inner_grid, graph)
     for ii, cheese_path_node in enumerate(path_to_cheese):
@@ -710,7 +710,9 @@ def get_node_value_at_offset(outer_grid, node, offset):
 NODE_TYPES = ['wall', 'unconn', 'end', 'path', 'branch2', 'branch3']
 def get_node_type_by_world_loc(states_bytes, world_node):
     '''Return node type of the square referred to by world_node
-    (world_node should be in world coords, not inner coords).
+    (world_node should be in world coords, not inner coords,
+    order is (row, col)).
+    
     Returns a tuple of (node_type, lrdu_open), where possible node types 
     are: wall, unconn, end (only one open neighbour), path (two open),
     branch2 (3 open), branch3 (4 open).  Second return enumerates
@@ -718,7 +720,7 @@ def get_node_type_by_world_loc(states_bytes, world_node):
     16 possibilities.  Returned as a bool array, even for walls.'''
     maze_env_state = EnvState(states_bytes)
     outer_grid = maze_env_state.full_grid()
-    node_value = outer_grid[world_node[0], world_node[1]]
+    node_value = outer_grid[world_node]
     lrdu_open = np.array([
         get_node_value_at_offset(outer_grid, world_node, ( 0, -1)),
         get_node_value_at_offset(outer_grid, world_node, ( 0,  1)),
@@ -881,10 +883,7 @@ def venv_with_all_mouse_positions(venv):
         state_bytes_list.append(env_state.state_bytes)
         env_state.state_bytes = sb_back
 
-    venv_all = create_venv(
-        num=len(legal_mouse_positions),
-        num_threads=1 if len(legal_mouse_positions) < 100 else os.cpu_count(), # total bullshit
-        num_levels=1, start_level=1
-    )
+    threads = 1 if len(legal_mouse_positions) < 100 else os.cpu_count() # bullshit
+    venv_all = create_venv(num=len(legal_mouse_positions), num_threads=threads, num_levels=1, start_level=1)
     venv_all.env.callmethod('set_state', state_bytes_list)
     return venv_all, (legal_mouse_positions, grid)
