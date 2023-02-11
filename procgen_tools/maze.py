@@ -294,7 +294,6 @@ class EnvState():
         # flipped turns out to be oriented right for grid.
         return int(ents['y'].val), int(ents['x'].val)
 
-
     def set_mouse_pos(self, x: int, y: int):
         """
         Set the mouse position in the maze state bytes. Much more optimized than parsing and serializing the whole state.

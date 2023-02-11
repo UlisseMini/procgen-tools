@@ -132,7 +132,7 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
-    """ Render the difference "vf1 - vf2" between two vector fields. """
+    """ Render the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
@@ -168,7 +168,7 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
 def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5):
-    """ Plot two vector fields and their difference vf2 - vf1. """
+    """ Plot two vector fields and their difference vf2 - vf1. Plots three axes in total. """
     num_cols = 3
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
 
