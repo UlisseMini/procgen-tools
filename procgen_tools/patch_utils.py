@@ -39,18 +39,10 @@ rand_region = 5
 def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
     "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
     venv = create_venv(num=2, start_level=seed, num_levels=1)
-    state_bytes_list = venv.env.callmethod("get_state")
 
     for idx in range(2):
         if has_cheese_tup[idx]: continue # Skip if we want cheese in this environment
-        state = maze.EnvState(state_bytes_list[idx])
-
-        # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
-        grid = state.full_grid()
-        grid[grid == maze.CHEESE] = maze.EMPTY
-        state.set_grid(grid)
-        state_bytes_list[idx] = state.state_bytes
-        venv.env.callmethod("set_state", state_bytes_list)
+        maze.remove_cheese(venv, idx=idx)
 
     return venv
 

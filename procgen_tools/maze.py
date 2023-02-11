@@ -341,6 +341,20 @@ def get_cheese_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
     return tuple(ix[0] for ix in np.where(grid == CHEESE))
 
+def remove_cheese(venv, idx : int = 0):
+    """
+    Remove the cheese from the grid, modifying venv in-place.
+    """
+    state_bytes_list = venv.env.callmethod("get_state")
+    state = maze.EnvState(state_bytes_list[idx])
+
+    # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
+    grid = state.full_grid()
+    grid[grid == CHEESE] = EMPTY
+    state.set_grid(grid)
+    state_bytes_list[idx] = state.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+
 
 def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     "Get (x, y) position of the mouse in the grid"
@@ -861,7 +875,7 @@ def copy_venv(venv, idx: int):
     env.env.callmethod("set_state", [sb])
     return env
 
-def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5):
+def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5, spawn_cheese : bool = True):
     """ Get num_obs observations from the maze environment. If on_training is True, then the observation is from a training level where the cheese is in the top-right rand_region corner. """
     assert rand_region <= WORLD_DIM, "rand_region must be less than or equal to WORLD_DIM."
     assert rand_region > 0, "rand_region must be greater than 0."
@@ -876,15 +890,20 @@ def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : i
         env_state = EnvState(venvs.env.callmethod('get_state')[i])
         grid = env_state.full_grid(with_mouse=False)
         legal_mouse_positions = get_legal_mouse_positions(grid)
+
         # choose a random legal mouse position
         mx, my = legal_mouse_positions[np.random.randint(len(legal_mouse_positions))]
+
         # set the mouse position
         env_state.set_mouse_pos(mx, my)
+
+        if not spawn_cheese: remove_cheese(venvs, i)
+
         # set the state
         state_bytes_list.append(env_state.state_bytes)
 
     venvs.env.callmethod('set_state', state_bytes_list)
-    return venvs.reset()
+    return venvs.reset().astype(np.float32)
 
 def venv_with_all_mouse_positions(venv):
     """
