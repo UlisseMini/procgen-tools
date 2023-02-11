@@ -161,21 +161,22 @@ def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdo
     plt.show()
 
 # %% Generate random mouse observations
-obs = maze.get_random_obs(50, cheese=False)
+obs = maze.get_random_obs(50, spawn_cheese=False)
 # Show the observation in human readable form
 # plt.imshow(rearrange(obs[2], 'c h w -> h w c'))
 # plt.show()
-hook.run_with_input(obs)
 
 @interact 
 def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
+    hook.run_with_input(obs)
     values = hook.get_value_by_label(label)
-    patches = get_mean_patch(values, label=label)
+    patches = get_mean_patch(values, label=label) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
     # title the fig with label
     fig.suptitle(label)
-    plt.show()
+    plt.show() 
+
 
 # %% Patching different layers
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """

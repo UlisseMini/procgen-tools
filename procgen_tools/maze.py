@@ -346,7 +346,7 @@ def remove_cheese(venv, idx : int = 0):
     Remove the cheese from the grid, modifying venv in-place.
     """
     state_bytes_list = venv.env.callmethod("get_state")
-    state = maze.EnvState(state_bytes_list[idx])
+    state = EnvState(state_bytes_list[idx])
 
     # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
     grid = state.full_grid()
