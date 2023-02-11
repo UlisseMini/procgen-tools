@@ -535,15 +535,17 @@ def venv_from_grid(grid: np.ndarray):
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
+def get_padding(grid: np.ndarray) -> int:
+    """ Return the padding of the grid, i.e. the number of walls around the maze. """
+    return (WORLD_DIM - grid.shape[0]) // 2
+
 def render_inner_grid(grid: np.ndarray):
     """ Extract the human-sensible view given grid, assumed to be an inner_grid. Return the human view."""
     venv = venv_from_grid(grid)
     human_view = venv.env.get_info()[0]['rgb']
 
     # Cut out the padding from the view. The padding is the walls around the maze. 
-    padding = WORLD_DIM - grid.shape[0] 
-    assert padding % 2 == 0
-    padding //= 2
+    padding = get_padding(grid)
     rescale = human_view.shape[0] / WORLD_DIM
     
     return human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)] if padding > 0 else human_view
@@ -859,12 +861,36 @@ def copy_venv(venv, idx: int):
     env.env.callmethod("set_state", [sb])
     return env
 
+def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5):
+    """ Get num_obs observations from the maze environment. If on_training is True, then the observation is from a training level where the cheese is in the top-right rand_region corner. """
+    assert rand_region <= WORLD_DIM, "rand_region must be less than or equal to WORLD_DIM."
+    assert rand_region > 0, "rand_region must be greater than 0."
+    assert num_obs > 0, "num_obs must be greater than 0."
+
+    venvs = create_venv(num_obs, start_level=0, num_levels=0)
+    # TODO ensure that if on_training is True, then the cheese is in the top-right rand_region corner
+    
+    # Randomly place the mouse in each environment 
+    state_bytes_list = []
+    for i in range(num_obs):
+        env_state = EnvState(venvs.env.callmethod('get_state')[i])
+        grid = env_state.full_grid(with_mouse=False)
+        legal_mouse_positions = get_legal_mouse_positions(grid)
+        # choose a random legal mouse position
+        mx, my = legal_mouse_positions[np.random.randint(len(legal_mouse_positions))]
+        # set the mouse position
+        env_state.set_mouse_pos(mx, my)
+        # set the state
+        state_bytes_list.append(env_state.state_bytes)
+
+    venvs.env.callmethod('set_state', state_bytes_list)
+    return venvs.reset()
 
 def venv_with_all_mouse_positions(venv):
     """
     From a venv with a single env, create a new venv with one env for each legal mouse position.
 
-    Returns venv_all, (legal_mouse_positions, grid_without_mouse)
+    Returns venv_all, (legal_mouse_positions, inner_grid_without_mouse)
     Typically you'd call this with `venv_all, _ = venv_with_all_mouse_positions(venv)`,
     The extra return values are useful for conciseness sometimes.
     """
@@ -875,8 +901,7 @@ def venv_with_all_mouse_positions(venv):
     legal_mouse_positions = get_legal_mouse_positions(grid)
 
     # convert coords from inner to outer grid coordinates
-    assert (env_state.world_dim - grid.shape[0]) % 2 == 0
-    padding = (env_state.world_dim - grid.shape[0]) // 2
+    padding = get_padding(grid)
 
     # create a venv for each legal mouse position
     state_bytes_list = []

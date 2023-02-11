@@ -106,7 +106,8 @@ def get_zero_patch(label: str):
 
 def get_mean_patch(values: np.ndarray, label: str):
     """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. """
-    return {label: lambda outp: reduce(t.from_numpy(values), 'batch ... -> ...', 'mean')}
+    mean_vals = reduce(t.from_numpy(values), 'batch ... -> ...', 'mean')
+    return {label: lambda _: mean_vals}
 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
