@@ -67,6 +67,7 @@ hook.run_with_input(np.zeros((1,3, 64, 64), dtype=np.float32))
 labels = list(hook.values_by_label.keys()) # all labels in the model
 if '_out' in labels: labels.remove('_out')
 
+# RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Sanity-check that the patching performance is not changed at the original square
 @interact
 def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, step=1, value=0)):
@@ -79,7 +80,7 @@ def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, s
     plt.show()
 
     values = cheese_diff_values(seed, label, hook)
-    patches = get_patches(values, coeff=-1, label=label)
+    patches = get_values_diff_patch(values, coeff=-1, label=label)
 
     original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
     with hook.use_patches(patches):
@@ -96,28 +97,6 @@ def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, s
     diff = np.linalg.norm(np.array(orig_arrow) - np.array(patch_arrow))
     print(f'Seed {seed} has difference {diff:.3f}')
 
-
-seed = 1
-label = 'embedder.block1.conv_in0'
-values = cheese_diff_values(seed, label, hook)
-patches = get_patches(values, coeff=-1, label=label)
-
-original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
-with hook.use_patches(patches):
-    patched_vfield = vfield.vector_field(copy_venv(cheese_pair, 1), hook.network)
-
-# Plot the vfield diff
-fig, axs = plot_vfs_with_diff(original_vfield, patched_vfield)
-plt.show(block=True)
-
-mouse_pos = maze.get_mouse_pos(maze.get_inner_grid_from_seed(seed))
-mouse_idx = original_vfield['legal_mouse_positions'].index(mouse_pos)
-orig_arrow = original_vfield['arrows'][mouse_idx]
-patch_arrow = patched_vfield['arrows'][mouse_idx]
-diff = np.linalg.norm(np.array(orig_arrow) - np.array(patch_arrow))
-print(f'{seed} has difference {diff:.3f}')
-
-# RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Vfields on each maze
 """ The vector field is a plot of the action probabilities for each state in the maze. Let's see what the vector field looks like for a given seed. We'll compare the vector field for the original and patched networks. 
 """
@@ -174,8 +153,8 @@ for seed in range(5):
 # %% Patch out each residual block
 @interact
 def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
-    patches = {zero_target: lambda x: t.zeros_like(x)}
     venv = create_venv(num=1, start_level=seed, num_levels=1)
+    patches = get_zero_patch(label=zero_target)
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
     # title the fig with label
     fig.suptitle(zero_target)
@@ -203,7 +182,7 @@ def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatS
     for label in labels:
         if label == 'fc_value_out': continue
         values = values_from_venv(venv, hook, label)
-        patches.update(get_patches(values=values, coeff=coeff, label=label))
+        patches.update(get_values_diff_patch(values=values, coeff=coeff, label=label))
         
     fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
@@ -236,7 +215,7 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
 
     if generate:  
         venv = maze.venv_from_grid(grid=grids[target_index])
-        patches = get_patches(values, -1, main_label)
+        patches = get_values_diff_patch(values, -1, main_label)
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
     else:
         fig, _, _ = plot_patched_vfields(seeds[target_index], -1, main_label, hook, values=values)
@@ -258,6 +237,6 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
     cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
     values = cheese_diff_values(seed, main_label, hook)
-    patches = get_patches(values, coeff=-1, label=main_label)
+    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
     fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
