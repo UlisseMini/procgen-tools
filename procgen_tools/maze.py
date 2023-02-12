@@ -33,6 +33,7 @@ class StateValue:
     val: typing.Any
     idx: int
 
+
 # fancy type just caused excessive checking / errors ;(
 StateValues = typing.Dict[str, typing.Any] # Union[StateValue, List[StateValue], 'StateValues']]
 Square = typing.Tuple[int, int]
@@ -779,7 +780,7 @@ def get_cheese_pos_from_seed(seed : int):
 def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
     """ Generate a list of maze seeds with cheese at the specified location. """
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
-    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+    assert (0 <= coord < WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
 
     seeds = []
     seed = 0
@@ -792,7 +793,7 @@ def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_maz
 def generate_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 50, skip_seed : int = -1):
     """ Generate the first num_mazes seeds which have an empty/cheese square at cheese_location, except the mazes are modified to instead have cheese at cheese_location. Returns a list of full grids. """
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
-    assert (0 <= coord < maze.WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
+    assert (0 <= coord < WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
 
     seeds, grids = [], []
     seed = 0
