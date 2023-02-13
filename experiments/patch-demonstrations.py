@@ -167,7 +167,7 @@ obs = maze.get_random_obs(50, spawn_cheese=False)
 # plt.show()
 
 @interact 
-def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
+def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
     hook.run_with_input(obs)
     values = hook.get_value_by_label(label)
