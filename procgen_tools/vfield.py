@@ -64,7 +64,7 @@ def vector_field(venv, policy):
     arrows = []
     probs = []
     for i in range(len(legal_mouse_positions)):
-        probs_dict = models.human_readable_actions(c.probs[i])
+        probs_dict = models.human_readable_actions(c.probs[i]) # TODO indexing error?
         probs_dict = {k: v.item() for k, v in probs_dict.items()}
         deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
         arrows.append(_tadd(*deltas))

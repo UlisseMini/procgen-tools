@@ -160,9 +160,9 @@ def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdo
     fig.suptitle(zero_target)
     plt.show()
 
-# %% Generate random mouse observations
+# %% Generate random mouse observations and then mean-ablate
 obs = maze.get_random_obs(50, spawn_cheese=False)
-# Show the observation in human readable form
+# Show a random observation
 # plt.imshow(rearrange(obs[2], 'c h w -> h w c'))
 # plt.show()
 
@@ -170,11 +170,13 @@ obs = maze.get_random_obs(50, spawn_cheese=False)
 def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
     hook.run_with_input(obs)
-    values = hook.get_value_by_label(label)
-    patches = get_mean_patch(values, label=label) 
+    random_values = hook.get_value_by_label(label)
+    patches = get_mean_patch(random_values, label=label) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
     # title the fig with label
-    fig.suptitle(label)
+    fig.suptitle(f'Mean patching layer {label}')
+    # Ensure the title is close to the plots
+    fig.subplots_adjust(top=1.05)
     plt.show() 
 
 
@@ -247,7 +249,7 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 
-# %%
+# %% See if the cheese patch blinds the agent
 @interact 
 def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
     cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
@@ -255,3 +257,5 @@ def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
     patches = get_values_diff_patch(values, coeff=-1, label=main_label)
     fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
+
+# %%
