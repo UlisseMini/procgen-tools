@@ -207,14 +207,13 @@ def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatS
 GENERATE_NUM = 50 # Number of seeds to generate, if generate is True
 SEARCH_NUM = 2 # Number of seeds to search for, if generate is False
 
-def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False, target_index : int = 0):
+def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, target_index : int = 0):
     """ Visualize what happens if the patch is transferred to a maze with the cheese translated by the given amount. TODO refactor into a helper class, with hook and other variables saved as class variables.
     
     Args:
         source_seed (int): The seed from which the patch was generated.
         col_translation (int): The number of columns to translate the cheese by.
         row_translation (int): The number of rows to translate the cheese by.
-        generate (bool): Whether to modify existing mazes or search for existing ones.
         target_index (int): The index of the target maze to use, among the seeds generated or searched for. 
     """
     values = cheese_diff_values(source_seed, main_label, hook)
@@ -223,29 +222,17 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     assert cheese_location[0] < maze.WORLD_DIM - row_translation, f"Cheese is too close to the bottom for it to be translated by {row_translation}."
     assert cheese_location[1] < maze.WORLD_DIM - col_translation, f"Cheese is too close to the right for it to be translated by {col_translation}."
 
-    if generate: 
-        seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = GENERATE_NUM, skip_seed=source_seed)
-    else: 
-        seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=SEARCH_NUM, skip_seed = source_seed)
-    if generate:  
-        venv = maze.venv_from_grid(grid=grids[target_index])
-        patches = get_values_diff_patch(values, -1, main_label)
-        fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
-    else:
-        fig, _, _ = plot_patched_vfields(seeds[target_index], -1, main_label, hook, values=values)
-    
+    seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = GENERATE_NUM, skip_seed=source_seed)
+    venv = maze.venv_from_grid(grid=grids[target_index])
+    patches = get_values_diff_patch(values, -1, main_label)
+    fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
+
     display(fig)
-    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}.\nRendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target.')
-
-# %% Natural cheese_location target mazes 
-# NOTE is this the same -- are natural mazes first generated and _then_ cheese is placed? Or is cheese placed and then the maze built around it, or something else?
-
-# Transfers to mazes with cheese at the same location, using SEARCH_NUM real seeds found via rejection sampling.
-_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(False), target_index=IntSlider(min=0, max=SEARCH_NUM-1, step=1, value=0))
+    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}.\nRendered seed: {seeds[target_index]}.')
 
 # %% Synthetic transfer to same cheese locations
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
-_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
+_ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 
 # %% See if the cheese patch blinds the agent
 values = cheese_diff_values(0, main_label, hook)
