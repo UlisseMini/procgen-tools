@@ -10,8 +10,8 @@ import itertools
 import numpy as np
 import numpy.linalg
 import pandas as pd
+import xarray as xr
 import torch as t
-
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import plotly.express as px
@@ -45,7 +45,7 @@ hook = cmh.ModuleHook(policy)
 # Pick a seed for randomizing the level_seeds,
 # and a number of levels to generate
 random_seed = 43
-num_levels = 10
+num_levels = 30
 
 # Pick direction of patch (patch cheese to make less cheese, 
 # or patch no-cheese to make cheesier)
@@ -61,11 +61,13 @@ maze_dim = 15
 # Pick some cheese positions to test (e.g. corners, and points in a 
 # square closer to middle?)  (In inner_grid coords)
 cheese_poss = [(2, 2), (2, 12), (12, 2), (12, 12)]
+#cheese_poss = [(2, 12)]
 num_cheese_pos = len(cheese_poss)
 
 # Pick some mouse positions to test (all true cells that are known 
 # to be open, and which could be branch squares?)
-mouse_poss = [(0, 0), (0, 2)]
+mouse_poss = [(0, 0), (2, 2), (4, 4), (6, 6), (8, 8), (10, 10)]
+#mouse_poss = [(8, 8)]
 num_mouse_pos = len(mouse_poss)
 
 def remove_cheese_from_state(state):
@@ -85,8 +87,9 @@ def move_cheese_in_state(state, new_cheese_pos):
 random.seed(random_seed)
 obs_no_cheese_list = []
 obs_cheese_list = []
+level_seeds = []
 with tqdm(total=num_levels) as pbar:
-    while len(obs_cheese_list) < num_levels:
+    while len(level_seeds) < num_levels:
         # Get the level seed
         level_seed = random.randint(0, int(1e6))
         
@@ -100,6 +103,7 @@ with tqdm(total=num_levels) as pbar:
         maze_dim_this = states[0].inner_grid().shape[0]
         if maze_dim_this != maze_dim:
             continue
+        level_seeds.append(level_seed)
         padding = (states[0].world_dim - maze_dim_this) // 2
         # Remove the cheese from all the envs
         states = [remove_cheese_from_state(state) for state in states]
@@ -136,45 +140,140 @@ with tqdm(total=num_levels) as pbar:
 # %%
 # Get all the values and action logits for all the observations
 
-# Concat lists into arrays
-obs_no_cheese = rearrange(obs_no_cheese_list, 'l p ... -> (l p) ...')
-obs_cheese = rearrange(obs_cheese_list, 'l p ... -> (l p) ...')
+mouse_pos_coords = np.array(mouse_poss, dtype='i,i')
+cheese_pos_coords = np.array(cheese_poss, dtype='i,i')
 
-# Run both obs through the hooked network and extract value
+# Rearrange lists into xarrays with appropriate non-flat dims
+obs_no_cheese = xr.DataArray(
+    data = rearrange(obs_no_cheese_list, 'lev mse ... -> lev mse ...'),
+    dims = ['level_seed', 'mouse_pos', 'rgb', 'y', 'x'],
+    coords = dict(level_seed=level_seeds, mouse_pos=mouse_pos_coords))
+obs_cheese = xr.DataArray(
+    data = rearrange(obs_cheese_list, 'lev (mse chs) ... ->  lev mse chs ...', 
+        mse=num_mouse_pos),
+    dims = ['level_seed', 'mouse_pos', 'cheese_pos', 'rgb', 'y', 'x'],
+    coords = dict(level_seed=level_seeds, mouse_pos=mouse_pos_coords,
+        cheese_pos=cheese_pos_coords))
+
+def stack(array):
+    dims_to_stack = [dim for dim in 
+        ['level_seed', 'mouse_pos', 'cheese_pos']
+        if dim in array.dims]
+    return array.stack(dict(sbatch=dims_to_stack)).transpose('sbatch',...)
+
+def unstack(array):
+    existing_dims = [dim for dim in array.dims if dim != 'sbatch']
+    unstacked = array.unstack('sbatch')
+    new_dims = [dim for dim in unstacked.dims if not dim in existing_dims]
+    return unstacked.transpose(*new_dims, ...)
+
+def add_cheese_dim(array):
+    return array.expand_dims(dict(cheese_pos=cheese_pos_coords), axis=2)
+
+# Run both obs through the hooked network and extract values, unstacked
+# (Force the no-cheese arrays to have the same shape as the cheese arrays,
+# for simpler indexing later)
 action_logits_label = 'fc_policy_out'
-hook.run_with_input(obs_no_cheese)
-value_no_cheese = hook.get_value_by_label(value_label)
-action_logits_no_cheese = hook.get_value_by_label(action_logits_label)
-hook.run_with_input(obs_cheese)
-value_cheese = hook.get_value_by_label(value_label)
-action_logits_cheese = hook.get_value_by_label(action_logits_label)
+hook.run_with_input(stack(obs_no_cheese))
+value_no_cheese = add_cheese_dim(unstack(hook.get_value_by_label(value_label)))
+action_logits_no_cheese = \
+    add_cheese_dim(unstack(hook.get_value_by_label(action_logits_label)))
+hook.run_with_input(stack(obs_cheese))
+value_cheese = unstack(hook.get_value_by_label(value_label))
+action_logits_cheese = unstack(hook.get_value_by_label(action_logits_label))
 
 # %%
 # Do the patching
 
-num_src_levels = 3
+num_src_levels = 1
 
-# Function to map (idx_level, idx_cheese, idx_mouse) arrays to flattened batch idx array
-def idxs_to_flat(idx_arrays):
-    return np.ravel_multi_index(idx_arrays, (num_levels, num_mouse_pos, num_cheese_pos))
+# # Function to map (idx_level, idx_cheese, idx_mouse) arrays to flattened batch idx array
+# def idxs_to_flat(idx_arrays):
+#     return np.ravel_multi_index(idx_arrays, (num_levels, num_mouse_pos, num_cheese_pos))
 
 def logits_to_prob_arrows(logits):
-    log_probs = F.log_softmax(t.from_numpy(logits), dim=1)
+    log_probs = F.log_softmax(t.from_numpy(logits.copy()), dim=1)
     probs = Categorical(logits=log_probs).probs.detach().numpy()
-    np.einsum('ba,ad', probs, models.MAZE_ACTION_DELTAS_BY_INDEX)
+    return np.einsum('ba,ad->ba', probs, models.MAZE_ACTION_DELTAS_BY_INDEX)
 
-def score_vect_cosim(action_logits_orig, action_logits_patched):
+def score_vect_cosim(action_logits_targ, action_logits_patched):
     # Turn logits into probs
-    arrows_orig = logits_to_prob_arrows(action_logits_orig)
+    arrows_targ = logits_to_prob_arrows(action_logits_targ)
     arrows_patched = logits_to_prob_arrows(action_logits_patched)
-    return np.einsum('id,jd', arrows_orig, arrows_patched) / \
-        (np.linalg.norm(arrows_orig, axis=1) * np.linalg.norm(arrows_patched, axis=1))
+    return np.einsum('bd,bd->b', arrows_targ, arrows_patched) / \
+        (np.linalg.norm(arrows_targ, axis=1) * np.linalg.norm(arrows_patched, axis=1))
 
+# Calculate all the cheese - (no cheese) diffs as patch sources
+cheese_diff = value_cheese - value_no_cheese
 
 # Test patching between different levels, same mouse and cheese pos
+# Iterate over source levels
+scores_np = np.zeros((num_src_levels, num_levels, num_mouse_pos, num_cheese_pos))
+scores_nopatch_np = np.zeros_like(scores_np)
 for src_level_idx in range(num_src_levels):
-    # TODO: pick up here
-    pass
+    # Grab the cheese diffs for this source level
+    cheese_diff_this = cheese_diff.isel(level_seed=src_level_idx)
+    # Iterate over levels-to-patch (could vectorize)
+    for patch_level_idx in range(num_levels):
+        # if src_level_idx == patch_level_idx:
+        #     continue # Don't patch the source level
+        # Make a patch function that will apply the appropriate
+        # diff at all mouse/cheese locations
+        cheese_diff_this_stk_t = t.from_numpy(
+            stack(cheese_diff_this).values)
+        def patch_func(outp):
+            #return t.from_numpy(
+            #    stack(value_cheese.isel(level_seed=src_level_idx)).values)
+            #return t.zeros_like(outp)
+            #return outp
+            return outp + (1. if patch_more_cheese else -1.)*cheese_diff_this_stk_t
+        # Apply the patch and run the network
+        if patch_more_cheese:
+            obs_to_use = obs_no_cheese.isel(level_seed=patch_level_idx)
+            action_logits_orig = action_logits_no_cheese.isel(level_seed=patch_level_idx)
+            action_logits_targ = action_logits_cheese.isel(level_seed=patch_level_idx)
+        else:
+            obs_to_use = obs_cheese.isel(level_seed=patch_level_idx)
+            action_logits_orig = action_logits_cheese.isel(level_seed=patch_level_idx)
+            action_logits_targ = action_logits_no_cheese.isel(level_seed=patch_level_idx)
+        hook.run_with_input(stack(obs_to_use), 
+            patches={value_label: patch_func})
+        # Get the (still stacked) patched logits
+        action_logits_patched_stk = hook.get_value_by_label(action_logits_label)
+        # Get the metric score
+        scores = score_vect_cosim(
+            stack(action_logits_targ).values,
+            action_logits_patched_stk.values)
+        scores_np[src_level_idx, patch_level_idx, ...] = rearrange(scores,
+            '(mse chs) -> mse chs', mse=num_mouse_pos)
+        # Save the baseline "no patch" score also
+        scores_nopatch_np[src_level_idx, patch_level_idx, ...] = rearrange(
+            score_vect_cosim(
+                stack(action_logits_targ).values,
+                stack(action_logits_orig).values),
+            '(mse chs) -> mse chs', mse=num_mouse_pos)
+
+scores = xr.DataArray(
+    data = scores_np,
+    dims = ['src_level_seed', 'patch_level_seed', 'mouse_pos', 'cheese_pos'],
+    coords = dict(
+        src_level_seed=obs_cheese.indexes['level_seed'].values[:num_src_levels],
+        patch_level_seed=obs_cheese.indexes['level_seed'].values,
+        mouse_pos=mouse_pos_coords,
+        cheese_pos=cheese_pos_coords))
+scores_nopatch = scores.copy(data=scores_nopatch_np)
+
+display((scores - scores_nopatch).mean().item())
+
+px.histogram((scores - scores_nopatch).values.flatten()).show()
+
+# display('No patch baseline', scores_nopatch_np.squeeze())
+# display('With patch', scores_np.squeeze())
+#score_improvement
+
+# Temp: visualize some stuff for sanity checking
+# px.imshow(rearrange(obs_cheese.values.squeeze(), 
+#     '(lh lw) c h w -> (lh h) (lw w) c', lh=2))
 
 
 # Test patching within the same level, same cheese pos, different mouse pos
@@ -190,3 +289,4 @@ for src_level_idx in range(num_src_levels):
 
 # For each source, for each target, patch in the cheese diff and 
 # apply metrics to the resulting pre and post logits
+# %%
