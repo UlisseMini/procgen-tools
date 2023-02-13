@@ -47,6 +47,7 @@ def plot_by_seed(
     for i, pos in enumerate(legal_mouse_positions):
         neighbors = [n for n in maze.get_empty_neighbors(grid, *pos) if n != cheese_pos]
         if len(neighbors) == 0:
+            colors.append('white')
             continue
         neighbor_indexes = [legal_mouse_positions.index(n) for n in neighbors]
         neighbor_values = [v[i] for i in neighbor_indexes]
