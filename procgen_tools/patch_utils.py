@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from IPython.display import Video, display, clear_output
 from ipywidgets import Text, interact, HBox
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+from einops import *
 
 # NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
 # Install normally with: pip install circrl
@@ -38,18 +39,10 @@ rand_region = 5
 def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
     "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
     venv = create_venv(num=2, start_level=seed, num_levels=1)
-    state_bytes_list = venv.env.callmethod("get_state")
 
     for idx in range(2):
         if has_cheese_tup[idx]: continue # Skip if we want cheese in this environment
-        state = maze.EnvState(state_bytes_list[idx])
-
-        # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
-        grid = state.full_grid()
-        grid[grid == maze.CHEESE] = maze.EMPTY
-        state.set_grid(grid)
-        state_bytes_list[idx] = state.state_bytes
-        venv.env.callmethod("set_state", state_bytes_list)
+        maze.remove_cheese(venv, idx=idx)
 
     return venv
 
@@ -90,7 +83,7 @@ def logits_to_action_plot(logits, title=''):
     prob_dist = t.stack(list(prob_dict.values()))
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
 
-def get_patches(values: np.ndarray, coeff: float, label: str):
+def get_values_diff_patch(values: np.ndarray, coeff: float, label: str):
     """ Get a patch function that patches the activations at label with coeff*(values[0, ...] - values[1, ...]). TODO generalize """
     cheese = values[0,...]
     no_cheese = values[1,...]
@@ -98,6 +91,17 @@ def get_patches(values: np.ndarray, coeff: float, label: str):
 
     cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
     return {label: lambda outp: outp + coeff*cheese_diff}
+
+def get_zero_patch(label: str):
+    """ Get a patch function that patches the activations at label with 0. """
+    return {label: lambda outp: t.zeros_like(outp)}
+
+def get_mean_patch(values: np.ndarray, label: str):
+    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. """
+    # Take mean across batch dimension using reduce, then broadcast to match shape of activations
+    mean_vals = reduce(t.from_numpy(values), 'b c h w -> c h w', 'mean')
+    # Ensure that the batch dimension has same size
+    return {label: lambda outp: repeat(mean_vals, 'c h w -> b c h w', b=outp.shape[0])}
 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
@@ -116,7 +120,7 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
 
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
     
-    patches = get_patches(values, coeff, label=activation_label)
+    patches = get_values_diff_patch(values, coeff, label=activation_label)
 
     if show_video:
         env = copy_venv(venv, 1 if vanished else 0)
@@ -186,7 +190,7 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     original_vfield = vfield.vector_field(venv, hook.network)
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
-    fig, axs = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding)
+    fig, axs = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size)
 
     obj = {
         'patches': patches,
@@ -200,7 +204,7 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
 def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, label, hook) if values is None else values
-    patches = get_patches(values, coeff, label) 
+    patches = get_values_diff_patch(values, coeff, label) 
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size)
@@ -214,5 +218,3 @@ def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHo
         fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
 
     return fig, axs, obj
-
-# %%
