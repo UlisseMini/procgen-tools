@@ -51,8 +51,8 @@ def get_decision_probs_original_and_patched(vfields, coeff: float):
     return np.array(decision_probs_original), np.array(decision_probs_patched)
 
 
-def plot_decision_probs(decision_probs_original, decision_probs_patched):
-    fig, ax = plt.subplots(1, 3, figsize=(12, 4))
+def plot_decision_probs(decision_probs_original, decision_probs_patched, ax_size : int = 4):
+    fig, ax = plt.subplots(1, 3, figsize=(3*ax_size, ax_size))
     dpo, dpp = decision_probs_original, decision_probs_patched
 
     dpo = np.stack([dpo[:,0], dpo[:,1], 1-dpo[:,0]-dpo[:,1]], axis=1)

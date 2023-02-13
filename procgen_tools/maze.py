@@ -295,7 +295,6 @@ class EnvState():
         # flipped turns out to be oriented right for grid.
         return int(ents['y'].val), int(ents['x'].val)
 
-
     def set_mouse_pos(self, x: int, y: int):
         """
         Set the mouse position in the maze state bytes. Much more optimized than parsing and serializing the whole state.
@@ -343,6 +342,20 @@ def get_cheese_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
     return tuple(ix[0] for ix in np.where(grid == CHEESE))
 
+def remove_cheese(venv, idx : int = 0):
+    """
+    Remove the cheese from the grid, modifying venv in-place.
+    """
+    state_bytes_list = venv.env.callmethod("get_state")
+    state = EnvState(state_bytes_list[idx])
+
+    # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
+    grid = state.full_grid()
+    grid[grid == CHEESE] = EMPTY
+    state.set_grid(grid)
+    state_bytes_list[idx] = state.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+
 
 def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     "Get (x, y) position of the mouse in the grid"
@@ -386,7 +399,7 @@ def _ingrid(grid: np.ndarray, n):
     "Is (x, y) in the grid?"
     return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
 
-def _get_empty_neighbors(grid: np.ndarray, x, y):
+def get_empty_neighbors(grid: np.ndarray, x, y):
     "Get the empty neighbors of (x, y) in the grid"
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
@@ -439,7 +452,7 @@ def shortest_path(
             extra['last_square'] = current
             break
 
-        for next in _get_empty_neighbors(grid, *current):
+        for next in get_empty_neighbors(grid, *current):
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
@@ -476,7 +489,7 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
             if debug: print(f'{node} already visited, a cycle!')
             return False
         visited_nodes.add(node)
-        for neighbor in _get_empty_neighbors(grid, *node):
+        for neighbor in get_empty_neighbors(grid, *node):
             edge = (node, neighbor)
             if edge not in visited_edges and edge[::-1] not in visited_edges:
                 stack.append(neighbor)
@@ -537,15 +550,17 @@ def venv_from_grid(grid: np.ndarray):
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
+def get_padding(grid: np.ndarray) -> int:
+    """ Return the padding of the grid, i.e. the number of walls around the maze. """
+    return (WORLD_DIM - grid.shape[0]) // 2
+
 def render_inner_grid(grid: np.ndarray):
     """ Extract the human-sensible view given grid, assumed to be an inner_grid. Return the human view."""
     venv = venv_from_grid(grid)
     human_view = venv.env.get_info()[0]['rgb']
 
     # Cut out the padding from the view. The padding is the walls around the maze. 
-    padding = WORLD_DIM - grid.shape[0] 
-    assert padding % 2 == 0
-    padding //= 2
+    padding = get_padding(grid)
     rescale = human_view.shape[0] / WORLD_DIM
     
     return human_view[int(padding*rescale):int(-padding*rescale), int(padding*rescale):int(-padding*rescale)] if padding > 0 else human_view
@@ -766,11 +781,18 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     conventions.'''
     get_object_pos_from_seq_of_states(state_bytes_seq, CHEESE)
     
-def get_full_grid_from_seed(seed : int):
+def get_envstate_from_seed(seed : int):
     seed_env = create_venv(num=1, start_level=seed, num_levels=1)
     state_bytes = seed_env.env.callmethod("get_state")[0]
-    state = EnvState(state_bytes)
+    return EnvState(state_bytes)
+
+def get_full_grid_from_seed(seed : int):
+    state = get_envstate_from_seed(seed)
     return state.full_grid()
+
+def get_inner_grid_from_seed(seed : int):
+    state = get_envstate_from_seed(seed)
+    return state.inner_grid()
 
 def get_cheese_pos_from_seed(seed : int):
     """ Get the cheese position from a maze seed. """
@@ -854,12 +876,41 @@ def copy_venv(venv, idx: int):
     env.env.callmethod("set_state", [sb])
     return env
 
+def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5, spawn_cheese : bool = True):
+    """ Get num_obs observations from the maze environment. If on_training is True, then the observation is from a training level where the cheese is in the top-right rand_region corner. """
+    assert rand_region <= WORLD_DIM, "rand_region must be less than or equal to WORLD_DIM."
+    assert rand_region > 0, "rand_region must be greater than 0."
+    assert num_obs > 0, "num_obs must be greater than 0."
+
+    venvs = create_venv(num_obs, start_level=0, num_levels=0)
+    # TODO ensure that if on_training is True, then the cheese is in the top-right rand_region corner
+    
+    # Randomly place the mouse in each environment 
+    state_bytes_list = []
+    for i in range(num_obs):
+        env_state = EnvState(venvs.env.callmethod('get_state')[i])
+        grid = env_state.full_grid(with_mouse=False)
+        legal_mouse_positions = get_legal_mouse_positions(grid)
+
+        # choose a random legal mouse position
+        mx, my = legal_mouse_positions[np.random.randint(len(legal_mouse_positions))]
+
+        # set the mouse position
+        env_state.set_mouse_pos(mx, my)
+
+        if not spawn_cheese: remove_cheese(venvs, i)
+
+        # set the state
+        state_bytes_list.append(env_state.state_bytes)
+
+    venvs.env.callmethod('set_state', state_bytes_list)
+    return venvs.reset().astype(np.float32)
 
 def venv_with_all_mouse_positions(venv):
     """
     From a venv with a single env, create a new venv with one env for each legal mouse position.
 
-    Returns venv_all, (legal_mouse_positions, grid_without_mouse)
+    Returns venv_all, (legal_mouse_positions, inner_grid_without_mouse)
     Typically you'd call this with `venv_all, _ = venv_with_all_mouse_positions(venv)`,
     The extra return values are useful for conciseness sometimes.
     """
@@ -870,8 +921,7 @@ def venv_with_all_mouse_positions(venv):
     legal_mouse_positions = get_legal_mouse_positions(grid)
 
     # convert coords from inner to outer grid coordinates
-    assert (env_state.world_dim - grid.shape[0]) % 2 == 0
-    padding = (env_state.world_dim - grid.shape[0]) // 2
+    padding = get_padding(grid)
 
     # create a venv for each legal mouse position
     state_bytes_list = []

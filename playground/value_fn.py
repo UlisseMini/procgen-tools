@@ -32,15 +32,41 @@ def plot_by_seed(
 
     g = grid.copy()
     g[g==maze.BLOCKED] = 0 # 50 screws up plot
-    g[g==maze.CHEESE] = 10 # 10 is more in-line with rest of things
+    g[g==maze.CHEESE] = 2.718**7 # 10 is more in-line with rest of things
     for i, pos in enumerate(legal_mouse_positions):
-        g[pos] = v[i].item()
+        g[pos] = v[i].exp().item()
     fig, ax = plt.subplots(1,1)
     fig.colorbar(ax.imshow(g, origin='lower', cmap='RdBu_r'), ax=ax)
 
+    # Cross entropy between policy and argmax of value function.
+    # Plot largest disagreements.
+
+    cheese_pos = maze.get_cheese_pos(grid)
+    agreements, total = 0, 0
+    colors = []
+    for i, pos in enumerate(legal_mouse_positions):
+        neighbors = [n for n in maze.get_empty_neighbors(grid, *pos) if n != cheese_pos]
+        if len(neighbors) == 0:
+            colors.append('white')
+            continue
+        neighbor_indexes = [legal_mouse_positions.index(n) for n in neighbors]
+        neighbor_values = [v[i] for i in neighbor_indexes]
+        n = neighbors[neighbor_values.index(max(neighbor_values))]
+        argmax_value_dir = (n[0]-pos[0], n[1]-pos[1])
+        argmax_policy_dir = tuple(models.MAZE_ACTION_DELTAS_BY_INDEX[c.probs[i].argmax().item()])
+        agreements += argmax_value_dir == argmax_policy_dir
+        total += 1
+        if argmax_value_dir != argmax_policy_dir:
+            colors.append('red')
+        else:
+            colors.append('green')
+    print(f'argmax behavior: {agreements}/{total} = {agreements/total:.2f}')
+
+
+    # Quiver
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in vf["arrows"]], [arr[0] for arr in vf["arrows"]], color='white', scale=1, scale_units='xy'
+        [arr[1] for arr in vf["arrows"]], [arr[0] for arr in vf["arrows"]], color=colors, scale=1, scale_units='xy'
     )
 
     # ax[1].imshow(grid, origin='lower')

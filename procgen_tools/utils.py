@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 def _extract_tgz(path):
     "Extracts a .tar.gz or .tgz file."
-    assert path.endswith('.tgz') or url.endswith('.tar.gz')
+    assert path.endswith('.tgz') or path.endswith('.tar.gz')
     with tarfile.open(path, 'r:gz') as tar:
         members = tar.getmembers()
         t = tqdm(members)
@@ -64,16 +64,18 @@ def setup_dir():
         os.chdir('procgen-tools')
 
 
-def setup():
+def setup(force: bool = False):
     """
     cd into the procgen-tools directory then download and extract data files.
     """
     setup_dir()
     assert Path.cwd().name == 'procgen-tools', 'must be in procgen-tools'
 
-    _fetch('https://nerdsniper.net/mats/episode_data.tgz')
-    _fetch('https://nerdsniper.net/mats/data.tgz')
-    _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth')
+    _fetch('https://nerdsniper.net/mats/episode_data.tgz', force=force)
+    _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
+    _fetch('https://nerdsniper.net/mats/data.tgz', force=force)
+    _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth', force=force)
+
 
     
 

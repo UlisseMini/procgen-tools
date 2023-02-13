@@ -68,6 +68,35 @@ labels = list(hook.values_by_label.keys()) # all labels in the model
 if '_out' in labels: labels.remove('_out')
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
+# %% Sanity-check that the patching performance is not changed at the original square
+@interact
+def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, step=1, value=0)):
+    cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
+
+    # Visualize the cheese pair to make sure we've got the environment right
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].imshow(cheese_pair.env.get_info()[0]['rgb'])
+    ax[1].imshow(cheese_pair.env.get_info()[1]['rgb'])
+    plt.show()
+
+    values = cheese_diff_values(seed, label, hook)
+    patches = get_values_diff_patch(values, coeff=-1, label=label)
+
+    original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
+    with hook.use_patches(patches):
+        patched_vfield = vfield.vector_field(copy_venv(cheese_pair, 1), hook.network)
+
+    # Plot the vfield diff
+    fig, axs = plot_vfs_with_diff(original_vfield, patched_vfield)
+    plt.show(block=True)
+
+    mouse_pos = maze.get_mouse_pos(maze.get_inner_grid_from_seed(seed))
+    mouse_idx = original_vfield['legal_mouse_positions'].index(mouse_pos)
+    orig_arrow = original_vfield['arrows'][mouse_idx]
+    patch_arrow = patched_vfield['arrows'][mouse_idx]
+    diff = np.linalg.norm(np.array(orig_arrow) - np.array(patch_arrow))
+    print(f'Seed {seed} has difference {diff:.3f}')
+
 # %% Vfields on each maze
 """ The vector field is a plot of the action probabilities for each state in the maze. Let's see what the vector field looks like for a given seed. We'll compare the vector field for the original and patched networks. 
 """
@@ -84,36 +113,18 @@ values_tup = cheese_diff_values(value_seed, main_label, hook), value_seed
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
 
-
-# %% We can patch a range of coefficients and seeds, saving figures from each one for later reference. This is somewhat deprecated due to the interactive plotting above.
-seeds = range(10)
-coeffs = [-2, -1, -0.5, 0.5, 1, 2]
-for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
-    fig, _, _ = plot_patched_vfields(seed, coeff, main_label=main_label, hook=hook)
-    fig.savefig(f"../figures/patched_vfield_seed{seed}_coeff{coeff}.png", dpi=300)
-    plt.clf()
-    plt.close()
-
-# %% Live vfield probability visualization
-""" Edit a maze and see how that changes the vector field representing the action probabilities. """
-vbox = custom_vfield(policy, seed=2)
-display(vbox)
-
 # %% We can construct a patch which averages over a range of seeds, and see if that generalizes better (it doesn't)
-values = np.zeros_like(cheese_diff_values(0, main_label, hook))
-seeds = slice(int(10e5),int(10e5+100))
-
-# Iterate over range specified by slice
-for seed in range(seeds.start, seeds.stop):
-    # Make values be rolling average of values from seeds
-    values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, main_label, hook)/(seed-seeds.start+1)
-
-# Assumes a fixed venv, hook, values, and main_label
+seeds = slice(int(10e5),int(10e5+19))
+last_labels = ['embedder.block3.res2.conv2_out', 'embedder.block3.res2.resadd_out', 'embedder.relu3_out', 'embedder.flatten_out', 'embedder.fc_out', 'embedder.relufc_out']
 @interact
-def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-10, max=10, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook, values=values)
-    plt.show()
+def interactive_patching(target_seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-2, max=2, step=0.1, value=-1), label=Dropdown(options=last_labels, value=last_labels[0])):
+    values = np.zeros_like(cheese_diff_values(0, label, hook))
+    for seed in range(seeds.start, seeds.stop):
+        # Make values be rolling average of values from seeds
+        values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
 
+    fig, _, _ = plot_patched_vfields(target_seed, coeff, label, hook, values=values)
+    plt.show()
 
 # %% Patching with a random vector 
 """ Are we just seeing noise? Let's try patching with a random vector and see if that works. First, let's find appropriate-magnitude random vectors."""
@@ -139,23 +150,46 @@ for seed in range(5):
 
 # It doesn't work, and destroys performance. In contrast, the cheese vector has a targeted and constrained effect on the network (when not transferring to other mazes), and does little when attempting transfer. This seems intriguing.
 
+# %% Patch out each residual block
+@interact
+def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
+    venv = create_venv(num=1, start_level=seed, num_levels=1)
+    patches = get_zero_patch(label=zero_target)
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
+    # title the fig with label
+    fig.suptitle(zero_target)
+    plt.show()
+
+# %% Generate random mouse observations and then mean-ablate
+obs = maze.get_random_obs(50, spawn_cheese=False)
+# Show a random observation
+# plt.imshow(rearrange(obs[2], 'c h w -> h w c'))
+# plt.show()
+
+@interact 
+def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
+    venv = create_venv(num=1, start_level=seed, num_levels=1)
+    hook.run_with_input(obs)
+    random_values = hook.get_value_by_label(label)
+    patches = get_mean_patch(random_values, label=label) 
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
+    # title the fig with label
+    fig.suptitle(f'Mean patching layer {label}')
+    # Ensure the title is close to the plots
+    fig.subplots_adjust(top=1.05)
+    plt.show() 
+
+
 # %% Patching different layers
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
 
-# Remove '_out' from labels
-
 # NOTE conv_in0 doesn't have effect, but shouldn't that literally make agent not see cheese? And why don't all bottleneck layers completely change agent computation so that it doesn't see cheese, at least at the relevant square? 
+# Actually you can't patch conv_in0, because it's not a parameter (it's an input)
 @interact
-def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), main_label=labels):
-    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook)
+def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=Dropdown(options=labels)):
+    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
     plt.show()    
-    print(f'Patching {main_label} layer')
-
-# %%
-for label in labels:
-    fig, _, _ = plot_patched_vfields(0, -1, label, hook)
-    plt.show()
-    print(f'^ Patching {label} layer')
+    print(f'Patching {label} layer')
 
 # %% Try all patches at once 
 @interact 
@@ -165,7 +199,7 @@ def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatS
     for label in labels:
         if label == 'fc_value_out': continue
         values = values_from_venv(venv, hook, label)
-        patches.update(get_patches(values=values, coeff=coeff, label=label))
+        patches.update(get_values_diff_patch(values=values, coeff=coeff, label=label))
         
     fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
@@ -198,7 +232,7 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
 
     if generate:  
         venv = maze.venv_from_grid(grid=grids[target_index])
-        patches = get_patches(values, -1, main_label)
+        patches = get_values_diff_patch(values, -1, main_label)
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
     else:
         fig, _, _ = plot_patched_vfields(seeds[target_index], -1, main_label, hook, values=values)
@@ -215,12 +249,13 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 """ Most levels don't have cheese in the same spot. The above method is slow, because it rejection-samples levels until it finds one with cheese in the right spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 
-# %%
+# %% See if the cheese patch blinds the agent
 @interact 
 def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
     cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
     values = cheese_diff_values(seed, main_label, hook)
-    patches = get_patches(values, coeff=-1, label=main_label)
+    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
     fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
+
 # %%
