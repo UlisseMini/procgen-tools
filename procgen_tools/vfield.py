@@ -167,8 +167,10 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
 
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
+    return vf_diff
+
 def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5):
-    """ Plot two vector fields and their difference vf2 - vf1. Plots three axes in total. """
+    """ Plot two vector fields and their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field."""
     num_cols = 3
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
 
@@ -180,8 +182,8 @@ def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, rende
     
     axs[2].set_xlabel("Patched vfield minus original")
     # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
-    plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
-    return fig, axs
+    vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
+    return fig, axs, vf_diff
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """

@@ -190,12 +190,13 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     original_vfield = vfield.vector_field(venv, hook.network)
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
-    fig, axs = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size)
+    fig, axs, vf_diff = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size)
 
     obj = {
         'patches': patches,
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
+        'diff_vfield': vf_diff,
     }
 
     return fig, axs, obj

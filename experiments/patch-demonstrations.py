@@ -87,7 +87,7 @@ def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, s
         patched_vfield = vfield.vector_field(copy_venv(cheese_pair, 1), hook.network)
 
     # Plot the vfield diff
-    fig, axs = plot_vfs_with_diff(original_vfield, patched_vfield)
+    fig, axs, diff_vf = plot_vfs_with_diff(original_vfield, patched_vfield)
     plt.show(block=True)
 
     mouse_pos = maze.get_mouse_pos(maze.get_inner_grid_from_seed(seed))
@@ -233,8 +233,9 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
         fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
     else:
         fig, _, _ = plot_patched_vfields(seeds[target_index], -1, main_label, hook, values=values)
+    
     display(fig)
-    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}. Rendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target location.')
+    print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}.\nRendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target.')
 
 # %% Natural cheese_location target mazes 
 # NOTE is this the same -- are natural mazes first generated and _then_ cheese is placed? Or is cheese placed and then the maze built around it, or something else?
@@ -247,13 +248,15 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(True), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0))
 
 # %% See if the cheese patch blinds the agent
+values = cheese_diff_values(0, main_label, hook)
+patches = get_values_diff_patch(values, coeff=-1, label=main_label)
+
 @interact 
-def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
+def compare_with_original(seed=IntSlider(min=0, max=10000, step=1, value=0)):
     # Close out unshown queued plots
     plt.close('all')
-    cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
-    values = cheese_diff_values(seed, main_label, hook)
-    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
-    fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
+    venv_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
+    fig, axs, info = compare_patched_vfields(venv_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
+
 # %%
