@@ -183,8 +183,6 @@ def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(o
 # %% Patching different layers
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
 
-# NOTE conv_in0 doesn't have effect, but shouldn't that literally make agent not see cheese? And why don't all bottleneck layers completely change agent computation so that it doesn't see cheese, at least at the relevant square? 
-# Actually you can't patch conv_in0, because it's not a parameter (it's an input)
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=Dropdown(options=labels)):
     fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
@@ -210,7 +208,7 @@ GENERATE_NUM = 50 # Number of seeds to generate, if generate is True
 SEARCH_NUM = 2 # Number of seeds to search for, if generate is False
 
 def test_transfer(source_seed : int, col_translation : int = 0, row_translation : int = 0, generate : bool = False, target_index : int = 0):
-    """ Visualize what happens if the patch is transferred to a maze with the cheese translated by the given amount. 
+    """ Visualize what happens if the patch is transferred to a maze with the cheese translated by the given amount. TODO refactor into a helper class, with hook and other variables saved as class variables.
     
     Args:
         source_seed (int): The seed from which the patch was generated.
@@ -229,7 +227,6 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
         seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes = GENERATE_NUM, skip_seed=source_seed)
     else: 
         seeds = maze.get_mazes_with_cheese_at_location((cheese_location[0] , cheese_location[1]+col_translation), num_mazes=SEARCH_NUM, skip_seed = source_seed)
-
     if generate:  
         venv = maze.venv_from_grid(grid=grids[target_index])
         patches = get_values_diff_patch(values, -1, main_label)
@@ -240,7 +237,7 @@ def test_transfer(source_seed : int, col_translation : int = 0, row_translation 
     print(f'The true cheese location is {cheese_location}. The new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}. Rendered seed: {seeds[target_index]}, where the cheese was{"" if generate else " not"} moved to the target location.')
 
 # %% Natural cheese_location target mazes 
-# TODO is this the same -- are natural mazes first generated and _then_ cheese is placed? Or is cheese placed and then the maze built around it, or something else?
+# NOTE is this the same -- are natural mazes first generated and _then_ cheese is placed? Or is cheese placed and then the maze built around it, or something else?
 
 # Transfers to mazes with cheese at the same location, using SEARCH_NUM real seeds found via rejection sampling.
 _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), generate=fixed(False), target_index=IntSlider(min=0, max=SEARCH_NUM-1, step=1, value=0))
@@ -252,10 +249,11 @@ _ = interact(test_transfer, source_seed=IntSlider(min=0, max=20, step=1, value=0
 # %% See if the cheese patch blinds the agent
 @interact 
 def compare_with_original(seed=IntSlider(min=0, max=20, step=1, value=0)):
+    # Close out unshown queued plots
+    plt.close('all')
     cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
     values = cheese_diff_values(seed, main_label, hook)
     patches = get_values_diff_patch(values, coeff=-1, label=main_label)
     fig, axs, _ = compare_patched_vfields(cheese_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
-
 # %%
