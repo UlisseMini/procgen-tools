@@ -6,17 +6,18 @@ from procgen_tools import vfield, maze, models
 from tqdm import tqdm
 from glob import glob
 from IPython.display import HTML, display, clear_output
+import value_fn
 
 # %%
 # Plot vector fields for a bunch of models over time
 
-for model_file in glob('/home/uli/2023-02-02__17-29-21__seed_870/*.pth'):
-    policy = models.load_policy(model_file, 15, 'cpu')
-    venv = maze.create_venv(num=1, start_level=0, num_levels=1)
+# for model_file in glob('/home/uli/2023-02-02__17-29-21__seed_870/*.pth'):
+#     policy = models.load_policy(model_file, 15, 'cpu')
+#     venv = maze.create_venv(num=1, start_level=0, num_levels=1)
 
-    vf = vfield.vector_field(venv, policy)
-    vfield.plot_vf(vf)
-    plt.show()
+#     vf = vfield.vector_field(venv, policy)
+#     vfield.plot_vf(vf)
+#     plt.show()
 
 # %%
 # Create animated video of vector field using imageio
@@ -34,8 +35,10 @@ with imageio.get_writer('vfield.mp4', fps=30) as writer:
         policy = models.load_policy(model_file, 15, 'cpu')
         venv = maze.create_venv(num=1, start_level=4, num_levels=1)
 
-        vf = vfield.vector_field(venv, policy)
-        vfield.plot_vf(vf)
+        # vf = vfield.vector_field(venv, policy)
+        # vfield.plot_vf(vf)
+        vf, (agree, total) = value_fn.plot(policy, venv)
+
         plt.axis('off')
 
         # preemptive fix for 'FigureCanvasAgg' object has no attribute 'renderer'

@@ -13,33 +13,24 @@ from glob import glob
 model_files = glob('../trained_models/**.pth')
 default_model = next(f for f in model_files if 'rand_region_5' in f)
 
-@interact
-def plot_by_seed(
-    seed = IntSlider(min=0, max=100, value=0),
-    model_file = Dropdown(options=model_files, value=default_model),
-):
-    policy = models.load_policy(model_file, 15, 'cpu')
-    # hook = cmh.ModuleHook(policy)
-
-    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+def plot(policy, venv):
     venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
     obs_all = t.tensor(venv_all.reset(), dtype=t.float32)
     # obs_all.requires_grad = True
     # c, v = hook.network(obs_all)
     c, v = policy(obs_all)
 
-    vf = vfield.vector_field(venv, policy)
+    vf = vfield.vector_field_tup((venv_all, (legal_mouse_positions, grid)), policy)
 
     g = grid.copy()
     g[g==maze.BLOCKED] = 0 # 50 screws up plot
-    g[g==maze.CHEESE] = 2.718**7 # 10 is more in-line with rest of things
+    g[g==maze.CHEESE] = 2.718**8 # 10 is more in-line with rest of things
     for i, pos in enumerate(legal_mouse_positions):
         g[pos] = v[i].exp().item()
     fig, ax = plt.subplots(1,1)
-    fig.colorbar(ax.imshow(g, origin='lower', cmap='RdBu_r'), ax=ax)
+    fig.colorbar(ax.imshow(g, origin='lower', cmap='RdBu_r', vmin=0, vmax=2.718**8), ax=ax)
 
-    # Cross entropy between policy and argmax of value function.
-    # Plot largest disagreements.
+    # Plot disagreements
 
     cheese_pos = maze.get_cheese_pos(grid)
     agreements, total = 0, 0
@@ -51,6 +42,10 @@ def plot_by_seed(
             continue
         neighbor_indexes = [legal_mouse_positions.index(n) for n in neighbors]
         neighbor_values = [v[i] for i in neighbor_indexes]
+        # NOTE: Argmax is okay here, since advantage is
+        # A(s,a) = R(s) + E_pi[V(s')] - V(s)
+        # since V(s) is a constant it doesn't change the ordering, note also R(s) = 0 for all non-terminal states.
+        # NOTE: There's a fancier analysis we could be doing by using the "true" clipped update, but this is good enough for now.   
         n = neighbors[neighbor_values.index(max(neighbor_values))]
         argmax_value_dir = (n[0]-pos[0], n[1]-pos[1])
         argmax_policy_dir = tuple(models.MAZE_ACTION_DELTAS_BY_INDEX[c.probs[i].argmax().item()])
@@ -70,6 +65,17 @@ def plot_by_seed(
     )
 
     # ax[1].imshow(grid, origin='lower')
+    return vf, (agreements, total)
+
+
+@interact
+def plot_by_seed(
+    seed = IntSlider(min=0, max=100, value=0),
+    model_file = Dropdown(options=model_files, value=default_model),
+):
+    policy = models.load_policy(model_file, 15, 'cpu')
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    plot(policy, venv)
     plt.show()
 
 
