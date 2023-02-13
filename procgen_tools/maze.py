@@ -399,7 +399,7 @@ def _ingrid(grid: np.ndarray, n):
     "Is (x, y) in the grid?"
     return 0 <= n[0] < grid.shape[0] and 0 <= n[1] < grid.shape[1]
 
-def _get_empty_neighbors(grid: np.ndarray, x, y):
+def get_empty_neighbors(grid: np.ndarray, x, y):
     "Get the empty neighbors of (x, y) in the grid"
     return [n for n in _get_neighbors(x, y) if _ingrid(grid, n) and grid[n] != BLOCKED]
 
@@ -452,7 +452,7 @@ def shortest_path(
             extra['last_square'] = current
             break
 
-        for next in _get_empty_neighbors(grid, *current):
+        for next in get_empty_neighbors(grid, *current):
             new_cost = cost_so_far[current] + 1
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
@@ -489,7 +489,7 @@ def is_tree(grid: np.ndarray, debug=False) -> bool:
             if debug: print(f'{node} already visited, a cycle!')
             return False
         visited_nodes.add(node)
-        for neighbor in _get_empty_neighbors(grid, *node):
+        for neighbor in get_empty_neighbors(grid, *node):
             edge = (node, neighbor)
             if edge not in visited_edges and edge[::-1] not in visited_edges:
                 stack.append(neighbor)
