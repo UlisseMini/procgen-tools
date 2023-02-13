@@ -13,7 +13,13 @@ from glob import glob
 model_files = glob('../trained_models/**.pth')
 default_model = next(f for f in model_files if 'rand_region_5' in f)
 
-def plot(policy, venv):
+def _get_timestep(checkpoint: str):
+    return int(checkpoint.split('_')[-1].split('.')[0])
+checkpoints = sorted(glob('/home/uli/2023-02-02__17-29-21__seed_870/*.pth'), key=lambda x: int(_get_timestep(x)))
+
+# %%
+
+def plot(policy, venv, exp=False):
     venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
     obs_all = t.tensor(venv_all.reset(), dtype=t.float32)
     # obs_all.requires_grad = True
@@ -24,11 +30,11 @@ def plot(policy, venv):
 
     g = grid.copy()
     g[g==maze.BLOCKED] = 0 # 50 screws up plot
-    g[g==maze.CHEESE] = 2.718**8 # 10 is more in-line with rest of things
+    g[g==maze.CHEESE] = 0 # 10 is more in-line with rest of things
     for i, pos in enumerate(legal_mouse_positions):
-        g[pos] = v[i].exp().item()
+        g[pos] = v[i].exp().item() if exp else v[i].item()
     fig, ax = plt.subplots(1,1)
-    fig.colorbar(ax.imshow(g, origin='lower', cmap='RdBu_r', vmin=0, vmax=2.718**8), ax=ax)
+    fig.colorbar(ax.imshow(g, origin='lower', cmap='RdBu_r', vmin=0, vmax=2.718**8 if exp else 10), ax=ax)
 
     # Plot disagreements
 
@@ -57,6 +63,8 @@ def plot(policy, venv):
             colors.append('green')
     print(f'argmax behavior: {agreements}/{total} = {agreements/total:.2f}')
 
+    # show cheese
+    ax.scatter(cheese_pos[1], cheese_pos[0], marker='*', color='yellow', s=100)
 
     # Quiver
     ax.quiver(
@@ -71,9 +79,11 @@ def plot(policy, venv):
 @interact
 def plot_by_seed(
     seed = IntSlider(min=0, max=100, value=0),
-    model_file = Dropdown(options=model_files, value=default_model),
+    # model_file = Dropdown(options=model_files, value=default_model),
+    model_num = IntSlider(min=0, max=len(checkpoints)-1, value=0),
+    exp = Dropdown(options=[False, True], value=False)
 ):
-    policy = models.load_policy(model_file, 15, 'cpu')
+    policy = models.load_policy(checkpoints[model_num], 15, 'cpu')
     venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
     plot(policy, venv)
     plt.show()
