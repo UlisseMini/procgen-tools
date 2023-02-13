@@ -145,7 +145,7 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
-    """ Render the difference "vf1 - vf2" between two vector fields. """
+    """ Render the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
@@ -180,10 +180,9 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
 
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
-def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False):
-    """ Plot two vector fields and their difference vf2 - vf1. """
+def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5):
+    """ Plot two vector fields and their difference vf2 - vf1. Plots three axes in total. """
     num_cols = 3
-    ax_size = 5
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
 
     axs[0].set_xlabel("Original")
@@ -197,10 +196,10 @@ def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, rende
     plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
     return fig, axs
 
-def custom_vfield(policy : torch.nn.Module, seed : int = 0):
+def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
-    fig, ax = plt.subplots(1,1, figsize=(3,3))
+    fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close()
     single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
 
