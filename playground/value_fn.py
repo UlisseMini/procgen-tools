@@ -85,7 +85,7 @@ def plot_by_seed(
 ):
     policy = models.load_policy(checkpoints[model_num], 15, 'cpu')
     venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-    plot(policy, venv)
+    plot(policy, venv, exp=exp)
     plt.show()
 
 
