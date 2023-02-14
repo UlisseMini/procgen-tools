@@ -88,6 +88,7 @@ def get_values_diff_patch(values: np.ndarray, coeff: float, label: str):
     cheese = values[0,...]
     no_cheese = values[1,...]
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
+    
 
     cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
     return {label: lambda outp: outp + coeff*cheese_diff} # can't pickle
@@ -214,7 +215,14 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
 def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
     """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, label, hook) if values is None else values
-    patches = get_values_diff_patch(values, coeff, label) 
+    patches = get_patches(values, coeff, label) 
+    
+    patch_shape = (1,) + hook.get_value_by_label(label, convert=False).shape[1:]
+    patch_value = t.zeros(patch_shape)
+    patch_mask = t.zeros(patch_shape, dtype=bool)
+    patch_mask[:,55,:,:] = True
+    patches = {label: cmh.PatchDef(patch_mask, patch_value)}
+
     venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size)
