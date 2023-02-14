@@ -96,12 +96,20 @@ def get_zero_patch(label: str):
     """ Get a patch function that patches the activations at label with 0. """
     return {label: lambda outp: t.zeros_like(outp)}
 
-def get_mean_patch(values: np.ndarray, label: str):
-    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. """
-    # Take mean across batch dimension using reduce, then broadcast to match shape of activations
-    mean_vals = reduce(t.from_numpy(values), 'b c h w -> c h w', 'mean')
-    # Ensure that the batch dimension has same size
-    return {label: lambda outp: repeat(mean_vals, 'c h w -> b c h w', b=outp.shape[0])}
+def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
+    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """
+    if channel >= 0:
+        values = values[:, channel, ...]
+        mean_vals = reduce(t.from_numpy(values), 'b h w -> h w', 'mean')
+        def mean_patch(outp): # TODO check this works
+            outp[:, channel, ...] = mean_vals
+            return outp
+        return {label: mean_patch}
+    else:
+        # Take mean across batch dimension using reduce, then broadcast to match shape of activations
+        mean_vals = reduce(t.from_numpy(values), 'b c h w -> c h w', 'mean')
+        # Ensure that the batch dimension has same size
+        return {label: lambda outp: repeat(mean_vals, 'c h w -> b c h w', b=outp.shape[0])}
 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """

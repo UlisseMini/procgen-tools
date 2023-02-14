@@ -69,33 +69,23 @@ if '_out' in labels: labels.remove('_out')
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Sanity-check that the patching performance is not changed at the original square
-@interact
-def sanity_check(label=Dropdown(options=labels), seed=IntSlider(min=0, max=20, step=1, value=0)):
-    cheese_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
-
-    # Visualize the cheese pair to make sure we've got the environment right
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    ax[0].imshow(cheese_pair.env.get_info()[0]['rgb'])
-    ax[1].imshow(cheese_pair.env.get_info()[1]['rgb'])
-    plt.show()
-
-    values = cheese_diff_values(seed, label, hook)
-    patches = get_values_diff_patch(values, coeff=-1, label=label)
+for seed in range(5):
+    cheese_pair = get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
+    values = cheese_diff_values(seed, main_label, hook)
+    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
 
     original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(copy_venv(cheese_pair, 1), hook.network)
+    diff_vf = vfield.get_vf_diff(original_vfield, patched_vfield)
 
-    # Plot the vfield diff
-    fig, axs, diff_vf = plot_vfs_with_diff(original_vfield, patched_vfield)
-    plt.show(block=True)
+    mouse_pos = maze.get_mouse_pos(maze.get_inner_grid_from_seed(seed=seed))
 
-    mouse_pos = maze.get_mouse_pos(maze.get_inner_grid_from_seed(seed))
     mouse_idx = original_vfield['legal_mouse_positions'].index(mouse_pos)
     orig_arrow = original_vfield['arrows'][mouse_idx]
     patch_arrow = patched_vfield['arrows'][mouse_idx]
     diff = np.linalg.norm(np.array(orig_arrow) - np.array(patch_arrow))
-    print(f'Seed {seed} has difference {diff:.3f}')
+    assert diff < 1e-3, "The patching performance is changed at the original square"
 
 # %% Vfields on each maze
 """ The vector field is a plot of the action probabilities for each state in the maze. Let's see what the vector field looks like for a given seed. We'll compare the vector field for the original and patched networks. 
@@ -262,7 +252,7 @@ for seed in source_seeds:
 combined_patch = combine_patches(patch_lst)
 
 @interact
-def test_multiple_transfer(source_seed=Dropdown(options=source_seeds), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0)): # TODO seems to not work with multiple seeds
+def test_multiple_transfer(source_seed=Dropdown(options=source_seeds), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0)): # NOTE investigate
     test_transfer(combined_patch, source_seed=source_seed, target_index=target_index)
 
 # %% See if the cheese patch blinds the agent

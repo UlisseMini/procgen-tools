@@ -131,15 +131,15 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
-def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
-    """ Render the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
-    # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
+def get_vf_diff(vf1 : dict, vf2 : dict):
+    """ Get the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
         assert vfa['grid'].shape == vfb['grid'].shape, "Grids must be the same shape to render the vf difference."
         assert len(vfa['arrows']) == len(vfb['arrows']), "Arrows must be the same length to render the vf difference."
     
-    for i in range(2): # Try twice, in case one of the levels has cheese
+    # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
+    for i in range(2):
         try: 
             assert_compatibility(vf1, vf2)
         except: 
@@ -163,7 +163,12 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     # Check if any of the diffs have components greater than 2 (which would be a bug)
     assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
 
-    vf_diff = {'arrows': arrow_diffs, 'legal_mouse_positions': vf2['legal_mouse_positions'], 'grid': vf2['grid']}
+    return {'arrows': arrow_diffs, 'legal_mouse_positions': vf2['legal_mouse_positions'], 'grid': vf2['grid']}
+
+def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, render_padding : bool = False): 
+    """ Render the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
+    # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
+    vf_diff = get_vf_diff(vf1, vf2)
 
     render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
