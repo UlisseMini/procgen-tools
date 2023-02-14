@@ -49,8 +49,28 @@ def vector_field(venv, policy):
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
     """
-    venv = maze.copy_venv(venv, 0)
-    venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
+    return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
+
+
+def get_arrows_and_probs(legal_mouse_positions, c_probs):
+    # FIXME: Vectorize this loop. It isn't as critical as the model though
+    arrows = []
+    probs = []
+    for i in range(len(legal_mouse_positions)):
+        probs_dict = models.human_readable_actions(c_probs[i])
+        probs_dict = {k: v.item() for k, v in probs_dict.items()}
+        deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
+        arrows.append(_tadd(*deltas))
+        probs.append(tuple(probs_dict.values()))
+    return arrows, probs
+
+
+# TODO: with the right APIs, this should be a few lines
+def vector_field_tup(venv_all_tup, policy):
+    """
+    Plot the vector field induced by the policy on the maze in venv env number 1.
+    """
+    venv_all, (legal_mouse_positions, grid) = venv_all_tup
 
     # TODO: Hypothetically, this step could run in parallel to the others (cpu vs. gpu)
     batched_obs = torch.tensor(venv_all.reset(), dtype=torch.float32, device=_device(policy))
@@ -60,15 +80,7 @@ def vector_field(venv, policy):
     with torch.no_grad():
         c, _ = policy(batched_obs)
 
-    # FIXME: Vectorize this loop. It isn't as critical as the model though
-    arrows = []
-    probs = []
-    for i in range(len(legal_mouse_positions)):
-        probs_dict = models.human_readable_actions(c.probs[i]) # TODO indexing error?
-        probs_dict = {k: v.item() for k, v in probs_dict.items()}
-        deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
-        arrows.append(_tadd(*deltas))
-        probs.append(tuple(probs_dict.values()))
+    arrows, probs = get_arrows_and_probs(legal_mouse_positions, c.probs)
 
     # make vfield object for returning
     return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs}
