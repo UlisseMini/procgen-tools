@@ -11,12 +11,14 @@ import struct
 import typing
 from typing import Tuple, Dict, Callable, List
 from dataclasses import dataclass
-from functools import lru_cache
 import os 
 import numpy as np
+import functools
+import collections
 import heapq
 import networkx as nx
 import os
+import copy
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -25,6 +27,7 @@ BLOCKED = 51
 MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
 
 WORLD_DIM = 25
+DEBUG = False # slows everything down by ensuring parse & seri
 
 # Types and things
 
@@ -170,9 +173,29 @@ MAZE_STATE_DICT_TEMPLATE = [
     ['int',    'END_OF_BUFFER']]
 
 
+# version of LRU cache that returns deepcopy of cached value
+def lru_cache(maxsize: int):
+    def decorator(func):
+        cache = collections.OrderedDict()
+        
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(kwargs.items()))
+            try:
+                value = cache.pop(key)
+            except KeyError:
+                value = func(*args, **kwargs)
+            cache[key] = value
+            if len(cache) > maxsize:
+                cache.popitem(last=False)
+            return copy.deepcopy(value)
 
-@lru_cache(maxsize=100)
-def _parse_maze_state_bytes(state_bytes: bytes, assert_=False) -> StateValues:
+        return wrapper
+    return decorator
+
+
+@lru_cache(maxsize=128)
+def _parse_maze_state_bytes(state_bytes: bytes, assert_=DEBUG) -> StateValues:
     # Functions to read values of different types
     def read_fixed(sb, idx, fmt):
         sz = struct.calcsize(fmt)
@@ -226,7 +249,7 @@ def _parse_maze_state_bytes(state_bytes: bytes, assert_=False) -> StateValues:
         assert _serialize_maze_state(vals, assert_=False) == state_bytes, 'serialize(deserialize(state_bytes)) != state_bytes'
     return vals
 
-def _serialize_maze_state(state_vals: StateValues, assert_=False) -> bytes:
+def _serialize_maze_state(state_vals: StateValues, assert_=DEBUG) -> bytes:
     # Serialize any value to a bytes object
     def serialize_val(val):
         if isinstance(val, StateValue):
@@ -355,6 +378,23 @@ def remove_cheese(venv, idx : int = 0):
     state.set_grid(grid)
     state_bytes_list[idx] = state.state_bytes
     venv.env.callmethod("set_state", state_bytes_list)
+    return venv
+
+
+def remove_all_cheese(venv):
+    """
+    Remove the cheese from each env in venv, inplace.
+    """
+    state_bytes_list = venv.env.callmethod("get_state")
+    states = [EnvState(state_bytes) for state_bytes in state_bytes_list]
+    for i, s in enumerate(states):
+        g = s.full_grid()
+        g[g==CHEESE] = EMPTY
+        s.set_grid(g)
+        state_bytes_list[i] = s.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+    return venv
+    
 
 
 def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
@@ -876,6 +916,14 @@ def copy_venv(venv, idx: int):
     env.env.callmethod("set_state", [sb])
     return env
 
+def copy_venvs(venv_all):
+    "Return a copy of all the venvs in venv_all. WARNING: After level is finished, the copy will be reset."
+    sb = venv_all.env.callmethod("get_state")
+    env = create_venv(num=len(sb), start_level=0, num_levels=1)
+    env.env.callmethod("set_state", sb)
+    return env
+
+
 def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5, spawn_cheese : bool = True):
     """ Get num_obs observations from the maze environment. If on_training is True, then the observation is from a training level where the cheese is in the top-right rand_region corner. """
     assert rand_region <= WORLD_DIM, "rand_region must be less than or equal to WORLD_DIM."
@@ -916,7 +964,9 @@ def venv_with_all_mouse_positions(venv):
     """
     assert venv.num_envs == 1, f'Did you forget to use maze.copy_venv to get a single env?'
 
-    env_state = EnvState(venv.env.callmethod('get_state')[0])
+    sb_back = venv.env.callmethod('get_state')[0]
+    env_state = EnvState(sb_back)
+
     grid = env_state.inner_grid(with_mouse=False)
     legal_mouse_positions = get_legal_mouse_positions(grid)
 
@@ -929,7 +979,6 @@ def venv_with_all_mouse_positions(venv):
         # we keep a backup of the state bytes for efficiency, as calling set_mouse_pos
         # implicitly calls _parse_state_bytes, which is slow. this is a hack.
         # NOTE: Object orientation hurts us here. It would be better to have functions.
-        sb_back = env_state.state_bytes
         env_state.set_mouse_pos(mx+padding, my+padding)
         state_bytes_list.append(env_state.state_bytes)
         env_state.state_bytes = sb_back
