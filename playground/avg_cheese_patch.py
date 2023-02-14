@@ -42,7 +42,7 @@ def main(
 
     mean_cheese_diff = (cheese_act - no_cheese_act).mean(0)
 
-    patches = {label: cmh.PatchDef(value=coeff*mean_cheese_diff, mask=np.array(True))}
+    patches = {label: lambda outp: outp + coeff*mean_cheese_diff} # can't pickle
 
     original_vfield = vfield.vector_field(venv_templ, hook.network)
     with hook.use_patches(patches):
