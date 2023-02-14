@@ -378,6 +378,23 @@ def remove_cheese(venv, idx : int = 0):
     state.set_grid(grid)
     state_bytes_list[idx] = state.state_bytes
     venv.env.callmethod("set_state", state_bytes_list)
+    return venv
+
+
+def remove_all_cheese(venv):
+    """
+    Remove the cheese from each env in venv, inplace.
+    """
+    state_bytes_list = venv.env.callmethod("get_state")
+    states = [EnvState(state_bytes) for state_bytes in state_bytes_list]
+    for i, s in enumerate(states):
+        g = s.full_grid()
+        g[g==CHEESE] = EMPTY
+        s.set_grid(g)
+        state_bytes_list[i] = s.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+    return venv
+    
 
 
 def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
@@ -898,6 +915,14 @@ def copy_venv(venv, idx: int):
     env = create_venv(num=1, start_level=0, num_levels=1)
     env.env.callmethod("set_state", [sb])
     return env
+
+def copy_venvs(venv_all):
+    "Return a copy of all the venvs in venv_all. WARNING: After level is finished, the copy will be reset."
+    sb = venv_all.env.callmethod("get_state")
+    env = create_venv(num=len(sb), start_level=0, num_levels=1)
+    env.env.callmethod("set_state", sb)
+    return env
+
 
 def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : int = 5, spawn_cheese : bool = True):
     """ Get num_obs observations from the maze environment. If on_training is True, then the observation is from a training level where the cheese is in the top-right rand_region corner. """
