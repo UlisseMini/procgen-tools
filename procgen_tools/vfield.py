@@ -5,6 +5,7 @@ from procgen_tools import models, maze
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
+from typing import Callable
 
 from procgen import ProcgenGym3Env
 from warnings import warn
@@ -203,7 +204,7 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
     return fig, axs, vf_diff if show_diff else None
 
-def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
+def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3, callback : Callable = None):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
@@ -224,8 +225,13 @@ def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
 
     update_plot()
 
+    def cb(_): # Callback for when the maze is edited
+        update_plot()
+        if callback is not None:
+            callback()
+
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot())
+    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=cb)
 
     # Display the maze editor and the plot in an HBox
     widget_vbox = VBox(editors + [output])
