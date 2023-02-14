@@ -195,7 +195,7 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
     venv1, venv2 = copy_venv(venv, 0), copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
 
-    original_vfield = vfield.vector_field(venv, hook.network)
+    original_vfield = vfield.vector_field(venv1, hook.network)
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
 
