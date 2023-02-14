@@ -144,7 +144,7 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def get_vf_diff(vf1 : dict, vf2 : dict):
-    """ Get the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
+    """ Get the difference "vf1 - vf2" between two vector fields. """
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
         assert vfa['grid'].shape == vfb['grid'].shape, "Grids must be the same shape to render the vf difference."
