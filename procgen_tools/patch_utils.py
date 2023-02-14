@@ -90,7 +90,8 @@ def get_values_diff_patch(values: np.ndarray, coeff: float, label: str):
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
     cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
-    return {label: lambda outp: outp + coeff*cheese_diff}
+    # return {label: lambda outp: outp + coeff*cheese_diff} # can't pickle
+    return {label: cmh.PatchDef(value=coeff*cheese_diff, mask=np.array(True))} # can pickle
 
 def get_zero_patch(label: str):
     """ Get a patch function that patches the activations at label with 0. """
