@@ -155,7 +155,6 @@ class InterpretableImpalaModel(nn.Module):
         x = self.relufc(x)
         return x
 
-
 class CategoricalPolicy(nn.Module):
     """
     Copied from train-procgen-pytorch, removed recurrent option as we're not using it.

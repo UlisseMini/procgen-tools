@@ -97,12 +97,20 @@ def get_zero_patch(label: str):
     """ Get a patch function that patches the activations at label with 0. """
     return {label: lambda outp: t.zeros_like(outp)}
 
-def get_mean_patch(values: np.ndarray, label: str):
-    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. """
-    # Take mean across batch dimension using reduce, then broadcast to match shape of activations
-    mean_vals = reduce(t.from_numpy(values), 'b c h w -> c h w', 'mean')
-    # Ensure that the batch dimension has same size
-    return {label: lambda outp: repeat(mean_vals, 'c h w -> b c h w', b=outp.shape[0])}
+def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
+    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """
+    if channel >= 0:
+        values = values[:, channel, ...]
+        mean_vals = reduce(t.from_numpy(values), 'b h w -> h w', 'mean')
+        def mean_patch(outp): # TODO check this works
+            outp[:, channel, ...] = mean_vals
+            return outp
+        return {label: mean_patch}
+    else:
+        # Take mean across batch dimension using reduce, then broadcast to match shape of activations
+        mean_vals = reduce(t.from_numpy(values), 'b ... -> ...', 'mean')
+        # Ensure that the batch dimension has same size
+        return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
@@ -182,7 +190,7 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
         # display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
-def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True):
+def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True):
     """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. """
 
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
@@ -191,12 +199,14 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     original_vfield = vfield.vector_field(venv, hook.network)
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
-    fig, axs = vfield.plot_vfs_with_diff(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size)
+
+    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff)
 
     obj = {
         'patches': patches,
         'original_vfield': original_vfield,
         'patched_vfield': patched_vfield,
+        'diff_vfield': vf_diff,
     }
 
     return fig, axs, obj
