@@ -241,46 +241,29 @@ def test_synthetic_transfer(source_seed=IntSlider(min=0, max=20, step=1, value=0
 # %% Try generating two disjoint patches and combining both
 def combine_patches(patches_lst : List[dict]):
     assert len(patches_lst) > 0, "Must provide at least one patch."
-    # Assert they all have the same keys TODO relax 
+    # Assert they all have the same keys TODO relax this req?
     for patches in patches_lst:
         assert patches.keys() == patches_lst[0].keys(), "All patches must have the same keys."
     
     # Combine the patches
     patches = {}
     for key in patches_lst[0].keys():
-        patches[key] = lambda outp: sum([patch[key](outp) for patch in patches_lst])
-    return patches
+        patches[key] = lambda outp: sum([patch[key](outp) for patch in patches_lst]) - outp*(len(patches_lst)-1) # Don't double-add the original vector
+    return patches 
 
 patch_lst = []
-source_seeds = (0, 5)
+source_seeds = (0, 2) # TODO just get small 5x5 covering?
+# First 50 works horribly
 for seed in source_seeds:
     values = cheese_diff_values(seed, main_label, hook)
     location = maze.get_cheese_pos_from_seed(seed)
     print(f'Cheese location for seed {seed}: {location}.')
     patch_lst.append(get_values_diff_patch(values, coeff=-1, label=main_label))
+combined_patch = combine_patches(patch_lst)
 
 @interact
-def test_multiple_transfer(source_seed=Dropdown(options=source_seeds), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0)):
-    test_transfer(patch_lst, source_seed=source_seed, target_index=target_index)
-
-# def test_transfer_multiple_source(patches : dict, source_seeds : List[int] = [0], target_index : int = 0):
-#     """ Visualize what happens if patches are transferred to a maze with the cheese translated by the given amount. TODO refactor into a helper class, with hook and other variables saved as class variables.
-
-#     Args:
-#         patches (dict): The patches to transfer.
-#         source_seed (int): The seed of the maze to transfer from.
-#         target_index (int): The index of the target maze to use, among the seeds generated or searched for. 
-#     """
-#     cheese_locations = [maze.get_cheese_pos_from_seed(source_seed) for source_seed in source_seeds]
-
-
-#     for loc in cheese_locations:
-#         seeds, grids = maze.generate_mazes_with_cheese_at_location(loc, num_mazes = GENERATE_NUM, skip_seeds=source_seeds)
-#     venv = maze.venv_from_grid(grid=grids[target_index])
-#     fig, _, _ = compare_patched_vfields(venv, patches, hook, render_padding=False)
-
-#     display(fig)
-#     print(f'The true cheese locations are {cheese_locations}.\nThe new location is row {cheese_location[0] + row_translation}, column {cheese_location[1]+col_translation}.\nRendered seed: {seeds[target_index]}.')
+def test_multiple_transfer(source_seed=Dropdown(options=source_seeds), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0)): # TODO seems to not work with multiple seeds
+    test_transfer(combined_patch, source_seed=source_seed, target_index=target_index)
 
 # %% See if the cheese patch blinds the agent
 values = cheese_diff_values(0, main_label, hook)
