@@ -40,7 +40,7 @@ policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_reg
 hook = cmh.ModuleHook(policy)
 
 # %%
-# Funtions for running stats on cheese patching
+# Functions for running stats on cheese patching
 
 def remove_cheese_from_state(state):
     grid = state.full_grid()
@@ -55,9 +55,8 @@ def move_cheese_in_state(state, new_cheese_pos):
     state.set_grid(grid)
     return state
 
-def stack(array):
-    dims_to_stack = [dim for dim in 
-        ['level_seed', 'mouse_pos', 'cheese_pos']
+def stack(array, dims_can_stack=['level_seed', 'mouse_pos', 'cheese_pos']):
+    dims_to_stack = [dim for dim in dims_can_stack
         if dim in array.dims]
     return array.stack(dict(sbatch=dims_to_stack)).transpose('sbatch',...)
 
@@ -72,24 +71,41 @@ def make_full_dims(array, coords):
     return array.expand_dims(dims_to_add).transpose(
         *(tuple(coords.keys()) + (...,)))
 
-def get_obs_batch_on_grid(num_levels, cheese_poss, mouse_poss,
-        maze_dim=15,
-        random_seed=43):
+def get_obs_batch_on_grid(
+        levels = 10,         # Pass int to generate N random levels, pass iterable of level_seeds for specific levels
+        cheese_poss = None,    # Iterable of fixed cheese positions to use in every level seed, None to use position in level
+        mouse_poss = None,     # Iterable of fixed mouse postions, or None to place 
+        maze_dim = 15,    # Int to filter for specific maze dimensions, None for no limit
+        random_seed = 43):
     
     # Setup
     random.seed(random_seed)
     obs_no_cheese_list = []
     obs_cheese_list = []
     level_seeds = []
-    num_mouse_pos = len(mouse_poss)
-    num_cheese_pos = len(cheese_poss)
+    num_mouse_pos = 1 if mouse_poss is None else len(mouse_poss)
+    num_cheese_pos = 1 if cheese_poss is None else len(cheese_poss)
+    try:
+        level_seed_it = iter(levels)
+        num_levels = len(levels)  # We may end up with less if they don't meet filter criteria
+    except TypeError:
+        def random_level_seed():
+            while True:
+                yield random.randint(0, int(1e6))
+        level_seed_it = random_level_seed()
+        num_levels = levels
     
     # Iterate through level_seeds, skipping all that don't match maze size
+    venv_no_cheese_list = []
+    venv_cheese_list = []
     with tqdm(total=num_levels) as pbar:
         while len(level_seeds) < num_levels:
     
-            # Get the level seed
-            level_seed = random.randint(0, int(1e6))
+            # Get the level seed, breaking out of the loop if we run out of levels
+            try:
+                level_seed = next(level_seed_it)
+            except StopIteration:
+                break
             
             # Create a venv to be the "no cheese" envs, which needs to have the same number
             # as mouse positions we want to evaluate
@@ -97,16 +113,32 @@ def get_obs_batch_on_grid(num_levels, cheese_poss, mouse_poss,
                 num_levels=1)
             state_bytes_list = venv_no_cheese.env.callmethod("get_state")
             states = [maze.EnvState(sb) for sb in state_bytes_list]
+            
             # Check the size, skipping if not correct
             maze_dim_this = states[0].inner_grid().shape[0]
-            if maze_dim_this != maze_dim:
+            if maze_dim is not None and maze_dim_this != maze_dim:
                 continue
+
+            # Check the presence of a decision square, skipping if required and not present
+            # dec_pos = maze.get_decision_square_from_maze_state
+
             level_seeds.append(level_seed)
             padding = (states[0].world_dim - maze_dim_this) // 2
-            # Remove the cheese from all the envs
-            states = [remove_cheese_from_state(state) for state in states]
-            state_bytes_list = [state.state_bytes for state in states]
-            venv_no_cheese.env.callmethod("set_state", state_bytes_list)
+                        
+            # TODO: speed this way up!  Should be able to just have one or two EnvStates and
+            # just save out bytes from these?
+                    
+            # Position the mouse as needed in all no-cheese envs, and remove the cheese
+            state_bytes_new = []
+            for idx, mouse_pos in enumerate(mouse_poss):
+                state = maze.EnvState(state_bytes_list[idx])
+                # Place/remove objects
+                remove_cheese_from_state(state)
+                state.set_mouse_pos(mouse_pos[1]+padding, mouse_pos[0]+padding)
+                # Update state bytes
+                state_bytes_new.append(state.state_bytes)
+            venv_no_cheese.env.callmethod("set_state", state_bytes_new)
+
             # Get the "no cheese" observations
             obs_no_cheese_list.append(venv_no_cheese.reset().astype(np.float32))
 
@@ -133,6 +165,10 @@ def get_obs_batch_on_grid(num_levels, cheese_poss, mouse_poss,
             # Get the "with cheese" observations
             obs_cheese_list.append(venv_cheese.reset().astype(np.float32))
 
+            # Store the venvs in case we want them later
+            venv_no_cheese_list.append(venv_no_cheese)
+            venv_cheese_list.append(venv_cheese)
+
             pbar.update(1)
 
     mouse_pos_coords = np.array(mouse_poss, dtype='i,i')
@@ -149,6 +185,9 @@ def get_obs_batch_on_grid(num_levels, cheese_poss, mouse_poss,
         dims = ['level_seed', 'mouse_pos', 'cheese_pos', 'rgb', 'y', 'x'],
         coords = dict(level_seed=level_seeds, mouse_pos=mouse_pos_coords,
             cheese_pos=cheese_pos_coords))
+
+    # # Same for venvs (with dims stacked as appropriate)
+    # venvs_no_cheese = stack(obs_no_cheese, []
     
     return xr.Dataset(dict(no_cheese=obs_no_cheese, cheese=obs_cheese))
 
@@ -255,7 +294,7 @@ def binary_scores_table(scores):
 # Get the observations to use for patching
 
 obs = get_obs_batch_on_grid(
-    num_levels =  30,
+    levels =  30,
     cheese_poss = [(2, 2), (2, 12), (12, 2), (12, 12)],
     mouse_poss =  [(0, 0), (2, 2), (4, 4), (6, 6), (8, 8), (10, 10)],
     maze_dim =    15,
@@ -264,6 +303,10 @@ obs = get_obs_batch_on_grid(
 
 action_logits, values = get_logits_and_values_from_obs(obs, hook,
     value_label = 'embedder.block2.res1.resadd_out')
+
+# Variables that are useful for multiple experiments
+patch_more_cheese = False
+cheese_diff = values['cheese'] - values['no_cheese']
 
 # # Pick some cheese positions to test (e.g. corners, and points in a 
 # # square closer to middle?)  (In inner_grid coords)
@@ -281,26 +324,28 @@ action_logits, values = get_logits_and_values_from_obs(obs, hook,
 # %%
 # Do "different level, same mouse/cheese pos" patching
 
-# Setup
-patch_more_cheese = False
-num_src_levels = 5
-
-# Cheese diff
-cheese_diff = values['cheese'] - values['no_cheese']
+num_src_levels = 1
 
 # Iterate over source levels
 scores_array_list = []
 for src_level_idx in range(num_src_levels):
     # Create the patch function based on the cheese diffs for this level
-    cheese_diff_this = cheese_diff.isel(level_seed=src_level_idx)
-    cheese_diff_this_stk_t = t.from_numpy(
-        stack(cheese_diff_this).values)
+    cheese_diff_this = cheese_diff.isel(level_seed=[src_level_idx])
+    cheese_diff_this_t = t.from_numpy(cheese_diff_this.values)
     def patch_func(outp):
-        #return t.from_numpy(
-        #    stack(value_cheese.isel(level_seed=src_level_idx)).values)
-        #return t.zeros_like(outp)
-        #return outp
-        return outp + (1. if patch_more_cheese else -1.)*cheese_diff_this_stk_t
+        outp_unstack = rearrange(outp, '(lev mse chs) ... -> lev mse chs ...', 
+            lev = cheese_diff.sizes['level_seed'],
+            mse = cheese_diff.sizes['mouse_pos']) \
+                + (1. if patch_more_cheese else -1.)*cheese_diff_this_t
+        return rearrange(outp_unstack, 'lev mse chs ... -> (lev mse chs) ...')
+
+        #return outp 
+    # def patch_func(outp):
+    #     #return t.from_numpy(
+    #     #    stack(value_cheese.isel(level_seed=src_level_idx)).values)
+    #     #return t.zeros_like(outp)
+    #     #return outp
+    #     return outp + (1. if patch_more_cheese else -1.)*cheese_diff_this_stk_t
 
     scores = run_cheese_patch_test(obs, action_logits, values, hook, patch_func=patch_func,
         orig_var = 'no_cheese' if patch_more_cheese else 'cheese',
@@ -320,15 +365,8 @@ display(scores_all.mean(dim='src_level_seed').to_dataframe(name='scores')/scores
 
 
 # %%
-# Try (0, 0) point within same level
+# Try mouse position (0, 0), patch to other positions within same level
 
-# Setup
-patch_more_cheese = False
-
-# Cheese diff
-cheese_diff = values['cheese'] - values['no_cheese']
-
-# Iterate over source levels
 # Create the patch function based on the cheese diffs for this level
 cheese_diff_this = cheese_diff.isel(mouse_pos=[0])
 cheese_diff_this_t = t.from_numpy(cheese_diff_this.values)
@@ -345,6 +383,15 @@ scores = run_cheese_patch_test(obs, action_logits, values, hook, patch_func=patc
 scores_table, scores_array = binary_scores_table(scores)
 
 display(scores_table/scores.patched.size)
+
+# %%
+# Test this with some vfield viz
+level_seed = scores.indexes['level_seed'][0]
+cheese_pos = scores.indexes['cheese_pos'][1]
+
+
+
+
 
 
 
