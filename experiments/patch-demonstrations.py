@@ -140,7 +140,7 @@ for seed in range(5):
 
 # It doesn't work, and destroys performance. In contrast, the cheese vector has a targeted and constrained effect on the network (when not transferring to other mazes), and does little when attempting transfer. This seems intriguing.
 
-# %% Patch out each residual block
+# %% Zero out each layer
 @interact
 def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
@@ -152,9 +152,6 @@ def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdo
 
 # %% Generate random mouse observations and then mean-ablate
 obs = maze.get_random_obs(50, spawn_cheese=False)
-# Show a random observation
-# plt.imshow(rearrange(obs[2], 'c h w -> h w c'))
-# plt.show()
 
 @interact 
 def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):

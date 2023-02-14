@@ -174,9 +174,9 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
 
     return vf_diff
 
-def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5):
-    """ Plot two vector fields and their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field."""
-    num_cols = 3
+def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5, show_diff : bool = True):
+    """ Plot two vector fields and, if show_diff is True, their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field."""
+    num_cols = 3 if show_diff else 2
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
 
     axs[0].set_xlabel("Original")
@@ -185,10 +185,11 @@ def plot_vfs_with_diff(vf1 : dict, vf2 : dict, human_render : bool = True, rende
     axs[1].set_xlabel("Patched")
     plot_vf(vf2, ax=axs[1], human_render=human_render, render_padding=render_padding)
     
-    axs[2].set_xlabel("Patched vfield minus original")
-    # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
-    vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
-    return fig, axs, vf_diff
+    if show_diff:
+        axs[2].set_xlabel("Patched vfield minus original")
+        # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
+        vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
+    return fig, axs, vf_diff if show_diff else None
 
 def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
