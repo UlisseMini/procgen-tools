@@ -19,7 +19,7 @@ setup(
         "bidict==0.22.*",
         "requests==2.28.*",
         "pandas>=1.5.3",
-        "circrl@git+https://github.com/montemac/circrl.git>=0.4.0",
+        "circrl>=0.4.0",
         "plotly>=5.13.0",
         "networkx>=3.0",
         "scipy==1.10.0",
