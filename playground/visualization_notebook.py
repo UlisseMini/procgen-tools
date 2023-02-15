@@ -132,13 +132,14 @@ def plot_activations(activations: np.ndarray, fig: go.FigureWidget):
 # %%
 # Now let's turn the above into a class. We want to be able to call the plotter with a single function call, and have it update the plot automatically.
 class ActivationsPlotter:
-    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, **act_kwargs):
+    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, **act_kwargs):
         """
         labels: The labels of the layers to plot
         plotter: A function that takes a label, channel, and activations and plots them
         activ_gen: A function that takes a label and obs and returns the activations which should be sent to plotter 
         hook: The hook that contains the activations
         coords_enabled: Whether to enable the row and column sliders
+        defaults: A dictionary of default values for the plotter, where the keys are attributes of this class which themselves have the "value" attribute. The class value will be set to the corresponding dictionary value.
         act_kwargs: Keyword arguments to pass to the activations generator
         """
         self.fig = go.FigureWidget()
@@ -165,6 +166,10 @@ class ActivationsPlotter:
         self.button = Button(description="Save image")
         self.button.on_click(self.save_image)
         self.widgets.append(HBox([self.filename_widget, self.button]))
+
+        if defaults is not None:
+            for key, value in defaults.items():
+                getattr(self, key).value = value
 
         for widget in self.widgets:
             if widget != self.fig:
@@ -271,7 +276,8 @@ nonzero_plotter.display()
 # # Visualizing actual observation activations
 
 # %%
-
+default_settings = {'channel_slider': 55, 'label_widget': 'block2.res1.resadd_out'}
+# %%
 def activ_gen_cheese(label: str, venv : ProcgenGym3Env = None): # TODO dont use None
     """ Generate an observation with cheese at the given location. Returns a tensor of shape (1, 3, rows, cols)."""
     assert venv is not None
@@ -283,7 +289,9 @@ def activ_gen_cheese(label: str, venv : ProcgenGym3Env = None): # TODO dont use 
 # Show a maze editor side-by-side with the interactive plotter
 SEED = 0
 venv = create_venv(num=1, start_level=SEED, num_levels=1) # This has to be a single maze, otherwise the vfield wont work
-custom_maze_plotter = ActivationsPlotter(labels, lambda activations, fig: plot_activations(activations[0], fig=fig), activ_gen_cheese, hook, venv=venv)
+custom_maze_plotter = ActivationsPlotter(labels, lambda activations, fig: plot_activations(activations[0], fig=fig), activ_gen_cheese, hook, defaults=default_settings, venv=venv)
+# Set the default settings
+
 
 widget_box = custom_vfield(policy, venv=venv, callback=custom_maze_plotter.update_plotter) 
 display(widget_box)
