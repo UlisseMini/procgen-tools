@@ -3,6 +3,8 @@ from typing import List, Tuple, Dict, Union, Optional, Callable
 import numpy as np
 import pandas as pd
 import torch as t
+import math 
+
 import plotly.express as px
 import plotly.graph_objects as go
 from tqdm import tqdm
@@ -204,24 +206,30 @@ class ActivationsPlotter:
         self.channel_slider.max = shap[1] - 1 if len(shap) > 2 else 0
         self.channel_slider.value = min(self.channel_slider.value, self.channel_slider.max)
         channel = self.channel_slider.value
+        assert channel < activations.shape[1], "Channel doesn't exist at this layer"
 
-        if len(activations.shape) == 2: # Linear layer (batch, hidden_dim) TODO check this 
-            # Unsqueeze the np.ndarray
-            activations = np.expand_dims(activations, axis=(1,2))
-            # If there's only a single channel, display a 1D Heatmap, with a single rowvalue and the activation indices as the col values TODO remove columns
-        else: 
-            assert channel < activations.shape[1], "Channel doesn't exist at this layer"
+        if len(activations.shape) == 2: # Linear layer (batch, hidden_dim)
+            # Ensure shape[1] is a perfect square
+            sqrt_act = int(math.sqrt(activations.shape[1]))
+            if sqrt_act * sqrt_act == activations.shape[1]:
+                activations = np.reshape(activations, newshape=(activations.shape[0], 1, sqrt_act, sqrt_act)) # Make a dummy channel dimension
+                # Annotate that there is no spatial meaning to the activations
+                self.fig.update_layout(title_text=f"{self.label_widget.value}; reshaped to 2D representation with no spatial meaning")
+            else:
+                activations = np.expand_dims(activations, axis=(1,2)) # Add a dummy dimension to the activations
 
         self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
         if label == 'fc_policy_out':
             # Transform each index into the corresponding action label, according to maze.py 
-            self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) # TODO is this correct, for 3 instead of 2?
-        else: # Reset the indices so that there are no xticks
-            self.fig.update_xaxes(ticktext=[], tickvals=[])
+            self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
+        else: # Reset the x-axis ticks to match the y-axis ticks
+            yaxis_ticktext, yaxis_tickvals = self.fig.layout.yaxis.ticktext, self.fig.layout.yaxis.tickvals # TODO double the step of yaxis ticks?
+            self.fig.update_xaxes(ticktext=yaxis_ticktext, tickvals=yaxis_tickvals)
 
         self.fig.update_xaxes(side="top") # Set the x ticks to the top
         self.fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange
         
+
         self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
 
         # Set the min and max to be the min and max of all channels at this label
