@@ -5,6 +5,7 @@ from procgen_tools import models, maze
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
+from typing import Callable
 
 from procgen import ProcgenGym3Env
 from warnings import warn
@@ -47,7 +48,7 @@ def _device(policy):
 # TODO: with the right APIs, this should be a few lines
 def vector_field(venv, policy):
     """
-    Plot the vector field induced by the policy on the maze in venv env number 1.
+    Get the vector field induced by the policy on the maze in venv env number 1.
     """
     return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
 
@@ -144,7 +145,7 @@ def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool 
     render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def get_vf_diff(vf1 : dict, vf2 : dict):
-    """ Get the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
+    """ Get the difference "vf1 - vf2" between two vector fields. """
     def assert_compatibility(vfa, vfb):
         assert vfa['legal_mouse_positions'] == vfb['legal_mouse_positions'], "Legal mouse positions must be the same to render the vf difference."
         assert vfa['grid'].shape == vfb['grid'].shape, "Grids must be the same shape to render the vf difference."
@@ -201,35 +202,7 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         axs[2].set_xlabel("Patched vfield minus original")
         # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
-    return fig, axs, vf_diff if show_diff else None
-
-def custom_vfield(policy : torch.nn.Module, seed : int = 0, ax_size : int = 3):
-    """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
-    output = Output()
-    fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
-    plt.close()
-    single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-
-    # We want to update ax whenever the maze is edited
-    def update_plot():
-        # Clear the existing plot
-        with output:
-            vfield = vector_field(single_venv, policy)
-            ax.clear()
-            plot_vf(vfield, ax=ax)
-
-            # Update the existing figure in place 
-            clear_output(wait=True)
-            display(fig)
-
-    update_plot()
-
-    # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=lambda _: update_plot())
-
-    # Display the maze editor and the plot in an HBox
-    widget_vbox = VBox(editors + [output])
-    return widget_vbox
+    return fig, axs, (vf_diff if show_diff else None)
 
 
 # %%
