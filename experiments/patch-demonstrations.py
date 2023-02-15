@@ -136,11 +136,12 @@ def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
             patched_vf = vfield.vector_field(venv1, hook.network)
         plot_vf(patched_vf, ax=axs[i+1], render_padding=True)
         plot_pixel_dot(axs[i+1], row, col)
-        axs[i+1].set_title(f'({row}, {col})') # TODO add diffs
+        axs[i+1].set_title(f'Rank {i}: ({row}, {col})') # TODO add diffs
     plt.show()
 
 for seed in (0, 4, 5): # TODO this is sooo slow
-    visualize_top_k_patches(seed)
+    visualize_top_k_patches(seed, top_k=50)
+
 # TODO make wider patch
 # TODO set to top-right and collect statistics 
 
