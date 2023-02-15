@@ -195,7 +195,8 @@ class ActivationsPlotter:
 
     def update_plotter(self, b=None):
         """ Update the plot with the current values of the widgets. """
-        label = expand_label(self.label_widget.value)
+        label = expand_label(self.label_widget.value)        
+        self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
         if self.coords_enabled:
             col, row = self.col_slider.value, self.row_slider.value
             activations = self.activ_gen(row, col, label, **self.act_kwargs)
@@ -214,11 +215,11 @@ class ActivationsPlotter:
             if sqrt_act * sqrt_act == activations.shape[1]:
                 activations = np.reshape(activations, newshape=(activations.shape[0], 1, sqrt_act, sqrt_act)) # Make a dummy channel dimension
                 # Annotate that there is no spatial meaning to the activations
-                self.fig.update_layout(title_text=f"{self.label_widget.value}; reshaped to 2D representation with no spatial meaning")
+                self.fig.update_layout(title_text=f"{self.label_widget.value}; reshaped to 2D; no spatial meaning")
             else:
                 activations = np.expand_dims(activations, axis=(1,2)) # Add a dummy dimension to the activations
 
-        self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
+
         if label == 'fc_policy_out':
             # Transform each index into the corresponding action label, according to maze.py 
             self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
