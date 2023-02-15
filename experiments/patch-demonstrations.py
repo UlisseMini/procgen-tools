@@ -92,7 +92,7 @@ def interactive_c55_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=
 
     # Draw a red pixel at the location of the patch
     plot_pixel_dot(axs[1], row, col)
-    plt.show() # TODO show where the patch is applied
+    plt.show() 
 
     # Add a button to save the figure to experiments/visualizations
     def save_fig(b):

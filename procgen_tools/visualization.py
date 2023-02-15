@@ -93,8 +93,6 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
     plt.close('all')
     if venv is None: 
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-    # else:
-        # assert venv.num == 1, "Can only visualize a single environment at a time."
 
     # We want to update ax whenever the maze is edited
     def update_plot():
@@ -119,7 +117,10 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
 
     # Then make a callback which updates the render in-place when the maze is edited
     editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)
+    # Set the editors so that they don't space out when the window is resized
+    for editor in editors:
+        editor.layout.height = "100%"
 
-    # Display the maze editor and the plot in an HBox
-    widget_vbox = VBox(editors + [output])
+    widget_vbox = Box(children=editors + [output], layout=Layout(display='flex', flex_flow='row', align_items='stretch', width='100%'))
+
     return widget_vbox
