@@ -68,6 +68,32 @@ labels = list(hook.values_by_label.keys()) # all labels in the model
 if '_out' in labels: labels.remove('_out')
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
+# %% Intervene on channel 55 of main_label, setting its value manually 
+dummy_venv = get_cheese_venv_pair(seed=0)
+human_view = dummy_venv.env.get_info()[0]['rgb']
+PIXEL_SIZE = human_view.shape[0] # width of the human view input image
+
+def get_pixel_loc(channel_pos : int, channel_size : int = 16):
+    assert channel_pos < channel_size, f"channel_pos {channel_pos} must be less than channel_size {channel_size}"
+    assert channel_pos >= 0, f"channel_pos {channel_pos} must be non-negative"
+
+    scale = PIXEL_SIZE // channel_size
+    return scale * channel_pos + scale // 2
+
+@interact
+def corner_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
+    venv = get_cheese_venv_pair(seed=seed)
+    patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) # patches[main_label](t.zeros(shap))[0,55] gives patch output
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
+
+    # Draw a red pixel at the location of the patch
+    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
+    axs[1].scatter(pixel_loc[0], pixel_loc[1], c='r', s=50)
+    plt.show() # TODO show where the patch is applied
+# TODO make wider patch
+# TODO set to top-right and collect statistics 
+# """ seed 0, (5, 5), (8, 5) """
+
 # %% Sanity-check that the patching performance is not changed at the original square
 for seed in range(5):
     cheese_pair = get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
