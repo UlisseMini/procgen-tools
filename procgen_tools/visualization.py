@@ -57,11 +57,12 @@ def get_stride(label : str):
         block_num -= 1
     return 2 ** block_num
 
-def visualize_venv(venv : ProcgenGym3Env, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True):
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True):
     """ Visualize the environment. 
     
     Parameters: 
     venv: The environment to visualize
+    idx: The index of the environment to visualize, in the vectorized environment.
     mode: The mode to visualize in. Can be "human", "agent", or "numpy"
     ax: The axis to plot on. If None, a new axis will be created.
     ax_size: The size of the axis to create, if ax is None.
@@ -73,11 +74,11 @@ def visualize_venv(venv : ProcgenGym3Env, mode : str="human", ax : plt.Axes = No
     ax.set_title(mode.title() + " view")
     
     if mode == "human":
-        img = venv.env.get_info()[0]['rgb']
+        img = venv.env.get_info()[idx]['rgb']
     elif mode == "agent":
-        img = venv.reset()[0].transpose(1,2,0)
+        img = venv.reset()[idx].transpose(1,2,0)
     elif mode == "numpy":
-        img = maze.EnvState(venv.env.callmethod('get_state')[0]).full_grid()[::-1, :]
+        img = maze.EnvState(venv.env.callmethod('get_state')[idx]).full_grid()[::-1, :]
     else:
         raise ValueError(f"Invalid mode {mode}")
 
