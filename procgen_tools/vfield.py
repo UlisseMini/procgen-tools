@@ -202,7 +202,7 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         axs[2].set_xlabel("Patched vfield minus original")
         # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[2], human_render=human_render, render_padding=render_padding)
-    return fig, axs, vf_diff if show_diff else None
+    return fig, axs, (vf_diff if show_diff else None)
 
 
 # %%

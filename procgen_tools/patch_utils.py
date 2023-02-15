@@ -112,9 +112,11 @@ def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
         # Ensure that the batch dimension has same size
         return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
-def c55_pixel_patch(label: str, channel : int, value : int = 1):
+def c55_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at label to 1 in the top left corner of the given channel. """
     assert channel >= 0
+    WIDTH = 16 # TODO get this from the environment
+    assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
 
     default = -.2
     def corner_patch(outp):
@@ -122,7 +124,7 @@ def c55_pixel_patch(label: str, channel : int, value : int = 1):
 
         assert new_features.shape[0] == new_features.shape[1], "Assumes square"
         midway = new_features.shape[0] // 2 
-        new_features[midway, midway] = value
+        new_features[coord] = value
         
         outp[:, channel, ...] = new_features
         return outp
