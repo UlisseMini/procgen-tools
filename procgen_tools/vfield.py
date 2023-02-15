@@ -48,7 +48,7 @@ def _device(policy):
 # TODO: with the right APIs, this should be a few lines
 def vector_field(venv, policy):
     """
-    Plot the vector field induced by the policy on the maze in venv env number 1.
+    Get the vector field induced by the policy on the maze in venv env number 1.
     """
     return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
 

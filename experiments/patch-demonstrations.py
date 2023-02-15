@@ -80,16 +80,67 @@ def get_pixel_loc(channel_pos : int, channel_size : int = 16):
     scale = PIXEL_SIZE // channel_size
     return scale * channel_pos + scale // 2
 
+def plot_pixel_dot(ax, row, col, color='r', size=50):
+    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
+    ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
+
 @interact
 def corner_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = get_cheese_venv_pair(seed=seed)
-    patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) # patches[main_label](t.zeros(shap))[0,55] gives patch output
+    patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
     # Draw a red pixel at the location of the patch
-    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
-    axs[1].scatter(pixel_loc[0], pixel_loc[1], c='r', s=50)
+    plot_pixel_dot(axs[1], row, col)
     plt.show() # TODO show where the patch is applied
+
+    # Add a button to save the figure to experiments/visualizations
+    def save_fig(b):
+        fig.savefig(f'visualizations/c55_{seed}_{row}_{col}_{value}.png')
+    button = Button(description='Save figure')
+    button.on_click(save_fig)
+    display(button)
+
+# %% Automatically find the highest-change patch for each seed
+def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
+    # Get the top-k patches for each seed
+    venv = get_cheese_venv_pair(seed=seed)
+    venv1 = copy_venv(venv, 0)
+    original_vf = vfield.vector_field(venv1, hook.network)
+
+    top_coords = []
+    for row in range(16):
+        for col in range(16):
+            patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+            with hook.use_patches(patches):
+                patched_vf = vfield.vector_field(venv1, hook.network)
+            diff = vfield.get_vf_diff(original_vf, patched_vf)
+            top_coords.append((diff, row, col))
+    # Take the norm of each diff vf
+    top_coords = sorted(top_coords, key=lambda x: sum(np.linalg.norm(arrow) for arrow in x[0]['arrows']), reverse=True) 
+    return [(row, col) for (_, row, col) in top_coords[:top_k]]
+
+# %% Visualize the top-k patches for each seed
+def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
+    coords = argmax_coords(seed, value, top_k)
+    venv = get_cheese_venv_pair(seed=seed)
+    venv1 = copy_venv(venv, 0)
+    fig, axs = plt.subplots(top_k + 1, 1, figsize=(6, top_k * 6))
+
+    original_vf = vfield.vector_field(venv1, hook.network)
+    plot_vf(original_vf, ax=axs[0], render_padding=True)
+    axs[0].set_title('Original')
+    for i, (row, col) in enumerate(coords):
+        patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+        with hook.use_patches(patches):
+            patched_vf = vfield.vector_field(venv1, hook.network)
+        plot_vf(patched_vf, ax=axs[i+1], render_padding=True)
+        plot_pixel_dot(axs[i+1], row, col)
+        axs[i+1].set_title(f'({row}, {col})') # TODO add diffs
+    plt.show()
+
+for seed in (0, 4, 5):
+    visualize_top_k_patches(seed)
 # TODO make wider patch
 # TODO set to top-right and collect statistics 
 # """ seed 0, (5, 5), (8, 5) """
