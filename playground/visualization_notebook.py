@@ -194,7 +194,6 @@ class ActivationsPlotter:
 
     def update_plotter(self, b=None):
         """ Update the plot with the current values of the widgets. """
-        print("Updating plot...")
         label = expand_label(self.label_widget.value)
         if self.coords_enabled:
             col, row = self.col_slider.value, self.row_slider.value
@@ -272,27 +271,24 @@ nonzero_plotter.display()
 # # Visualizing actual observation activations
 
 # %%
-SEED = 0
-venv = create_venv(num=1, start_level=SEED, num_levels=1)
 
-def activ_gen_cheese(label: str): # TODO doesnt update with maze? 
+def activ_gen_cheese(label: str, venv : ProcgenGym3Env = None): # TODO dont use None
     """ Generate an observation with cheese at the given location. Returns a tensor of shape (1, 3, rows, cols)."""
+    assert venv is not None
     cheese_obs = venv.reset() 
     cheese_obs = np.array(cheese_obs, dtype=np.float32)
     activations = get_activations(label, cheese_obs)
     return activations
 
 # Show a maze editor side-by-side with the interactive plotter
-custom_maze_plotter = ActivationsPlotter(labels, lambda activations, fig: plot_activations(activations[0], fig=fig), activ_gen_cheese, hook)
+SEED = 0
+venv = create_venv(num=1, start_level=SEED, num_levels=1) # This has to be a single maze, otherwise the vfield wont work
+custom_maze_plotter = ActivationsPlotter(labels, lambda activations, fig: plot_activations(activations[0], fig=fig), activ_gen_cheese, hook, venv=venv)
 
-widget_box = custom_vfield(policy, seed=SEED, callback=custom_maze_plotter.update_plotter) 
+widget_box = custom_vfield(policy, venv=venv, callback=custom_maze_plotter.update_plotter) 
 display(widget_box)
     
 custom_maze_plotter.display() 
 # TODO make it so that it's easy to attach notes to files, load  
 
 # %%
-# widget_box = custom_vfield(policy, seed=2)
-# display(widget_box)
-
-
