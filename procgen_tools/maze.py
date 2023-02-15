@@ -675,7 +675,7 @@ def venv_editors(venv, check_on_dist=True, env_nums=None, callback=None, **kwarg
                 env_states[i].set_grid(gridm)
                 # FIXME: If the maze is edited externally this will break (state_vals_list is constant)
                 venv.env.callmethod("set_state", [vs.state_bytes for vs in env_states])
-                if callback:
+                if callback is not None:
                     callback(gridm)
         return _cb
 
