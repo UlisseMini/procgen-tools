@@ -33,6 +33,30 @@ def format_labels(labels : List[str]):
     """Format labels for display in the visualization."""
     return list(map(format_label, labels))
 
+AGENT_OBS_WIDTH = 64
+def get_impala_num(label : str):
+    """Get the block number of a layer."""
+    if not label.startswith("embedder.block"): raise ValueError(f"Not in the Impala blocks.")
+
+    # The labels are formatted as embedder.block{blocknum}.{residual_block_num}
+    return int(label.split(".")[1][-1])
+
+def get_residual_num(label : str):
+    """Get the residual block number of a layer."""
+    if not label.startswith("embedder.block"): raise ValueError(f"Not in the Impala blocks.")
+
+    # The labels are formatted as embedder.block{blocknum}.{residual_block_num}
+    return int(label.split(".")[2][-1])
+
+def get_stride(label : str):
+    """Get the stride of the layer referred to by label. How many pixels required to translate a single entry in the feature maps of label. """
+    if not label.startswith("embedder.block"): raise ValueError(f"Not in the Impala blocks.")
+
+    block_num = get_impala_num(label)
+    if 'conv_out' in label: # Before that Impala layer's maxpool has been applied
+        block_num -= 1
+    return 2 ** block_num
+
 # Visualization subroutines
 # class ActivationsPlotter:
 #     def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, **act_kwargs):
@@ -154,7 +178,7 @@ def custom_vfield(policy : t.nn.Module, seed : int = 0, ax_size : int = 3, callb
     def cb(_): # Callback for when the maze is edited
         if callback is not None:
             callback()
-        # update_plot()
+        update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
     editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=cb)

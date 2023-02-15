@@ -112,6 +112,22 @@ def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
         # Ensure that the batch dimension has same size
         return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
+def c55_pixel_patch(label: str, channel : int, value : int = 1):
+    """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at label to 1 in the top left corner of the given channel. """
+    assert channel >= 0
+
+    default = -.2
+    def corner_patch(outp):
+        new_features = t.ones_like(outp[0, channel, ...]) * default
+
+        assert new_features.shape[0] == new_features.shape[1], "Assumes square"
+        midway = new_features.shape[0] // 2 
+        new_features[midway, midway] = value
+        
+        outp[:, channel, ...] = new_features
+        return outp
+    return {label: corner_patch}
+
 def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
     Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed_str}-{coeff}.mp4", where rand_region is a global int.

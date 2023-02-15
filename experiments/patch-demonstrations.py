@@ -68,6 +68,20 @@ labels = list(hook.values_by_label.keys()) # all labels in the model
 if '_out' in labels: labels.remove('_out')
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
+# %% Intervene on channel 55 of main_label, setting its value manually 
+@interact
+def corner_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=1)):
+    venv = get_cheese_venv_pair(seed=seed)
+    patches = c55_pixel_patch(label=main_label, channel=55, value=value) # patches[main_label](t.zeros(shap))[0,55] gives patch output
+    fig, ax, info = compare_patched_vfields(venv, patches, hook)
+    # Print off channel 55 from patched network
+    # Get the patched activations at channel 55 of layer main_label
+    with hook.use_patches(patches):
+        obs = venv.reset().astype(np.float32)
+        hook.run_with_input(obs)
+    # print(hook.values_by_label[main_label][1,55])
+    plt.show()
+
 # %% Sanity-check that the patching performance is not changed at the original square
 for seed in range(5):
     cheese_pair = get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
