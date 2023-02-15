@@ -85,7 +85,7 @@ def plot_pixel_dot(ax, row, col, color='r', size=50):
     ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
 @interact
-def corner_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
+def interactive_c55_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = get_cheese_venv_pair(seed=seed)
     patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
@@ -139,11 +139,10 @@ def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
         axs[i+1].set_title(f'({row}, {col})') # TODO add diffs
     plt.show()
 
-for seed in (0, 4, 5):
+for seed in (0, 4, 5): # TODO this is sooo slow
     visualize_top_k_patches(seed)
 # TODO make wider patch
 # TODO set to top-right and collect statistics 
-# """ seed 0, (5, 5), (8, 5) """
 
 # %% Sanity-check that the patching performance is not changed at the original square
 for seed in range(5):

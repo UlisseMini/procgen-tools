@@ -177,7 +177,7 @@ def custom_vfield(policy : t.nn.Module, seed : int = 0, ax_size : int = 3, callb
 
     def cb(_): # Callback for when the maze is edited
         if callback is not None:
-            callback()
+            callback(_)
         update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
