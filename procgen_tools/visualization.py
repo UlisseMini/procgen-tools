@@ -86,18 +86,21 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     if show_plot:
         plt.show() 
 
-def custom_vfield(policy : t.nn.Module, seed : int = 0, ax_size : int = 3, callback : Callable = None):
+def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 3, callback : Callable = None):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close('all')
-    single_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    if venv is None: 
+        venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    # else:
+        # assert venv.num == 1, "Can only visualize a single environment at a time."
 
     # We want to update ax whenever the maze is edited
     def update_plot():
         # Clear the existing plot
         with output:
-            vfield = vector_field(single_venv, policy)
+            vfield = vector_field(venv, policy)
             ax.clear()
             plot_vf(vfield, ax=ax)
 
@@ -115,7 +118,7 @@ def custom_vfield(policy : t.nn.Module, seed : int = 0, ax_size : int = 3, callb
 
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(single_venv, check_on_dist=False, env_nums=range(1), callback=cb)
+    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)
 
     # Display the maze editor and the plot in an HBox
     widget_vbox = VBox(editors + [output])
