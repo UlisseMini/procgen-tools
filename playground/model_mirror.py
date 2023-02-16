@@ -134,8 +134,8 @@ def rollout_video_clip(predict, level, remove_cheese=False,
     env_state = maze.EnvState(venv.env.callmethod('get_state')[0])
     if mouse_inner_pos is not None:
         padding = (env_state.world_dim - env_state.inner_grid().shape[0]) // 2
-        mouse_outer_pos = (mouse_pos_inner[0] + padding,
-            mouse_pos_inner[1] + padding)
+        mouse_outer_pos = (mouse_inner_pos[0] + padding,
+            mouse_inner_pos[1] + padding)
     if mouse_outer_pos is not None:
         env_state.set_mouse_pos(mouse_outer_pos[1], mouse_outer_pos[0])
         venv.env.callmethod('set_state', [env_state.state_bytes])
@@ -179,7 +179,7 @@ policy_normal = models.load_policy(path_prefix + f'trained_models/maze_I/model_r
 predict_normal = get_predict(policy_normal)
 
 # %%
-# Top-left agent (flip on X axis)
+# All agents
 level = 13
 
 # Apply flipping to get new model and predict func
@@ -208,5 +208,66 @@ display(side_by_side_rollout(predict_dict, level, True,  mouse_outer_pos=(11, 11
 #
 # One possibility is that it all happens in the final fully-connected layers, and everything in the conv layers is just detecting maze-solving-relate stuff?  I doubt this is true (<20% credence) but worth starting here?
 #
-# Let's first visualize the flatten-to-fc weights, reshaped to return the spatial context...
+# Let's first visualize the flatten-to-fc weights, reshaped to return the spatial context... TODO
 
+# %%[markdown]
+#
+# What would happen if we created new agent, which is the combination of multiple agents with a summation at the final logits?  Would such an agent be capable at all, or would it just get stuck if the models disagreed, or be broken in some other way?  Let's try it...
+#
+# Okay, 
+
+# %%
+# Try combining two agents at the logit level
+
+def get_dist_from_policies(policies, obs_t):
+    logits_list = []
+    for policy in policies:
+        hidden = policy.embedder(obs_t)
+        logits_list.append(policy.fc_policy(hidden))
+    # Sum the logits
+    logits_comb = rearrange(logits_list, 'p b a -> p b a').mean(axis=0)
+    log_probs = F.log_softmax(logits_comb, dim=1)
+    return Categorical(logits=log_probs)
+
+def get_predict_multi(policies):
+    def predict(obs, deterministic):
+        obs_t = t.FloatTensor(obs)
+        dist = get_dist_from_policies(policies, obs_t)
+        if deterministic:
+            act = dist.mode.numpy()
+        else:
+            act = dist.sample().numpy()
+        return act, None, dist.logits.detach().numpy()
+    return predict
+
+def get_forward_multi(policies):
+    def forward(obs_t):
+        dist = get_dist_from_policies(policies, obs_t)
+        return dist, None
+    return forward
+
+def rollout_and_vfield_diff(level, policies_original, policies_patched, desc):
+    print(f'{desc} | level:{level}')
+    # Rollout
+    predict_dict = {'original': get_predict_multi(policies_original),
+        'patched': get_predict_multi(policies_patched)}
+    display(side_by_side_rollout(predict_dict, level))
+    # Vfield
+    venv = maze.create_venv(1, start_level=level, num_levels=1)
+    policy_hacked = copy.deepcopy(policy_normal)
+    policy_hacked.forward = get_forward_multi(policies_original)
+    vf_original = vfield.vector_field(venv, policy_hacked)
+    policy_hacked.forward = get_forward_multi(policies_patched)
+    vf_patched = vfield.vector_field(venv, policy_hacked)
+    vfield.plot_vfs(vf_original, vf_patched)
+    plt.show()
+
+desc = 'Original vs all-dirs-combined'
+policies_all_dirs = [
+    flip_weights_and_actions(policy_normal, flip_x=True, flip_y=False),
+    flip_weights_and_actions(policy_normal, flip_x=False, flip_y=False),
+    flip_weights_and_actions(policy_normal, flip_x=True,  flip_y=True),
+    flip_weights_and_actions(policy_normal, flip_x=False, flip_y=True)]
+
+rollout_and_vfield_diff(13, [policy_normal], policies_all_dirs, desc)
+rollout_and_vfield_diff(2, [policy_normal], policies_all_dirs, desc)
