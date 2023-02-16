@@ -112,7 +112,7 @@ def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
         # Ensure that the batch dimension has same size
         return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
-def c55_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
+def channel_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at label to 1 in the top left corner of the given channel. """
     assert channel >= 0
     WIDTH = 16 # TODO get this from the environment
@@ -205,7 +205,6 @@ def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_vide
     # patch_layer(hook, values, 0, label, venv, seed=seed, show_video=show_video, show_vfield=show_vfield, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
-        # display(Text(f'Patching with coeff {coeff} seed {seed}'))
         patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True):

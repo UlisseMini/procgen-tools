@@ -2,70 +2,7 @@
 %reload_ext autoreload
 %autoreload 2
 
-# Install procgen tools if needed
-try:
-  import procgen_tools
-except ImportError:
-  get_ipython().run_line_magic(magic_name='pip', line='install git+https://github.com/ulissemini/procgen-tools')
-
-# %%
-# Download data and create directory structure
-
-import os, sys
-from pathlib import Path
-from procgen_tools.utils import setup
-
-setup() # create directory structure and download data
-
-# path this notebook expects to be in
-if 'experiments' not in os.getcwd():
-    Path('experiments').mkdir(exist_ok=True)
-    os.chdir('experiments')
-
-# %%
-# Imports
-from typing import List, Tuple, Dict, Union, Optional, Callable
-
-import numpy as np
-import pandas as pd
-import torch as t
-import plotly.express as px
-import plotly as py
-import plotly.graph_objects as go
-from tqdm import tqdm
-from einops import rearrange
-from IPython.display import Video, display, clear_output
-from ipywidgets import *
-import itertools
-from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-import matplotlib.pyplot as plt 
-plt.ioff() # disable interactive plotting, so that we can control where figures show up when refreshed by an ipywidget
-
-import circrl.module_hook as cmh
-import procgen_tools.models as models
-from procgen_tools.patch_utils import *
-from procgen_tools.vfield import *
-from procgen import ProcgenGym3Env
-
-# %%
-# Check whether we're in jupyter
-try:
-    get_ipython()
-    in_jupyter = True
-except NameError:
-    in_jupyter = False
-path_prefix = '../' if in_jupyter else ''
-
-# Load model
-rand_region = 5
-policy = models.load_policy(path_prefix + f'trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, t.device('cpu'))
-hook = cmh.ModuleHook(policy)
-
-main_label = 'embedder.block2.res1.resadd_out'
-
-hook.run_with_input(np.zeros((1,3, 64, 64), dtype=np.float32))
-labels = list(hook.values_by_label.keys()) # all labels in the model
-if '_out' in labels: labels.remove('_out')
+from procgen_tools.imports import *
 
 # RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Intervene on channel 55 of main_label, setting its value manually 
@@ -87,7 +24,7 @@ def plot_pixel_dot(ax, row, col, color='r', size=50):
 @interact
 def interactive_c55_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = get_cheese_venv_pair(seed=seed)
-    patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
+    patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
     # Draw a red pixel at the location of the patch
@@ -111,7 +48,7 @@ def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
     top_coords = []
     for row in range(16):
         for col in range(16):
-            patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+            patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
             with hook.use_patches(patches):
                 patched_vf = vfield.vector_field(venv1, hook.network)
             diff = vfield.get_vf_diff(original_vf, patched_vf)
@@ -125,18 +62,13 @@ def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
     coords = argmax_coords(seed, value, top_k)
     venv = get_cheese_venv_pair(seed=seed)
     venv1 = copy_venv(venv, 0)
-    fig, axs = plt.subplots(top_k + 1, 1, figsize=(6, top_k * 6))
-
-    original_vf = vfield.vector_field(venv1, hook.network)
-    plot_vf(original_vf, ax=axs[0], render_padding=True)
-    axs[0].set_title('Original')
+    # Use compare_vector_fields for each patch
     for i, (row, col) in enumerate(coords):
-        patches = c55_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
-        with hook.use_patches(patches):
-            patched_vf = vfield.vector_field(venv1, hook.network)
-        plot_vf(patched_vf, ax=axs[i+1], render_padding=True)
-        plot_pixel_dot(axs[i+1], row, col)
-        axs[i+1].set_title(f'Rank {i}: ({row}, {col})') # TODO add diffs
+        patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+        fig, axs, info = compare_patched_vfields(venv1, patches, hook)
+        fig.suptitle(f'Seed {seed}, patch {i+1}/{top_k} at ({row}, {col})')
+        for idx in (1,2): 
+            plot_pixel_dot(axs[idx], row, col)
     plt.show()
 
 for seed in (0, 4, 5): # TODO this is sooo slow

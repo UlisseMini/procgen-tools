@@ -12,68 +12,8 @@
 %autoreload 2
 
 # %%
-# Imports
-from typing import List, Tuple, Dict, Union, Optional, Callable
-import re 
-
-import numpy as np
-import pandas as pd
-import torch as t
-import plotly.express as px
-import plotly as py
-import plotly.graph_objects as go
-from tqdm import tqdm
-from einops import rearrange
-from IPython.display import *
-from ipywidgets import *
-import itertools
-from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-import matplotlib.pyplot as plt
-
-# Install procgen tools if needed
-try:
-  import procgen_tools
-except ImportError:
-  get_ipython().run_line_magic(magic_name='pip', line='install -U git+https://github.com/ulissemini/procgen-tools')
-
-# %%
-# Download data and create directory structure
-
-import os, sys
-from pathlib import Path
-from procgen_tools.utils import setup
-
-setup() # create directory structure and download data
-
-# path this notebook expects to be in
-if 'experiments' not in os.getcwd():
-    Path('experiments').mkdir(exist_ok=True)
-    os.chdir('experiments')
-
-
-# %%
-import circrl.module_hook as cmh
-import procgen_tools.models as models
-from procgen_tools.patch_utils import *
-from procgen_tools.visualization import *
-
-from procgen import ProcgenGym3Env
-from ipywidgets import Text # Import this later because otherwise Text gets cast as str?
-
-RAND_REGION = 5
-NUM_ACTIONS = 15
-try:
-    get_ipython()
-    in_jupyter = True
-except NameError:
-    in_jupyter = False
-PATH_PREFIX = '../' if in_jupyter else ''
-
-# %%
-# Load model
-model_path = PATH_PREFIX + f'trained_models/maze_I/model_rand_region_{RAND_REGION}.pth'
-policy = models.load_policy(model_path, NUM_ACTIONS, t.device('cpu'))
-hook = cmh.ModuleHook(policy)
+# Super-long import code!
+from procgen_tools.imports import *
 
 # %% [markdown]
 # Let's visualize the network structure. Here's a Mermaid diagram. 
@@ -162,7 +102,7 @@ nonzero_plotter.display()
 
 # %% [markdown]
 # # 1: Locality
-# Consider `n` convolutional layers (3x3 kernel, stride=1, padding=1) which each preserve the height col width of the previous feature maps. The above demonstrates that after these layers, information can only propagate `n` L1 pixels. The network itself is composed of # TODO 
+# Consider `n` convolutional layers (3x3 kernel, stride=1, padding=1) which each preserve the height col width of the previous feature maps. The above demonstrates that after these layers, information can only propagate `n` L1 pixels. The network itself is composed of # TODO explain the network structure, using diff plots to show how the activations propagate across the network. Also make a line plot of information propagation distance vs. layer number.
 
 # %% [markdown]
 # # Visualizing actual observation activations
@@ -170,7 +110,6 @@ nonzero_plotter.display()
 # %%
 default_settings = {'channel_slider': 55, 'label_widget': 'block2.res1.resadd_out'}
 # %%
-default_settings['label_widget'] = 'fc_out'
 def activ_gen_cheese(label: str, venv : ProcgenGym3Env = None): # TODO dont use None
     """ Generate an observation with cheese at the given location. Returns a tensor of shape (1, 3, rows, cols)."""
     assert venv is not None
