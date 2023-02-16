@@ -68,6 +68,43 @@ def plot_decision_probs(decision_probs_original, decision_probs_patched, ax_size
     return fig
 
 
+
+_plot_labels = ('cheese', 'top-right', 'other')
+
+def plot_dprobs_hist(dpo, dpp, ax=None):
+    """ Plot histograms of the decision probabilities for the original and patched vfields. """
+    assert len(ax) == len(_plot_labels) == 3
+
+    ax[0].set_ylabel('count')
+    for i in range(3):
+        ax[i].set_title([f'P({label} | decision-square)' for label in _plot_labels][i])
+        ax[i].set_xlabel('probability')
+        ax[i].hist(dpo[:,i], bins=20, label='original', alpha=0.5)
+        ax[i].hist(dpp[:,i], bins=20, label='patched', alpha=0.5)
+        ax[i].legend()
+
+
+def plot_dprobs_scatter(dpo, dpp, ax=None):
+    """ Plot scatter plots of the decision probabilities for the original and patched vfields. """
+    assert len(ax) == len(_plot_labels) == 3
+    ax[0].set_ylabel('patched')
+    for i in range(3):
+        ax[i].set_title([f'P({label} | decision-square)' for label in _plot_labels][i])
+        ax[i].scatter(dpo[:,i], dpp[:,i], alpha=0.5)
+        ax[i].set_xlabel('original')
+
+
+def plot_dprobs_box(dpo, dpp, ax=None):
+    """ Plot box plots of the decision probabilities for the original and patched vfields. """
+    assert len(ax) == len(_plot_labels) == 3
+    ax[0].set_ylabel('probability')
+    for i in range(3):
+        ax[i].boxplot([dpo[:,i], dpp[:,i]], labels=['original', 'patched'])
+        ax[i].set_xticks([1, 2])
+        ax[i].set_xticklabels(['original', 'patched'])
+
+
+
 def plot_vfs(vfs: dict):
     """
     Plot the original and patched vfields for a data entry saved by gatherdata_vfields.py
