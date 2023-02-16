@@ -2,11 +2,12 @@
 %reload_ext autoreload
 %autoreload 2
 
+# %%
 from procgen_tools.imports import *
+from procgen_tools.procgen_imports import *
 
-# RUN ABOVE here; the rest are one-off experiments which don't have to be run in sequence
 # %% Intervene on channel 55 of main_label, setting its value manually 
-dummy_venv = get_cheese_venv_pair(seed=0)
+dummy_venv = get_cheese_venv_pair(seed=0) # TODO put these in visualization.py
 human_view = dummy_venv.env.get_info()[0]['rgb']
 PIXEL_SIZE = human_view.shape[0] # width of the human view input image
 
@@ -22,7 +23,7 @@ def plot_pixel_dot(ax, row, col, color='r', size=50):
     ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
 @interact
-def interactive_c55_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
+def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = get_cheese_venv_pair(seed=seed)
     patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
@@ -48,7 +49,7 @@ def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
     top_coords = []
     for row in range(16):
         for col in range(16):
-            patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+            patches = get_channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
             with hook.use_patches(patches):
                 patched_vf = vfield.vector_field(venv1, hook.network)
             diff = vfield.get_vf_diff(original_vf, patched_vf)
@@ -64,7 +65,7 @@ def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
     venv1 = copy_venv(venv, 0)
     # Use compare_vector_fields for each patch
     for i, (row, col) in enumerate(coords):
-        patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+        patches = get_channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
         fig, axs, info = compare_patched_vfields(venv1, patches, hook)
         fig.suptitle(f'Seed {seed}, patch {i+1}/{top_k} at ({row}, {col})')
         for idx in (1,2): 

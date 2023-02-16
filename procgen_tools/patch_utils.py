@@ -1,40 +1,4 @@
-# %%
-# Imports
-from typing import List, Tuple, Dict, Union, Optional, Callable
-
-import numpy as np
-import torch as t
-import plotly.express as px
-import matplotlib.pyplot as plt
-from IPython.display import Video, display, clear_output
-from ipywidgets import Text, interact, HBox
-from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-from einops import *
-
-# NOTE: this is Monte's RL hooking code (and other stuff will be added in the future)
-# Install normally with: pip install circrl
-import circrl.module_hook as cmh
-import circrl.rollouts as cro
-
-from procgen_tools import maze, vfield
-import procgen_tools.models as models
-from procgen_tools.maze import copy_venv, create_venv
-
-# %% 
-# Load two levels and get values
-import pickle as pkl
-from procgen import ProcgenGym3Env
-
-# Check whether we're in jupyter
-try:
-    get_ipython()
-    in_jupyter = True
-except NameError:
-    in_jupyter = False
-
-path_prefix = '../' if in_jupyter else ''
-rand_region = 5
-
+from procgen_tools.imports import * 
 
 def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
     "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
@@ -112,7 +76,7 @@ def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
         # Ensure that the batch dimension has same size
         return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
-def channel_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
+def get_channel_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at label to 1 in the top left corner of the given channel. """
     assert channel >= 0
     WIDTH = 16 # TODO get this from the environment
@@ -125,6 +89,7 @@ def channel_pixel_patch(label: str, channel : int, value : int = 1, coord : Tupl
         assert new_features.shape[0] == new_features.shape[1], "Assumes square"
         midway = new_features.shape[0] // 2 
         new_features[coord] = value
+        new_features[coord[0]+1, coord[1]] = value
         
         outp[:, channel, ...] = new_features
         return outp

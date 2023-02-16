@@ -34,6 +34,9 @@ from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, clips_ar
 import matplotlib.pyplot as plt 
 plt.ioff() # disable interactive plotting, so that we can control where figures show up when refreshed by an ipywidget
 
+import lovely_tensors as lt
+lt.monkey_patch()
+
 import circrl.module_hook as cmh
 import circrl.rollouts as cro
 import procgen_tools.models as models
@@ -196,3 +199,14 @@ display(side_by_side_rollout(predict_dict, level, True,  mouse_outer_pos=(11, 11
 # Interestingly, the bottom-seeking agents, especially the bottom-right seeking agent, seems to be generally less capable than the other agents.  I hypothesize that this may be caused by some sensitivity to the mouse/cheese icon flipping (the only non-visually-symmetrical objects in the environment as far as I can tell, with the exception of some minor asymmetries in the background pattern.)
 #
 # To see if this is driven by visual stuff only and not some mistaken assumption in the weight modification process, we can test the normal agent, with flipped observations and flipped actions only...
+#
+# TODO: do this!
+
+# %%[markdown]
+#
+# Let's think about how this corner-seeking could be implemented.
+#
+# One possibility is that it all happens in the final fully-connected layers, and everything in the conv layers is just detecting maze-solving-relate stuff?  I doubt this is true (<20% credence) but worth starting here?
+#
+# Let's first visualize the flatten-to-fc weights, reshaped to return the spatial context...
+

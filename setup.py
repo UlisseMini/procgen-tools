@@ -24,5 +24,6 @@ setup(
         "networkx>=3.0",
         "scipy==1.10.0",
         "mistune==0.8.4", # intermediate dependency issue with ndconvert?
+        "captum>=0.6.0",
     ]
 )

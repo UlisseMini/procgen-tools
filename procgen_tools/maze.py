@@ -17,7 +17,6 @@ import functools
 import collections
 import heapq
 import networkx as nx
-import os
 import copy
 
 # Constants in numeric maze representation

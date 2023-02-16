@@ -33,13 +33,8 @@ except ImportError:
   get_ipython().run_line_magic(magic_name='pip', line='install -U git+https://github.com/ulissemini/procgen-tools')
   
 import circrl.module_hook as cmh
+import circrl.rollouts as cro
 
-import procgen_tools.models as models
-from procgen_tools.patch_utils import *
-from procgen_tools.visualization import *
-from procgen_tools import vfield
-import procgen_tools.vfield_stats as vs
-from procgen_tools.maze import *
 from procgen import ProcgenGym3Env
 
 import os, sys
@@ -52,7 +47,6 @@ FOLDER = 'experiments'
 if FOLDER not in os.getcwd(): # path this notebook expects to be in
     Path(FOLDER).mkdir(exist_ok=True)
     os.chdir(FOLDER)
-
 RAND_REGION = 5
 NUM_ACTIONS = 15
 try:

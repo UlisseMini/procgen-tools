@@ -14,6 +14,7 @@
 # %%
 # Super-long import code!
 from procgen_tools.imports import *
+from procgen_tools.procgen_imports import *
 
 # %% [markdown]
 # Let's visualize the network structure. Here's a Mermaid diagram. 
@@ -119,7 +120,7 @@ def activ_gen_cheese(label: str, venv : ProcgenGym3Env = None): # TODO dont use 
     return activations
 
 # Show a maze editor side-by-side with the interactive plotter
-SEED = 0
+SEED = 2
 venv = create_venv(num=1, start_level=SEED, num_levels=1) # This has to be a single maze, otherwise the vfield wont work
 custom_maze_plotter = ActivationsPlotter(labels, lambda activations, fig: plot_activations(activations[0], fig=fig), activ_gen_cheese, hook, defaults=default_settings, venv=venv)
 # Set the default settings
