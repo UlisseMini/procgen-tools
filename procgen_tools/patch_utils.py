@@ -55,17 +55,23 @@ def num_channels(hook : cmh.ModuleHook, layer_name : str):
     assert hook.get_value_by_label(layer_name) is not None, "Hook has not been run on any input"
     return hook.get_value_by_label(layer_name).shape[1]
 
+NUM_CHANNEL_DICT = dict([(layer_name, num_channels(hook, layer_name)) for layer_name in labels if layer_name != '_out']) # NOTE assumes existence of "labels" and "hook" variables
+
 # PATCHES
-def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.ndarray], np.ndarray]):
-    """ Apply the patching function to the given channel at the given layer. """
-    def patch_fn_channel(outp : np.ndarray):
+def channel_patch_or_broadcast(layer_name : str,  patch_fn : Callable[[np.ndarray], np.ndarray], channel : int = -1):
+    """ Apply the patching function to the given channel at the given layer. If channel is -1, apply the patching function to all channels. """
+    patch_single_channel = channel >= 0
+
+    def patch_fn_new(outp : np.ndarray):
         new_out = patch_fn(outp[:, channel, ...])
-        # Cast to t.tensor if new_out is np.ndarray TODO check why necessary
         if isinstance(new_out, np.ndarray):
             new_out = t.from_numpy(new_out)
-        outp[:, channel, ...] = new_out
+        if patch_single_channel: 
+            outp[:, channel, ...] = new_out
+        else: 
+            outp[:] = new_out
         return outp
-    return {layer_name: patch_fn_channel}
+    return {layer_name: patch_fn_new} 
 
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
     """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). """
@@ -77,9 +83,9 @@ def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
     return {layer_name: lambda outp: outp + coeff*cheese_diff} # can't pickle
     # return {layer_name: cmh.PatchDef(value=coeff*cheese_diff, mask=np.array(True))} # can pickle
 
-def get_zero_patch(layer_name: str):
+def get_zero_patch(layer_name: str, channel : int = -1):
     """ Get a patch function that patches the activations at layer_name with 0. """
-    return {layer_name: lambda outp: t.zeros_like(outp)}
+    return channel_patch_or_broadcast(layer_name=layer_name, channel=channel, patch_fn=lambda outp: t.zeros_like(outp))
 
 def get_mean_patch(layer_name: str, values: np.ndarray = None, channel : int = -1, num_samples : int = 50):
     """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. If values is not specified, sample num_samples random observations and use the activations at layer_name. """ 
@@ -91,10 +97,7 @@ def get_mean_patch(layer_name: str, values: np.ndarray = None, channel : int = -
         values = hook.get_value_by_label(layer_name)
     mean_vals = reduce(t.from_numpy(values[:, channel, ...] if patch_single_channel else values), 'b ... -> ...', 'mean')
 
-    if patch_single_channel:
-        return make_channel_patch(layer_name, channel, lambda outp: mean_vals) # TODO check this works
-    else: # Ensure that the batch dimension has same size 
-        return {layer_name: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
+    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=lambda outp: mean_vals) 
 
 def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1):
     """ Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. """
@@ -106,88 +109,50 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
     values = hook.get_value_by_label(layer_name) # shape (batch, channels, ...)
     if patch_single_channel:
         values = values[:, channel, ...] # shape (batch, ...)
-    random_vals = t.from_numpy(values[0, ...]) # Get from the first and only batch elt
+    random_vals = t.from_numpy(values[0, ...]) # shape (...)
+
+    """ 
+    rand_obs = (1, 3, 64, 64)
+    values = (1, 128, 16, 16)
+    if patch_single_channel: 
+        values = (1, 16, 16)
+        random_vals: (16, 16) 
+    else:
+        values: (1, 128, 16, 16)
+        random_vals: (128, 16, 16)
+    outp (96, 128, 16, 16)
+    
+    Want to apply patch to each output channel, so we need to broadcast the random values to the entire output
+    
+
+    """
 
     def patch_fn(outp): 
         return random_vals 
         
     # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
-    return make_channel_patch(layer_name, channel, patch_fn) if patch_single_channel else {layer_name: patch_fn}    
+    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=patch_fn)
 
 
 def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. """
     assert channel >= 0
-    WIDTH = 16 # TODO get this from the environment/layer_name
+    WIDTH = NUM_CHANNEL_DICT[layer_name]
     assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
 
     default = -.2
-    def new_corner_patch(outp): # Use make_channel_patch as a helper
+    def new_corner_patch(outp): 
         """ outp has shape (batch, ...) -- without a channel dimension. """
         new_features = t.ones_like(outp[0, ...]) * default
         new_features[coord] = value
         outp[:, ...] = new_features
         return outp
 
-    return make_channel_patch(layer_name, channel, new_corner_patch) # TODO make box activation
+    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=new_corner_patch) # TODO make box activation
 
 def get_multiply_patch(layer_name : str, channel : int = -1, multiplier : float = 2):
     """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. """
-    if channel >= 0:
-        return make_channel_patch(layer_name, channel, lambda outp: outp * multiplier)
-    else:
-        return {layer_name: lambda outp: outp * multiplier}
-
-def patch_layer(hook, values, coeff:float, layer_name: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
-    """
-    Add coeff*(values[0, ...] - values[1, ...]) to the activations at the given layer. If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed_str}-{coeff}.mp4", where rand_region is a global int.
-    """
-    # Custom predict function to match rollout expected interface, uses
-    # the hooked network so it is patchable
-    def predict(obs, deterministic):
-        obs = t.FloatTensor(obs)
-        dist, value = hook.network(obs)
-        if deterministic:
-            act = dist.mode.numpy() # Take most likely action
-        else:
-            act = dist.sample().numpy() # Sample from distribution
-        return act, None
-
-    assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
-    
-    patches = get_values_diff_patch(values, coeff, layer_name=layer_name)
-
-    if show_video:
-        env = maze.copy_venv(venv, 1 if vanished else 0)
-        with hook.use_patches(patches):
-            seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
-        hook.run_with_input(seq.obs.astype(np.float32))
-        action_logits = hook.get_value_by_label('fc_policy_out')
-        logits_to_action_plot(action_logits, title=layer_name)
-        
-        vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed_str}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
-        clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
-        clip.write_videofile(vidpath, logger=None)
-        display(Video(vidpath, embed=True))
-
-    if show_vfield:
-        # Make a side-by-side subplot of the two vector fields
-        fig = plt.figure(figsize=(10, 5))
-
-        # Make the subplots 
-        plt.subplot(1, 2, 1)
-        plt.gca().set_title("Original")
-        vf1 = vfield.vector_field(venv, hook.network)
-        vfield.plot_vf(vf1)
-
-        plt.subplot(1, 2, 2)
-        with hook.use_patches(patches):
-            plt.gca().set_title("Patched")
-            vf2 = vfield.vector_field(venv, hook.network)
-            vfield.plot_vf(vf2)
-        # Make a figure title above the two subplots
-        fig.suptitle(f"Vector fields for layer {layer_name} with coeff={coeff:.2f} and level={seed_str}") 
-        plt.show()
+    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=lambda outp: outp * multiplier)
 
 # %% 
 # Infrastructure for running different kinds of seeds
@@ -201,19 +166,6 @@ def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook): # TODO r
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
-
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, layer_name='embedder.block2.res1.resadd_out', steps:int=150, render_padding : bool = False):
-    """ Run a single seed, with the given hook and diff_coeffs. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
-    venv = get_cheese_venv_pair(seed) 
-
-    # Get values if not provided
-    values, value_src = (cheese_diff_values(seed, layer_name, hook), seed) if values_tup is None else values_tup
-
-    # Show behavior on the level without cheese
-    # patch_layer(hook, values, 0, layer_name, venv, seed=seed, show_video=show_video, show_vfield=show_vfield, vanished=True, steps=steps)
-
-    for coeff in diff_coeffs:
-        patch_layer(hook, values, coeff, layer_name, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True):
     """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. """

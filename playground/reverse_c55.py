@@ -76,14 +76,16 @@ def c55_patch_transfer_channels(seed=IntSlider(min=0, max=100, step=1, value=0),
     button.on_click(save_fig)
     display(button)
 
-# %% Random patching c55
+
+# %%
+
+# %% Random patching channels
 channel_slider = IntSlider(min=0, max=63, step=1, value=55)
 @interact
-def random_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), layer_name=Dropdown(options=labels, value=default_layer), channel=channel_slider):
+def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_name=Dropdown(options=labels, value=default_layer), channel=channel_slider):
     """ Replace channel 55's activations with values from a randomly sampled observation. This invokes get_random_patch from patch_utils. """
-    channel_slider.max = num_channels(hook, layer_name)
-    print(f'Channel slider max: {channel_slider.max}')
-    channel_slider.value = min(channel_slider.value, channel_slider.max)
+    channel_slider.max = num_channels(hook, layer_name) -1
+    channel = channel_slider.value = min(channel_slider.value, channel_slider.max)
 
     venv = get_cheese_venv_pair(seed=seed)
     patches = get_random_patch(layer_name=layer_name, hook=hook, channel=channel)

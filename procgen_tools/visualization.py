@@ -126,8 +126,6 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
             callback(gridm)
         update_plot()
         
-
-
     # Then make a callback which updates the render in-place when the maze is edited
     editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)
     # Set the editors so that they don't space out when the window is resized
@@ -236,11 +234,8 @@ class ActivationsPlotter:
         else:
             activations = self.activ_gen(label, self.hook, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers 
 
-        shap = self.hook.get_value_by_label(label).shape
-        self.channel_slider.max = shap[1] - 1 if len(shap) > 2 else 0
-        self.channel_slider.value = min(self.channel_slider.value, self.channel_slider.max)
-        channel = self.channel_slider.value
-        assert channel < activations.shape[1], "Channel doesn't exist at this layer"
+        self.channel_slider.max = patch_utils.num_channels(hook=self.hook, layer_name=label) - 1 if len(shap) > 2 else 0
+        channel = self.channel_slider.value = min(self.channel_slider.value, self.channel_slider.max)
 
         if len(activations.shape) == 2: # Linear layer (batch, hidden_dim)
             # Ensure shape[1] is a perfect square
@@ -254,7 +249,6 @@ class ActivationsPlotter:
 
         self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
         self.format_fig(activations)
-
 
     def format_fig(self, activations : np.ndarray):
         """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. """
