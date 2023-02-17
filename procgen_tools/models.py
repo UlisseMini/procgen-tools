@@ -201,9 +201,11 @@ MAZE_ACTION_DELTAS = bidict({
 })
 
 # TODO: clean this up
+MAZE_ACTIONS_BY_INDEX = np.zeros((15), dtype='<U5')
 MAZE_ACTION_DELTAS_BY_INDEX = np.zeros((15,2))
 for act, inds in MAZE_ACTION_INDICES.items():
     MAZE_ACTION_DELTAS_BY_INDEX[inds,:] = np.array(MAZE_ACTION_DELTAS[act])
+    MAZE_ACTIONS_BY_INDEX[inds] = act
 
 
 def human_readable_action(act: int) -> str:
