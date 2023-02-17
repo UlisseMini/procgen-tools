@@ -20,7 +20,7 @@ from procgen_tools.procgen_imports import *
 
 @interact
 def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
-    venv = get_cheese_venv_pair(seed=seed)
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
@@ -38,7 +38,7 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), va
 # %% Automatically find the highest-change patch for each seed
 def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
     # Get the top-k patches for each seed
-    venv = get_cheese_venv_pair(seed=seed)
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
     venv1 = copy_venv(venv, 0)
     original_vf = vfield.vector_field(venv1, hook.network)
 
@@ -57,7 +57,7 @@ def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
 # %% Visualize the top-k patches for each seed
 def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
     coords = argmax_coords(seed, value, top_k)
-    venv = get_cheese_venv_pair(seed=seed)
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
     venv1 = copy_venv(venv, 0)
     # Use compare_vector_fields for each patch
     for i, (row, col) in enumerate(coords):
@@ -76,9 +76,9 @@ for seed in (0, 4, 5): # TODO this is sooo slow
 
 # %% Sanity-check that the patching performance is not changed at the original square
 for seed in range(5):
-    cheese_pair = get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
-    values = cheese_diff_values(seed, default_layer, hook)
-    patches = get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
+    cheese_pair = patch_utils.get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
+    values = patch_utils.cheese_diff_values(seed, default_layer, hook)
+    patches = patch_utils.get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
 
     original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
     with hook.use_patches(patches):
@@ -185,7 +185,7 @@ def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSl
 # %% Try all patches at once 
 @interact 
 def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-1, max=1, step=0.025, value=-.05)):
-    venv = get_cheese_venv_pair(seed) 
+    venv = patch_utils.get_cheese_venv_pair(seed) 
     patches = {}
     for layer_name in labels:
         if layer_name == 'fc_value_out': continue
@@ -266,7 +266,7 @@ patches = get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
 def compare_with_original(seed=IntSlider(min=0, max=10000, step=1, value=0)):
     # Close out unshown queued plots
     plt.close('all')
-    venv_pair = get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
+    venv_pair = patch_utils.get_cheese_venv_pair(seed, has_cheese_tup = (False, True))
     fig, axs, info = compare_patched_vfields(venv_pair, patches, hook, render_padding=False, reuse_first=False) 
     plt.show()
 

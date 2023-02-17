@@ -58,6 +58,18 @@ def plot_pixel_dot(ax, row, col, color='r', size=50):
     pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
     ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
+def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_layer):
+    """ Given a grid position, find the channel location that corresponds to that position. """
+    # Ensure cheese_pos is valid
+    assert pos[0] >= 0 and pos[0] < maze.WORLD_DIM and pos[1] >= 0 and pos[1] < maze.WORLD_DIM, f'Invalid position: {pos}'
+
+    # Convert to pixel location
+    pixel_pos = ((pos[0] + .5) * maze.PX_PER_TILE, (pos[1] + .5) * maze.PX_PER_TILE)
+
+    px_per_channel_idx = get_stride(layer) # How many pixels per channel index
+    channel_pos = (pixel_pos[0] // px_per_channel_idx, pixel_pos[1] // px_per_channel_idx)
+    return (int(channel_pos[0]), int(channel_pos[1]))
+
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True):
     """ Visualize the environment. 
     
@@ -222,7 +234,7 @@ class ActivationsPlotter:
             col, row = self.col_slider.value, self.row_slider.value
             activations = self.activ_gen(row, col, label, self.hook, **self.act_kwargs)
         else:
-            activations = self.activ_gen(label, self.hook, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers # TODO wrong for values_from_venv -- takes venv last instead of first
+            activations = self.activ_gen(label, self.hook, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers 
 
         shap = self.hook.get_value_by_label(label).shape
         self.channel_slider.max = shap[1] - 1 if len(shap) > 2 else 0

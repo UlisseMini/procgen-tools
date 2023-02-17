@@ -49,6 +49,12 @@ def logits_to_action_plot(logits, title=''):
     prob_dist = t.stack(list(prob_dict.values()))
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
 
+def num_channels(hook : cmh.ModuleHook, layer_name : str):
+    """ Get the number of channels in the given layer. """
+    # Ensure hook has been run on dummy input
+    assert hook.get_value_by_label(layer_name) is not None, "Hook has not been run on any input"
+    return hook.get_value_by_label(layer_name).shape[1]
+
 # PATCHES
 def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.ndarray], np.ndarray]):
     """ Apply the patching function to the given channel at the given layer. """
@@ -75,9 +81,14 @@ def get_zero_patch(layer_name: str):
     """ Get a patch function that patches the activations at layer_name with 0. """
     return {layer_name: lambda outp: t.zeros_like(outp)}
 
-def get_mean_patch(values: np.ndarray, layer_name: str, channel : int = -1):
-    """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """ # TODO make it so that this doesn't require 
+def get_mean_patch(layer_name: str, values: np.ndarray = None, channel : int = -1, num_samples : int = 50):
+    """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. If values is not specified, sample num_samples random observations and use the activations at layer_name. """ 
     patch_single_channel = channel >= 0
+
+    if values is None:
+        # Get activations at this layer and channel for a randomly sampled observation
+        rand_obs = maze.get_random_obs(num_obs=num_samples, on_training=False)
+        values = hook.get_value_by_label(layer_name)
     mean_vals = reduce(t.from_numpy(values[:, channel, ...] if patch_single_channel else values), 'b ... -> ...', 'mean')
 
     if patch_single_channel:
@@ -95,10 +106,12 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
     values = hook.get_value_by_label(layer_name) # shape (batch, channels, ...)
     if patch_single_channel:
         values = values[:, channel, ...] # shape (batch, ...)
-    random_vals = values[0, ...] # Get from the first and only batch elt
+    random_vals = t.from_numpy(values[0, ...]) # Get from the first and only batch elt
 
-    patch_fn = lambda outp: random_vals # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
-
+    def patch_fn(outp): 
+        return random_vals 
+        
+    # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
     return make_channel_patch(layer_name, channel, patch_fn) if patch_single_channel else {layer_name: patch_fn}    
 
 
@@ -116,7 +129,7 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
         outp[:, ...] = new_features
         return outp
 
-    return make_channel_patch(layer_name, channel, new_corner_patch)
+    return make_channel_patch(layer_name, channel, new_corner_patch) # TODO make box activation
 
 def get_multiply_patch(layer_name : str, channel : int = -1, multiplier : float = 2):
     """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. """

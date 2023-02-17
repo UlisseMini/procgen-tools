@@ -14,7 +14,11 @@ setup() # create directory structure and download data
 
 # %% Super-long import code!
 from procgen_tools.imports import *
-from procgen_tools.procgen_imports import * # TODO doesn't let us autoreload
+
+from procgen_tools.patch_utils import * # TODO stop using import * 
+from procgen_tools.visualization import *
+from procgen_tools import vfield
+from procgen_tools.maze import *
 
 # %% Doubling c55
 @interact
@@ -36,43 +40,53 @@ def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplie
 
 # %%
 # For each seed, compute the cheese location and then find an appropriate channel patch
-def get_channel_from_grid_pos(cheese_pos : Tuple[ int, int ], layer : str = default_layer):
-    """ Given a grid position, find the channel location that corresponds to that position. """
-    # Ensure cheese_pos is valid
-    assert cheese_pos[0] >= 0 and cheese_pos[0] < maze.WORLD_DIM and cheese_pos[1] >= 0 and cheese_pos[1] < maze.WORLD_DIM, f'Invalid cheese position: {cheese_pos}'
-
-    # Convert to pixel location
-    cheese_pos = ((cheese_pos[0] + .5) * maze.PX_PER_TILE, (cheese_pos[1] + .5) * maze.PX_PER_TILE)
-
-    px_per_channel_idx = get_stride(layer) # How many pixels per channel index
-    channel_pos = (cheese_pos[0] // px_per_channel_idx, cheese_pos[1] // px_per_channel_idx)
-    return (int(channel_pos[0]), int(channel_pos[1]))
-
 @interact 
 def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=1)):
     venv = get_cheese_venv_pair(seed=seed)
     cheese_pos = get_cheese_pos_from_seed(seed)
     channel_pos = get_channel_from_grid_pos(cheese_pos, layer=default_layer)
     patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, coord=channel_pos)
-    # print(f'Cheese position: {cheese_pos}, channel position: {channel_pos} (channel 55)')
 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
-    fig.suptitle(f'Channel position: {channel_pos} (channel 55)')
+    fig.suptitle(f'Channel 55, position {channel_pos}')
     plt.show()
 
-
-    def save_fig(b):
+    def save_fig(b): # TODO make this a library call
         fig.savefig(f'playground/visualizations/c55_synthetic_seed_{seed}.png')
     button = Button(description='Save figure')
     button.on_click(save_fig)
     display(button)
-    
-# %% Random patching c55
+
+# %% Compare with patching a different channel with the same synthetic patch
 @interact
-def random_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0)):
-    """ Replace channel 55's activations with values from a randomly sampled observation. This invokes get_random_patch from patch_utils. """
+def c55_patch_transfer_channels(seed=IntSlider(min=0, max=100, step=1, value=0), channel=IntSlider(min=0, max=63, step=1, value=54)):
     venv = get_cheese_venv_pair(seed=seed)
-    patches = get_random_patch(layer_name=default_layer, hook=hook, channel=55)
+    cheese_pos = get_cheese_pos_from_seed(seed)
+    channel_pos = get_channel_from_grid_pos(cheese_pos, layer=default_layer)
+    patches = get_channel_pixel_patch(layer_name=default_layer, channel=channel, coord=channel_pos)
+    patches = get_random_patch(layer_name=default_layer, hook=hook, channel=channel) # TODO why doesn't this work?
+
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
+    fig.suptitle(f'Channel {channel}, position {channel_pos}')
+    plt.show()
+
+    def save_fig(b):
+        fig.savefig(f'playground/visualizations/c{channel}_synthetic_seed_{seed}.png')
+    button = Button(description='Save figure')
+    button.on_click(save_fig)
+    display(button)
+
+# %% Random patching c55
+channel_slider = IntSlider(min=0, max=63, step=1, value=55)
+@interact
+def random_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), layer_name=Dropdown(options=labels, value=default_layer), channel=channel_slider):
+    """ Replace channel 55's activations with values from a randomly sampled observation. This invokes get_random_patch from patch_utils. """
+    channel_slider.max = num_channels(hook, layer_name)
+    print(f'Channel slider max: {channel_slider.max}')
+    channel_slider.value = min(channel_slider.value, channel_slider.max)
+
+    venv = get_cheese_venv_pair(seed=seed)
+    patches = get_random_patch(layer_name=layer_name, hook=hook, channel=channel)
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
     plt.show()
 
