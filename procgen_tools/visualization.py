@@ -1,7 +1,9 @@
 from procgen_tools.imports import *
+from procgen_tools import maze, vfield, patch_utils
 
 NUM_ACTIONS = 15
 
+# LABEL HANDLING
 def format_label(label : str):
     """Format a label for display in the visualization."""
     return label.replace("embedder.", "")
@@ -31,6 +33,7 @@ def get_residual_num(label : str):
     # The labels are formatted as embedder.block{blocknum}.{residual_block_num}
     return int(label.split(".")[2][-1])
 
+# Navigating the feature maps
 def get_stride(label : str):
     """Get the stride of the layer referred to by label. How many pixels required to translate a single entry in the feature maps of label. """
     if not label.startswith("embedder.block"): raise ValueError(f"Not in the Impala blocks.")
@@ -39,6 +42,21 @@ def get_stride(label : str):
     if 'conv_out' in label: # Before that Impala layer's maxpool has been applied
         block_num -= 1
     return 2 ** block_num
+
+dummy_venv = patch_utils.get_cheese_venv_pair(seed=0) 
+human_view = dummy_venv.env.get_info()[0]['rgb']
+PIXEL_SIZE = human_view.shape[0] # width of the human view input image
+
+def get_pixel_loc(channel_pos : int, channel_size : int = 16):
+    assert channel_pos < channel_size, f"channel_pos {channel_pos} must be less than channel_size {channel_size}"
+    assert channel_pos >= 0, f"channel_pos {channel_pos} must be non-negative"
+
+    scale = PIXEL_SIZE // channel_size
+    return scale * channel_pos + scale // 2
+
+def plot_pixel_dot(ax, row, col, color='r', size=50):
+    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
+    ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True):
     """ Visualize the environment. 
@@ -69,7 +87,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     if show_plot:
         plt.show() 
 
-def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 3, callback : Callable = None):
+def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
@@ -81,9 +99,9 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
     def update_plot():
         # Clear the existing plot
         with output:
-            vfield = vector_field(venv, policy)
+            vf = vfield.vector_field(venv, policy)
             ax.clear()
-            plot_vf(vfield, ax=ax)
+            vfield.plot_vf(vf, ax=ax)
 
             # Update the existing figure in place 
             clear_output(wait=True)
