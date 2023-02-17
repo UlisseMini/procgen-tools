@@ -14,7 +14,6 @@ from procgen_tools.utils import setup
 setup() # create directory structure and download data 
 
 # %%
-
 from procgen_tools.imports import *
 from procgen_tools.procgen_imports import *
 # %% Intervene on channel 55 of default_layer, setting its value manually 

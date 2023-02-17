@@ -163,16 +163,16 @@ def patch_layer(hook, values, coeff:float, layer_name: str, venv, seed_str: str 
 
 # %% 
 # Infrastructure for running different kinds of seeds
-def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, layer_name: str):
+def values_from_venv(layer_name: str, hook: cmh.ModuleHook, venv: ProcgenGym3Env):
     """ Get the values of the activations at the layer for the given venv. """
-    obs = venv.reset().astype(np.float32) # TODO why reset?
+    obs = venv.reset().astype(np.float32) 
     hook.run_with_input(obs, func=forward_func_policy)
     return hook.get_value_by_label(layer_name)
 
-def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook):
+def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook): # TODO rename to cheese_ablation_values ?
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
     venv = get_cheese_venv_pair(seed) 
-    return values_from_venv(venv, hook, layer_name)
+    return values_from_venv(layer_name, hook, venv)
 
 def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, layer_name='embedder.block2.res1.resadd_out', steps:int=150, render_padding : bool = False):
     """ Run a single seed, with the given hook and diff_coeffs. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 

@@ -18,7 +18,7 @@ from procgen_tools.procgen_imports import * # TODO doesn't let us autoreload
 
 # %% Doubling c55
 @interact
-def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplier=FloatSlider(min=-15, max=15, step=0.1, value=2)):
+def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
     venv = get_cheese_venv_pair(seed=seed)
     patches = get_multiply_patch(layer_name=default_layer, channel=55, multiplier=multiplier)
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)

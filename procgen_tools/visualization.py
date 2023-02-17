@@ -126,6 +126,27 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
 
     return widget_vbox
 
+### Activation management
+def get_activations(obs : np.ndarray, hook: cmh.ModuleHook, layer_name: str):
+    hook.run_with_input(obs) # Run the model with the given obs
+    return hook.get_value_by_label(layer_name) # Shape is (b, c, h, w) at conv layers, (b, activations) at linear layers
+
+### Plotters
+def plot_activations(activations: np.ndarray, fig: go.FigureWidget):
+    """ Plot the activations given a single (non-batched) activation tensor. """
+    fig.update(data=[go.Heatmap(z=activations)])
+
+def plot_nonzero_activations(activations: np.ndarray, fig: go.FigureWidget): 
+    """ Plot the nonzero activations in a heatmap. """
+    # Find nonzero activations and cast to floats
+    nz = (activations != 0).astype(np.float32)
+    fig.update(data=[go.Heatmap(z=nz)])
+
+def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
+    """ Plot the nonzero activation diffs in a heatmap. """
+    diffs = activations[0] - activations[1]
+    plot_nonzero_activations(diffs, fig)
+
 class ActivationsPlotter:
     def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, **act_kwargs):
         """
@@ -198,9 +219,9 @@ class ActivationsPlotter:
         self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
         if self.coords_enabled:
             col, row = self.col_slider.value, self.row_slider.value
-            activations = self.activ_gen(row, col, label, **self.act_kwargs)
+            activations = self.activ_gen(row, col, label, self.hook, **self.act_kwargs)
         else:
-            activations = self.activ_gen(label, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers
+            activations = self.activ_gen(label, self.hook, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers # TODO wrong for values_from_venv -- takes venv last instead of first
 
         shap = self.hook.get_value_by_label(label).shape
         self.channel_slider.max = shap[1] - 1 if len(shap) > 2 else 0
