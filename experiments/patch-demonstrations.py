@@ -8,21 +8,88 @@ try:
     import procgen_tools
 except ImportError or ModuleNotFoundError:
     get_ipython().run_line_magic(magic_name='pip', line='install -U git+https://github.com/ulissemini/procgen-tools')
-  
+
 from procgen_tools.utils import setup
 
 setup() # create directory structure and download data 
 
+# %%
 
-from procgen_tools.imports import *
-from procgen_tools.procgen_imports import *
+# from procgen_tools.imports import *
+# from procgen_tools.procgen_imports import *
+# %%
+from collections import defaultdict
+import pickle
 
-# %% Intervene on channel 55 of main_label, setting its value manually 
+import numpy as np
+import pandas as pd
+import torch as t
+import math 
+
+import plotly.express as px
+import plotly as py
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from tqdm import tqdm
+from einops import *
+from IPython.display import *
+from ipywidgets import *
+from ipywidgets import interact
+import itertools
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 140
+
+import circrl.module_hook as cmh
+import circrl.rollouts as cro
+
+import procgen_tools.models as models
+from procgen import ProcgenGym3Env
+
+import os, sys
+from glob import glob
+from pathlib import Path
+
+from ipywidgets import Text # Import this later because otherwise Text gets cast as str?
+
+RAND_REGION = 5
+NUM_ACTIONS = 15
+try:
+  get_ipython()
+  in_jupyter = True
+except NameError:
+  in_jupyter = False
+PATH_PREFIX = '../' if in_jupyter else ''
+
+# Load model
+model_stub = f'trained_models/maze_I/model_rand_region_{RAND_REGION}.pth'
+try:
+  model_path = PATH_PREFIX + model_stub
+  policy = models.load_policy(model_path, NUM_ACTIONS, t.device('cpu'))
+except FileNotFoundError:
+  policy = models.load_policy(model_stub, NUM_ACTIONS, t.device('cpu'))
+  
+hook = cmh.ModuleHook(policy)
+
+# Useful general variables
+default_layer = 'embedder.block2.res1.resadd_out'
+hook.run_with_input(np.zeros((1,3, 64, 64), dtype=np.float32))
+labels = list(hook.values_by_label.keys()) # all labels in the model
+if '_out' in labels: labels.remove('_out')
+
+from procgen_tools.patch_utils import *
+from procgen_tools.visualization import *
+from procgen_tools import vfield
+import procgen_tools.vfield_stats as vs
+from procgen_tools.maze import *
+
+# %% Intervene on channel 55 of default_layer, setting its value manually 
 
 @interact
 def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = get_cheese_venv_pair(seed=seed)
-    patches = channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col)) 
+    patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, value=value, coord=(row, col)) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
     # Draw a red pixel at the location of the patch
@@ -46,7 +113,7 @@ def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
     top_coords = []
     for row in range(16):
         for col in range(16):
-            patches = get_channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+            patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, value=value, coord=(row, col))
             with hook.use_patches(patches):
                 patched_vf = vfield.vector_field(venv1, hook.network)
             diff = vfield.get_vf_diff(original_vf, patched_vf)
@@ -62,7 +129,7 @@ def visualize_top_k_patches(seed : int, value : float = 5.6, top_k : int = 5):
     venv1 = copy_venv(venv, 0)
     # Use compare_vector_fields for each patch
     for i, (row, col) in enumerate(coords):
-        patches = get_channel_pixel_patch(label=main_label, channel=55, value=value, coord=(row, col))
+        patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, value=value, coord=(row, col))
         fig, axs, info = compare_patched_vfields(venv1, patches, hook)
         fig.suptitle(f'Seed {seed}, patch {i+1}/{top_k} at ({row}, {col})')
         for idx in (1,2): 
@@ -78,8 +145,8 @@ for seed in (0, 4, 5): # TODO this is sooo slow
 # %% Sanity-check that the patching performance is not changed at the original square
 for seed in range(5):
     cheese_pair = get_cheese_venv_pair(seed=seed, has_cheese_tup=(False, True))
-    values = cheese_diff_values(seed, main_label, hook)
-    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
+    values = cheese_diff_values(seed, default_layer, hook)
+    patches = get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
 
     original_vfield = vfield.vector_field(copy_venv(cheese_pair, 0), hook.network)
     with hook.use_patches(patches):
@@ -99,14 +166,14 @@ for seed in range(5):
 """
 @interact
 def interactive_patching(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1)):
-    fig, _, _ = plot_patched_vfields(seed, coeff, main_label, hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, default_layer, hook)
     plt.show()
 
 # %% Patching from a fixed seed
 """ Let's see what happens when we patch the network from a fixed seed. We'll compare the vector field for the original and patched networks.
 """
 value_seed = 0
-values_tup = cheese_diff_values(value_seed, main_label, hook), value_seed
+values_tup = cheese_diff_values(value_seed, default_layer, hook), value_seed
 for seed in range(10):  
     run_seed(seed, hook, [-1], values_tup=values_tup)
 
@@ -114,7 +181,7 @@ for seed in range(10):
 seeds = slice(int(10e5),int(10e5+19))
 last_labels = ['embedder.block3.res2.conv2_out', 'embedder.block3.res2.resadd_out', 'embedder.relu3_out', 'embedder.flatten_out', 'embedder.fc_out', 'embedder.relufc_out']
 @interact
-def interactive_patching(target_seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-2, max=2, step=0.1, value=-1), label=Dropdown(options=last_labels, value=last_labels[0])):
+def interactive_patching(target_seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-2, max=2, step=0.1, value=-1), layer_name=Dropdown(options=last_labels, value=last_labels[0])):
     values = np.zeros_like(cheese_diff_values(0, label, hook))
     for seed in range(seeds.start, seeds.stop):
         # Make values be rolling average of values from seeds
@@ -130,15 +197,15 @@ for mode in ['random', 'cheese']:
     vectors = []
     for value_seed in range(100):
         if mode == 'random':
-            vectors.append(np.random.randn(*cheese_diff_values(0, main_label, hook).shape, ) * rand_magnitude)
+            vectors.append(np.random.randn(*cheese_diff_values(0, default_layer, hook).shape, ) * rand_magnitude)
         else:
-            vectors.append(cheese_diff_values(value_seed, main_label, hook))
+            vectors.append(cheese_diff_values(value_seed, default_layer, hook))
         
     norms = [np.linalg.norm(v) for v in vectors]
     print(f'For {mode}-vectors, the norm is {np.mean(norms):.2f} with std {np.std(norms):.2f}. Max absolute-value difference of {np.max(np.abs(vectors)):.2f}.')
 
 # %% Run the patches
-values = np.random.randn(*cheese_diff_values(0, main_label, hook).shape) * rand_magnitude
+values = np.random.randn(*cheese_diff_values(0, default_layer, hook).shape) * rand_magnitude
 # Cast this to float32
 values = values.astype(np.float32)
 print(np.max(values).max())
@@ -151,7 +218,7 @@ for seed in range(5):
 @interact
 def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdown(options=labels, value='embedder.block2.res1.conv2_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
-    patches = get_zero_patch(label=zero_target)
+    patches = get_zero_patch(layer_name=zero_target)
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
     # title the fig with label
     fig.suptitle(zero_target)
@@ -161,11 +228,11 @@ def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdo
 obs = maze.get_random_obs(50, spawn_cheese=False)
 
 @interact 
-def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
+def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), layer_name=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
     hook.run_with_input(obs)
     random_values = hook.get_value_by_label(label)
-    patches = get_mean_patch(random_values, label=label) 
+    patches = get_mean_patch(random_values, layer_name=label) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
     # title the fig with label
     fig.suptitle(f'Mean patching layer {label}')
@@ -178,7 +245,7 @@ def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), label=Dropdown(o
 """ We chose the layer block2.res1.resadd_out because it seemed to have a strong effect on the vector field. Let's see what happens when we patch other layers. """
 
 @interact
-def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), label=Dropdown(options=labels)):
+def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), layer_name=Dropdown(options=labels)):
     fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
     plt.show()    
     print(f'Patching {label} layer')
@@ -191,7 +258,7 @@ def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatS
     for label in labels:
         if label == 'fc_value_out': continue
         values = values_from_venv(venv, hook, label)
-        patches.update(get_values_diff_patch(values=values, coeff=coeff, label=label))
+        patches.update(get_values_diff_patch(values=values, coeff=coeff, layer_name=label))
         
     fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
@@ -228,8 +295,8 @@ def test_transfer(patches : dict, source_seed : int = 0, col_translation : int =
 """ Most levels don't have cheese in the same spot. Let's try a synthetic transfer, where we find levels with an open spot at the appropriate location, and then move the cheese there. """
 @interact
 def test_synthetic_transfer(source_seed=IntSlider(min=0, max=20, step=1, value=0), col_translation=IntSlider(min=-5, max=5, step=1, value=0), row_translation=IntSlider(min=-5, max=5, step=1, value=0), target_index=IntSlider(min=0, max=GENERATE_NUM-1, step=1, value=0)):
-    values = cheese_diff_values(source_seed, main_label, hook)
-    patches = get_values_diff_patch(values, coeff=-1, label=main_label)
+    values = cheese_diff_values(source_seed, default_layer, hook)
+    patches = get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
     test_transfer(patches, source_seed, col_translation, row_translation, target_index, skip_seed=source_seed)
 
 # %% Try generating two disjoint patches and combining both
@@ -249,10 +316,10 @@ patch_lst = []
 source_seeds = (0, 2) # TODO just get small 5x5 covering?
 # First 50 works horribly
 for seed in source_seeds:
-    values = cheese_diff_values(seed, main_label, hook)
+    values = cheese_diff_values(seed, default_layer, hook)
     location = maze.get_cheese_pos_from_seed(seed)
     print(f'Cheese location for seed {seed}: {location}.')
-    patch_lst.append(get_values_diff_patch(values, coeff=-1, label=main_label))
+    patch_lst.append(get_values_diff_patch(values, coeff=-1, layer_name=default_layer))
 combined_patch = combine_patches(patch_lst)
 
 @interact
@@ -260,8 +327,8 @@ def test_multiple_transfer(source_seed=Dropdown(options=source_seeds), target_in
     test_transfer(combined_patch, source_seed=source_seed, target_index=target_index)
 
 # %% See if the cheese patch blinds the agent
-values = cheese_diff_values(0, main_label, hook)
-patches = get_values_diff_patch(values, coeff=-1, label=main_label)
+values = cheese_diff_values(0, default_layer, hook)
+patches = get_values_diff_patch(values, coeff=-1, layer_name=default_layer)
 
 @interact 
 def compare_with_original(seed=IntSlider(min=0, max=10000, step=1, value=0)):
