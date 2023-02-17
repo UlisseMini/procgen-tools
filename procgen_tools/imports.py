@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 plt.rcParams['figure.dpi'] = 140
 
 from procgen_tools.utils import setup
+import procgen_tools.models as models
 
 setup() # create directory structure and download data 
 

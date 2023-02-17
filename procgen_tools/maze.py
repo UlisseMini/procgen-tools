@@ -1063,14 +1063,18 @@ def get_random_obs_opts(
             # decision square requirement, if any
             #print(mr, mc)
             #print(legal_mouse_positions)
-            if must_be_dec_square:
+            if must_be_dec_square or return_metadata:
                 graph = maze_grid_to_graph(inner_grid)
                 mr_inner, mc_inner = mr - padding, mc - padding
                 path_to_cheese = get_path_to_cheese(inner_grid, graph, (mr_inner, mc_inner))
                 path_to_corner = get_path_to_corner(inner_grid, graph, (mr_inner, mc_inner))
+                def path_step_inner_to_outer(path):
+                    return (path[1][0] + padding, path[1][1] + padding) if len(path) > 1 \
+                        else (mr, mc)
+                next_pos_cheese_outer = path_step_inner_to_outer(path_to_cheese)
+                next_pos_corner_outer = path_step_inner_to_outer(path_to_corner)
                 #print(path_to_cheese[1], path_to_corner[1])
-                if len(path_to_cheese) < 2 or len(path_to_corner) < 2 or \
-                        path_to_cheese[1] == path_to_corner[1]:
+                if must_be_dec_square and (next_pos_cheese_outer == next_pos_corner_outer):
                     continue
 
             # If we get here, we're ready to use this state
@@ -1079,6 +1083,8 @@ def get_random_obs_opts(
                 level_seed = this_level,
                 mouse_pos_outer = (mr, mc),
                 cheese_pos_outer = cheese_pos_outer_this,
+                next_pos_cheese_outer = next_pos_cheese_outer,
+                next_pos_corner_outer = next_pos_corner_outer,
                 maze_dim = maze_dim_this,
             ))
 
@@ -1087,7 +1093,7 @@ def get_random_obs_opts(
     venvs = create_venv(num_obs, start_level=0, num_levels=0)
     venvs.env.callmethod('set_state', state_bytes_list)
     if return_metadata:
-        return venvs.reset().astype(np.float32), metadata_list
+        return venvs.reset().astype(np.float32), metadata_list, metadata_list[-1]['level_seed']+1
     else:
         return venvs.reset().astype(np.float32)
 
