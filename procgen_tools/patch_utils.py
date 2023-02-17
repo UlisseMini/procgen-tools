@@ -50,10 +50,12 @@ def logits_to_action_plot(logits, title=''):
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
 
 # PATCHES
-# TODO reframe from "layer_name" to "layer"?
 def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.ndarray], np.ndarray]):
     """ Apply the patching function to the given channel at the given layer. """
-    return {layer_name: lambda outp: t.zeros_like(outp[:, channel, ...])}
+    def patch_fn_channel(outp : np.ndarray):
+        outp[:, channel, ...] = patch_fn(outp[:, channel, ...])
+        return outp
+    return {layer_name: patch_fn_channel}
 
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
     """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). TODO generalize """
@@ -74,10 +76,7 @@ def get_mean_patch(values: np.ndarray, layer_name: str, channel : int = -1):
     if channel >= 0:
         values = values[:, channel, ...]
         mean_vals = reduce(t.from_numpy(values), 'b h w -> h w', 'mean')
-        def mean_patch(outp): # TODO check this works
-            outp[:, channel, ...] = mean_vals
-            return outp
-        return {layer_name: mean_patch}
+        return make_channel_patch(layer_name, channel, lambda outp: mean_vals) # TODO check this works
     else:
         # Take mean across batch dimension using reduce, then broadcast to match shape of activations
         mean_vals = reduce(t.from_numpy(values), 'b ... -> ...', 'mean')
@@ -91,17 +90,20 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
     assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
 
     default = -.2
-    def corner_patch(outp):
-        new_features = t.ones_like(outp[0, channel, ...]) * default
-
-        assert new_features.shape[0] == new_features.shape[1], "Assumes square"
-        midway = new_features.shape[0] // 2 
-        new_features[coord] = value
-        new_features[coord[0]+1, coord[1]] = value
+    # def corner_patch(outp):
+    #     new_features = t.ones_like(outp[0, channel, ...]) * default
+    #     new_features[coord] = value
         
-        outp[:, channel, ...] = new_features
+    #     outp[:, channel, ...] = new_features
+    #     return outp
+    def new_corner_patch(outp): # Use make_channel_patch as a helper
+        """ outp has shape (batch, ...) -- without a channel dimension. """
+        new_features = t.ones_like(outp[0, ...]) * default
+        new_features[coord] = value
+        outp[:, ...] = new_features
         return outp
-    return {layer_name: corner_patch}
+
+    return make_channel_patch(layer_name, channel, new_corner_patch)
 
 def get_multiply_patch(layer_name : str):
     pass 
