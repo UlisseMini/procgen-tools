@@ -63,7 +63,8 @@ def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=1)):
 
 
     def save_fig(b):
-        fig.savefig(f'visualizations/c55_synthetic_seed_{seed}.png')
+        print(os.getcwd())
+        fig.savefig(f'playground/visualizations/c55_synthetic_seed_{seed}.png')
     button = Button(description='Save figure')
     button.on_click(save_fig)
     display(button)

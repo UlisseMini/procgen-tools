@@ -58,7 +58,7 @@ def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.
     return {layer_name: patch_fn_channel}
 
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
-    """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). TODO generalize """
+    """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). """
     cheese = values[0,...]
     no_cheese = values[1,...]
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
@@ -72,16 +72,31 @@ def get_zero_patch(layer_name: str):
     return {layer_name: lambda outp: t.zeros_like(outp)}
 
 def get_mean_patch(values: np.ndarray, layer_name: str, channel : int = -1):
-    """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """
-    if channel >= 0:
-        values = values[:, channel, ...]
-        mean_vals = reduce(t.from_numpy(values), 'b h w -> h w', 'mean')
+    """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """ # TODO make it so that this doesn't require 
+    patch_single_channel = channel >= 0
+    mean_vals = reduce(t.from_numpy(values[:, channel, ...] if patch_single_channel else values), 'b ... -> ...', 'mean')
+
+    if patch_single_channel:
         return make_channel_patch(layer_name, channel, lambda outp: mean_vals) # TODO check this works
-    else:
-        # Take mean across batch dimension using reduce, then broadcast to match shape of activations
-        mean_vals = reduce(t.from_numpy(values), 'b ... -> ...', 'mean')
-        # Ensure that the batch dimension has same size
+    else: # Ensure that the batch dimension has same size 
         return {layer_name: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
+
+def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1):
+    """ Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. """
+    patch_single_channel = channel >= 0
+    
+    # Get activations at this layer and channel for a randomly sampled observation
+    rand_obs = maze.get_random_obs_opts(num_obs=1, on_training=False)
+    hook.run_with_input(obs, func=forward_func_policy)
+    values = hook.get_value_by_label(layer_name) # shape (batch, channels, ...)
+    if patch_single_channel:
+        values = values[:, channel, ...] # shape (batch, ...)
+    random_vals = values[0, ...] # Get from the first and only batch elt
+
+    patch_fn = lambda outp: random_vals # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
+
+    return make_channel_patch(layer_name, channel, patch_fn) if patch_single_channel else {layer_name: patch_fn}    
+
 
 def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. """
@@ -105,10 +120,6 @@ def get_multiply_patch(layer_name : str, channel : int = -1, multiplier : float 
         return make_channel_patch(layer_name, channel, lambda outp: outp * multiplier)
     else:
         return {layer_name: lambda outp: outp * multiplier}
-    
-
-# TODO combine patches by composing them? 
-
 
 def patch_layer(hook, values, coeff:float, layer_name: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
