@@ -15,75 +15,8 @@ setup() # create directory structure and download data
 
 # %%
 
-# from procgen_tools.imports import *
-# from procgen_tools.procgen_imports import *
-# %%
-from collections import defaultdict
-import pickle
-
-import numpy as np
-import pandas as pd
-import torch as t
-import math 
-
-import plotly.express as px
-import plotly as py
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
-from tqdm import tqdm
-from einops import *
-from IPython.display import *
-from ipywidgets import *
-from ipywidgets import interact
-import itertools
-from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-import matplotlib.pyplot as plt
-plt.rcParams['figure.dpi'] = 140
-
-import circrl.module_hook as cmh
-import circrl.rollouts as cro
-
-import procgen_tools.models as models
-from procgen import ProcgenGym3Env
-
-import os, sys
-from glob import glob
-from pathlib import Path
-
-from ipywidgets import Text # Import this later because otherwise Text gets cast as str?
-
-RAND_REGION = 5
-NUM_ACTIONS = 15
-try:
-  get_ipython()
-  in_jupyter = True
-except NameError:
-  in_jupyter = False
-PATH_PREFIX = '../' if in_jupyter else ''
-
-# Load model
-model_stub = f'trained_models/maze_I/model_rand_region_{RAND_REGION}.pth'
-try:
-  model_path = PATH_PREFIX + model_stub
-  policy = models.load_policy(model_path, NUM_ACTIONS, t.device('cpu'))
-except FileNotFoundError:
-  policy = models.load_policy(model_stub, NUM_ACTIONS, t.device('cpu'))
-  
-hook = cmh.ModuleHook(policy)
-
-# Useful general variables
-default_layer = 'embedder.block2.res1.resadd_out'
-hook.run_with_input(np.zeros((1,3, 64, 64), dtype=np.float32))
-labels = list(hook.values_by_label.keys()) # all labels in the model
-if '_out' in labels: labels.remove('_out')
-
-from procgen_tools.patch_utils import *
-from procgen_tools.visualization import *
-from procgen_tools import vfield
-import procgen_tools.vfield_stats as vs
-from procgen_tools.maze import *
-
+from procgen_tools.imports import *
+from procgen_tools.procgen_imports import *
 # %% Intervene on channel 55 of default_layer, setting its value manually 
 
 @interact
@@ -182,12 +115,12 @@ seeds = slice(int(10e5),int(10e5+19))
 last_labels = ['embedder.block3.res2.conv2_out', 'embedder.block3.res2.resadd_out', 'embedder.relu3_out', 'embedder.flatten_out', 'embedder.fc_out', 'embedder.relufc_out']
 @interact
 def interactive_patching(target_seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-2, max=2, step=0.1, value=-1), layer_name=Dropdown(options=last_labels, value=last_labels[0])):
-    values = np.zeros_like(cheese_diff_values(0, label, hook))
+    values = np.zeros_like(cheese_diff_values(0, layer_name, hook))
     for seed in range(seeds.start, seeds.stop):
         # Make values be rolling average of values from seeds
-        values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, label, hook)/(seed-seeds.start+1)
+        values = (seed-seeds.start)/(seed-seeds.start+1)*values + cheese_diff_values(seed, layer_name, hook)/(seed-seeds.start+1)
 
-    fig, _, _ = plot_patched_vfields(target_seed, coeff, label, hook, values=values)
+    fig, _, _ = plot_patched_vfields(target_seed, coeff, layer_name, hook, values=values)
     plt.show()
 
 # %% Patching with a random vector 
@@ -220,7 +153,7 @@ def run_label(seed=IntSlider(min=0, max=20, step=1, value=0), zero_target=Dropdo
     venv = create_venv(num=1, start_level=seed, num_levels=1)
     patches = get_zero_patch(layer_name=zero_target)
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
-    # title the fig with label
+    # title the fig with layer
     fig.suptitle(zero_target)
     plt.show()
 
@@ -231,11 +164,11 @@ obs = maze.get_random_obs(50, spawn_cheese=False)
 def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), layer_name=Dropdown(options=labels, value='embedder.block3.res2.resadd_out')):
     venv = create_venv(num=1, start_level=seed, num_levels=1)
     hook.run_with_input(obs)
-    random_values = hook.get_value_by_label(label)
-    patches = get_mean_patch(random_values, layer_name=label) 
+    random_values = hook.get_value_by_label(layer_name)
+    patches = get_mean_patch(random_values, layer_name=layer_name) 
     fig, axs, info = compare_patched_vfields(venv, patches, hook, ax_size=5)
-    # title the fig with label
-    fig.suptitle(f'Mean patching layer {label}')
+    # title the fig with layer_name
+    fig.suptitle(f'Mean patching layer {layer_name}')
     # Ensure the title is close to the plots
     fig.subplots_adjust(top=1.05)
     plt.show() 
@@ -246,19 +179,19 @@ def mean_ablate(seed=IntSlider(min=0, max=20, step=1, value=0), layer_name=Dropd
 
 @interact
 def run_all_labels(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-3, max=3, step=0.1, value=-1), layer_name=Dropdown(options=labels)):
-    fig, _, _ = plot_patched_vfields(seed, coeff, label, hook)
+    fig, _, _ = plot_patched_vfields(seed, coeff, layer_name, hook)
     plt.show()    
-    print(f'Patching {label} layer')
+    print(f'Patching {layer_name} layer')
 
 # %% Try all patches at once 
 @interact 
 def run_all_patches(seed=IntSlider(min=0, max=20, step=1, value=0), coeff=FloatSlider(min=-1, max=1, step=0.025, value=-.05)):
     venv = get_cheese_venv_pair(seed) 
     patches = {}
-    for label in labels:
-        if label == 'fc_value_out': continue
-        values = values_from_venv(venv, hook, label)
-        patches.update(get_values_diff_patch(values=values, coeff=coeff, layer_name=label))
+    for layer_name in labels:
+        if layer_name == 'fc_value_out': continue
+        values = values_from_venv(venv, hook, layer_name)
+        patches.update(get_values_diff_patch(values=values, coeff=coeff, layer_name=layer_name))
         
     fig, _, _ = compare_patched_vfields(venv, patches, hook)
     plt.show()
