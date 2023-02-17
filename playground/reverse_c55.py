@@ -34,7 +34,6 @@ def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplie
 # %% [markdown]
 # Let's see whether the c55 synthetic patch reproduces behavior in the unpatched model. 
 
-
 # %%
 # For each seed, compute the cheese location and then find an appropriate channel patch
 def get_channel_from_grid_pos(cheese_pos : Tuple[ int, int ], layer : str = default_layer):
@@ -63,9 +62,24 @@ def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=1)):
 
 
     def save_fig(b):
-        print(os.getcwd())
         fig.savefig(f'playground/visualizations/c55_synthetic_seed_{seed}.png')
     button = Button(description='Save figure')
     button.on_click(save_fig)
     display(button)
+    
+# %% Random patching c55
+@interact
+def random_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0)):
+    """ Replace channel 55's activations with values from a randomly sampled observation. This invokes get_random_patch from patch_utils. """
+    venv = get_cheese_venv_pair(seed=seed)
+    patches = get_random_patch(layer_name=default_layer, hook=hook, channel=55)
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
+    plt.show()
+
+    def save_fig(b):
+        fig.savefig(f'playground/visualizations/c55_random_seed_{seed}.png')
+    button = Button(description='Save figure')
+    button.on_click(save_fig)
+    display(button)
+
 # %%

@@ -200,12 +200,13 @@ class ActivationsPlotter:
 
     def save_image(self, b): # Add a save button to save the image
         basename = self.filename_widget.value if self.filename_widget.value != "" else f"{self.label_widget.value}_{self.channel_slider.value}{f'_{self.col_slider.value}_{self.row_slider.value}' if self.coords_enabled else ''}"
-        filepath = f"{PATH_PREFIX}experiments/visualizations/{basename}.png"
+        filepath = f"experiments/visualizations/{basename}.png" # NOTE For some reason, PATH_PREFIX isn't necessary? Unsure why
 
         # Annotate to the outside of the plot
         old_title = self.fig.layout.title
         self.fig.layout.title = f"{self.label_widget.value};\nchannel {self.channel_slider.value}{f' at ({self.col_slider.value}, {self.row_slider.value})' if self.coords_enabled else ''}"
 
+        self.fig.update_yaxes(autorange="reversed") 
         self.fig.write_image(filepath)
         print(f"Saved image to {filepath}")
 
@@ -216,7 +217,7 @@ class ActivationsPlotter:
     def update_plotter(self, b=None):
         """ Update the plot with the current values of the widgets. """
         label = expand_label(self.label_widget.value)        
-        self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
+
         if self.coords_enabled:
             col, row = self.col_slider.value, self.row_slider.value
             activations = self.activ_gen(row, col, label, self.hook, **self.act_kwargs)
@@ -239,8 +240,16 @@ class ActivationsPlotter:
             else:
                 activations = np.expand_dims(activations, axis=(1,2)) # Add a dummy dimension to the activations
 
+        self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
+        self.format_fig(activations)
 
-        if label == 'fc_policy_out':
+
+    def format_fig(self, activations : np.ndarray):
+        """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. """
+        self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
+        self.fig.update_xaxes(side="top")        
+        
+        if self.label_widget.value == 'fc_policy_out':
             # Transform each index into the corresponding action label, according to maze.py 
             self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
         else: # Reset the x-axis ticks to match the y-axis ticks
@@ -248,14 +257,12 @@ class ActivationsPlotter:
             self.fig.update_xaxes(ticktext=yaxis_ticktext, tickvals=yaxis_tickvals)
 
         self.fig.update_xaxes(side="top") # Set the x ticks to the top
-        self.fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange
+        self.fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange        
         
-
-        self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
-
         # Set the min and max to be the min and max of all channels at this label
         bounds = np.abs(activations).max()
         self.fig.update_traces(zmin=-1 * bounds, zmid=0, zmax=bounds)    
         
         # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
         self.fig.update_traces(colorscale='RdBu')
+    

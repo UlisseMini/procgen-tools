@@ -53,7 +53,11 @@ def logits_to_action_plot(logits, title=''):
 def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.ndarray], np.ndarray]):
     """ Apply the patching function to the given channel at the given layer. """
     def patch_fn_channel(outp : np.ndarray):
-        outp[:, channel, ...] = patch_fn(outp[:, channel, ...])
+        new_out = patch_fn(outp[:, channel, ...])
+        # Cast to t.tensor if new_out is np.ndarray TODO check why necessary
+        if isinstance(new_out, np.ndarray):
+            new_out = t.from_numpy(new_out)
+        outp[:, channel, ...] = new_out
         return outp
     return {layer_name: patch_fn_channel}
 
@@ -86,8 +90,8 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
     patch_single_channel = channel >= 0
     
     # Get activations at this layer and channel for a randomly sampled observation
-    rand_obs = maze.get_random_obs_opts(num_obs=1, on_training=False)
-    hook.run_with_input(obs, func=forward_func_policy)
+    rand_obs = maze.get_random_obs(num_obs=1, on_training=False) # TODO switch to "opts"
+    hook.run_with_input(rand_obs, func=forward_func_policy)
     values = hook.get_value_by_label(layer_name) # shape (batch, channels, ...)
     if patch_single_channel:
         values = values[:, channel, ...] # shape (batch, ...)
