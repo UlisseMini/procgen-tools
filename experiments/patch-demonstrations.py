@@ -3,24 +3,21 @@
 %autoreload 2
 
 # %%
+# Install procgen tools if needed
+try:
+    import procgen_tools
+except ImportError or ModuleNotFoundError:
+    get_ipython().run_line_magic(magic_name='pip', line='install -U git+https://github.com/ulissemini/procgen-tools')
+  
+from procgen_tools.utils import setup
+
+setup() # create directory structure and download data 
+
+
 from procgen_tools.imports import *
 from procgen_tools.procgen_imports import *
 
 # %% Intervene on channel 55 of main_label, setting its value manually 
-dummy_venv = get_cheese_venv_pair(seed=0) # TODO put these in visualization.py
-human_view = dummy_venv.env.get_info()[0]['rgb']
-PIXEL_SIZE = human_view.shape[0] # width of the human view input image
-
-def get_pixel_loc(channel_pos : int, channel_size : int = 16):
-    assert channel_pos < channel_size, f"channel_pos {channel_pos} must be less than channel_size {channel_size}"
-    assert channel_pos >= 0, f"channel_pos {channel_pos} must be non-negative"
-
-    scale = PIXEL_SIZE // channel_size
-    return scale * channel_pos + scale // 2
-
-def plot_pixel_dot(ax, row, col, color='r', size=50):
-    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
-    ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
 @interact
 def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):

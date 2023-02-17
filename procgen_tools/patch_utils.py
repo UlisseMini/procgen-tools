@@ -1,8 +1,10 @@
 from procgen_tools.imports import * 
+import procgen_tools.maze as maze
+import procgen_tools.vfield as vfield
 
 def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
     "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
-    venv = create_venv(num=2, start_level=seed, num_levels=1)
+    venv = maze.create_venv(num=2, start_level=seed, num_levels=1)
 
     for idx in range(2):
         if has_cheese_tup[idx]: continue # Skip if we want cheese in this environment
@@ -12,13 +14,13 @@ def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, 
 
 def get_custom_venv_pair(seed: int, num_envs=2):
     """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
-    venv = create_venv(num=num_envs, start_level=seed, num_levels=1)
+    venv = maze.create_venv(num=num_envs, start_level=seed, num_levels=1)
     display(HBox(maze.venv_editor(venv, check_on_dist=False)))
     return venv
 
 def load_venv_pair(path: str):
     """ Load a venv pair from a file. """
-    venv = create_venv(num=2, start_level=1, num_levels=1)
+    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
     with open(path_prefix + path, 'rb') as f:
         state_bytes = pkl.load(f) 
     venv.env.callmethod('set_state', state_bytes)
@@ -47,37 +49,43 @@ def logits_to_action_plot(logits, title=''):
     prob_dist = t.stack(list(prob_dict.values()))
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
 
-def get_values_diff_patch(values: np.ndarray, coeff: float, label: str):
-    """ Get a patch function that patches the activations at label with coeff*(values[0, ...] - values[1, ...]). TODO generalize """
+# PATCHES
+# TODO reframe from "layer_name" to "layer"?
+def make_channel_patch(layer_name : str, channel : int, patch_fn : Callable[[np.ndarray], np.ndarray]):
+    """ Apply the patching function to the given channel at the given layer. """
+    return {layer_name: lambda outp: t.zeros_like(outp[:, channel, ...])}
+
+def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
+    """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). TODO generalize """
     cheese = values[0,...]
     no_cheese = values[1,...]
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
-    cheese_diff = cheese - no_cheese # Add this to activation_label's activations during forward passes
-    return {label: lambda outp: outp + coeff*cheese_diff} # can't pickle
-    # return {label: cmh.PatchDef(value=coeff*cheese_diff, mask=np.array(True))} # can pickle
+    cheese_diff = cheese - no_cheese # Add this to activations during forward passes
+    return {layer_name: lambda outp: outp + coeff*cheese_diff} # can't pickle
+    # return {layer_name: cmh.PatchDef(value=coeff*cheese_diff, mask=np.array(True))} # can pickle
 
-def get_zero_patch(label: str):
-    """ Get a patch function that patches the activations at label with 0. """
-    return {label: lambda outp: t.zeros_like(outp)}
+def get_zero_patch(layer_name: str):
+    """ Get a patch function that patches the activations at layer_name with 0. """
+    return {layer_name: lambda outp: t.zeros_like(outp)}
 
-def get_mean_patch(values: np.ndarray, label: str, channel : int = -1):
-    """ Get a patch that replaces the activations at label with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """
+def get_mean_patch(values: np.ndarray, layer_name: str, channel : int = -1):
+    """ Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. """
     if channel >= 0:
         values = values[:, channel, ...]
         mean_vals = reduce(t.from_numpy(values), 'b h w -> h w', 'mean')
         def mean_patch(outp): # TODO check this works
             outp[:, channel, ...] = mean_vals
             return outp
-        return {label: mean_patch}
+        return {layer_name: mean_patch}
     else:
         # Take mean across batch dimension using reduce, then broadcast to match shape of activations
         mean_vals = reduce(t.from_numpy(values), 'b ... -> ...', 'mean')
         # Ensure that the batch dimension has same size
-        return {label: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
+        return {layer_name: lambda outp: repeat(mean_vals, '... -> b ...', b=outp.shape[0])}
 
-def get_channel_pixel_patch(label: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
-    """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at label to 1 in the top left corner of the given channel. """
+def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
+    """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. """
     assert channel >= 0
     WIDTH = 16 # TODO get this from the environment
     assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
@@ -93,11 +101,17 @@ def get_channel_pixel_patch(label: str, channel : int, value : int = 1, coord : 
         
         outp[:, channel, ...] = new_features
         return outp
-    return {label: corner_patch}
+    return {layer_name: corner_patch}
 
-def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
+def get_multiply_patch(layer_name : str):
+    pass 
+
+# TODO combine patches by composing them? 
+
+
+def patch_layer(hook, values, coeff:float, layer_name: str, venv, seed_str: str = '', show_video: bool = False, show_vfield: bool = True, vanished=False, steps: int = 150):
     """
-    Add coeff*(values[0, ...] - values[1, ...]) to the activations at label given by activation_label.  If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed_str}-{coeff}.mp4", where rand_region is a global int.
+    Add coeff*(values[0, ...] - values[1, ...]) to the activations at the given layer. If display_bl is True, plot using logits_to_action_plot and video of rollout in the first environment specified by venv. Saves movie at "videos/{rand_region}/lvl-{seed_str}-{coeff}.mp4", where rand_region is a global int.
     """
     # Custom predict function to match rollout expected interface, uses
     # the hooked network so it is patchable
@@ -112,15 +126,15 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
 
     assert hasattr(venv, 'num_envs'), "Environment must be vectorized"
     
-    patches = get_values_diff_patch(values, coeff, label=activation_label)
+    patches = get_values_diff_patch(values, coeff, layer_name=layer_name)
 
     if show_video:
-        env = copy_venv(venv, 1 if vanished else 0)
+        env = maze.copy_venv(venv, 1 if vanished else 0)
         with hook.use_patches(patches):
             seq, _, _ = cro.run_rollout(predict, env, max_steps=steps, deterministic=False)
         hook.run_with_input(seq.obs.astype(np.float32))
         action_logits = hook.get_value_by_label('fc_policy_out')
-        logits_to_action_plot(action_logits, title=activation_label)
+        logits_to_action_plot(action_logits, title=layer_name)
         
         vidpath = path_prefix + f'videos/{rand_region}/lvl:{seed_str}_{"no_cheese" if vanished else "coeff:" + str(coeff)}.mp4'
         clip = ImageSequenceClip([aa.to_numpy() for aa in seq.renders], fps=10.)
@@ -143,40 +157,40 @@ def patch_layer(hook, values, coeff:float, activation_label: str, venv, seed_str
             vf2 = vfield.vector_field(venv, hook.network)
             vfield.plot_vf(vf2)
         # Make a figure title above the two subplots
-        fig.suptitle(f"Vector fields for layer {activation_label} with coeff={coeff:.2f} and level={seed_str}") 
+        fig.suptitle(f"Vector fields for layer {layer_name} with coeff={coeff:.2f} and level={seed_str}") 
         plt.show()
 
 # %% 
 # Infrastructure for running different kinds of seeds
-def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, label: str):
-    """ Get the values of the activations at label for the given venv. """
+def values_from_venv(venv: ProcgenGym3Env, hook: cmh.ModuleHook, layer_name: str):
+    """ Get the values of the activations at the layer for the given venv. """
     obs = venv.reset().astype(np.float32) # TODO why reset?
     hook.run_with_input(obs, func=forward_func_policy)
-    return hook.get_value_by_label(label)
+    return hook.get_value_by_label(layer_name)
 
-def cheese_diff_values(seed:int, label:str, hook: cmh.ModuleHook):
-    """ Get the cheese/no-cheese activations at the label for the given seed. """
+def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook):
+    """ Get the cheese/no-cheese activations at the layer for the given seed. """
     venv = get_cheese_venv_pair(seed) 
-    return values_from_venv(venv, hook, label)
+    return values_from_venv(venv, hook, layer_name)
 
-def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, label='embedder.block2.res1.resadd_out', steps:int=150, render_padding : bool = False):
+def run_seed(seed:int, hook: cmh.ModuleHook, diff_coeffs: List[float], show_video: bool = False, show_vfield: bool = True, values_tup:Optional[Union[np.ndarray, str]]=None, layer_name='embedder.block2.res1.resadd_out', steps:int=150, render_padding : bool = False):
     """ Run a single seed, with the given hook and diff_coeffs. If values_tup is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.""" 
     venv = get_cheese_venv_pair(seed) 
 
     # Get values if not provided
-    values, value_src = (cheese_diff_values(seed, label, hook), seed) if values_tup is None else values_tup
+    values, value_src = (cheese_diff_values(seed, layer_name, hook), seed) if values_tup is None else values_tup
 
     # Show behavior on the level without cheese
-    # patch_layer(hook, values, 0, label, venv, seed=seed, show_video=show_video, show_vfield=show_vfield, vanished=True, steps=steps)
+    # patch_layer(hook, values, 0, layer_name, venv, seed=seed, show_video=show_video, show_vfield=show_vfield, vanished=True, steps=steps)
 
     for coeff in diff_coeffs:
-        patch_layer(hook, values, coeff, label, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
+        patch_layer(hook, values, coeff, layer_name, venv, seed_str=f'{seed}_vals:{value_src}', show_video=show_video, show_vfield=show_vfield,steps=steps)
 
 def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True):
     """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. """
 
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
-    venv1, venv2 = copy_venv(venv, 0), copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
+    venv1, venv2 = maze.copy_venv(venv, 0), maze.copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
 
     original_vfield = vfield.vector_field(venv1, hook.network)
     with hook.use_patches(patches):
@@ -194,20 +208,20 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     return fig, axs, obj
 
 
-def plot_patched_vfields(seed: int, coeff: float, label: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
-    """ Plot the original and patched vector fields for the given seed, coeff, and label. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
-    values = cheese_diff_values(seed, label, hook) if values is None else values
-    patches = get_values_diff_patch(values, coeff, label) 
-    venv = copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
+def plot_patched_vfields(seed: int, coeff: float, layer_name: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
+    """ Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
+    values = cheese_diff_values(seed, layer_name, hook) if values is None else values
+    patches = get_values_diff_patch(values, coeff, layer_name) 
+    venv = maze.copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size)
     obj.update({
         'seed': seed,
         'coeff': coeff,
-        'patch_label': label,
+        'patch_layer_name': layer_name,
         })
 
     if show_title:
-        fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {label}")
+        fig.suptitle(title if title != '' else f"Level {seed} coeff {coeff} layer {layer_name}")
 
     return fig, axs, obj

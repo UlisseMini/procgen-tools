@@ -8,7 +8,7 @@ setup(
     version='0.1.1',
     packages=find_packages(),
     install_requires=[
-        "gym==0.21.0",
+        "gym==0.26.*",
         "gym3==0.3.3",
         "torch==1.13.1",
         "numpy==1.24.1",
@@ -16,7 +16,7 @@ setup(
         "tqdm==4.64.1",
         "ipywidgets==7.*", # v8 causes vscode bug
         "procgen==0.10.7",
-        "bidict==0.22.*",
+        "bidict>=0.22.0",
         "requests==2.28.*",
         "pandas>=1.5.3",
         "circrl>=0.4.0",
