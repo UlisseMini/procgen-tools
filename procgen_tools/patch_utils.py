@@ -86,16 +86,10 @@ def get_mean_patch(values: np.ndarray, layer_name: str, channel : int = -1):
 def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
     """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. """
     assert channel >= 0
-    WIDTH = 16 # TODO get this from the environment
+    WIDTH = 16 # TODO get this from the environment/layer_name
     assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
 
     default = -.2
-    # def corner_patch(outp):
-    #     new_features = t.ones_like(outp[0, channel, ...]) * default
-    #     new_features[coord] = value
-        
-    #     outp[:, channel, ...] = new_features
-    #     return outp
     def new_corner_patch(outp): # Use make_channel_patch as a helper
         """ outp has shape (batch, ...) -- without a channel dimension. """
         new_features = t.ones_like(outp[0, ...]) * default
@@ -105,8 +99,13 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
 
     return make_channel_patch(layer_name, channel, new_corner_patch)
 
-def get_multiply_patch(layer_name : str):
-    pass 
+def get_multiply_patch(layer_name : str, channel : int = -1, multiplier : float = 2):
+    """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. """
+    if channel >= 0:
+        return make_channel_patch(layer_name, channel, lambda outp: outp * multiplier)
+    else:
+        return {layer_name: lambda outp: outp * multiplier}
+    
 
 # TODO combine patches by composing them? 
 
