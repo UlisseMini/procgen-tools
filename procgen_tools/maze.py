@@ -367,11 +367,13 @@ class EnvState():
 # ============== Grid helpers ==============
 
 
-def get_cheese_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
-    "Get (x, y) position of the cheese in the grid"
+def get_cheese_pos(grid: np.ndarray, flip_y : bool = False) -> Square:
+    "Get (row, col) position of the cheese in the grid. Note that the numpy grid is flipped along the y-axis, relative to rendered images."
     num_cheeses = (grid == CHEESE).sum()
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
-    return tuple(ix[0] for ix in np.where(grid == CHEESE))
+    row, col = np.where(grid == CHEESE)
+    row, col = row[0], col[0]
+    return (maze.WORLD_DIM - row if flip_y else row), col
 
 def remove_cheese(venv, idx : int = 0):
     """

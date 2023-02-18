@@ -47,19 +47,25 @@ dummy_venv = patch_utils.get_cheese_venv_pair(seed=0)
 human_view = dummy_venv.env.get_info()[0]['rgb']
 PIXEL_SIZE = human_view.shape[0] # width of the human view input image
 
-def get_pixel_loc(channel_pos : int, channel_size : int = 16):
-    assert channel_pos < channel_size, f"channel_pos {channel_pos} must be less than channel_size {channel_size}"
-    assert channel_pos >= 0, f"channel_pos {channel_pos} must be non-negative"
+def get_pixel_loc(val : int, channel_size : int = 16):
+    """ Given a single channel position value, find the pixel location that corresponds to that channel. """
+    assert val < channel_size, f"channel_pos {val} must be less than channel_size {channel_size}"
+    assert val >= 0, f"channel_pos {val} must be non-negative"
 
-    scale = PIXEL_SIZE // channel_size
-    return scale * channel_pos + scale // 2
+    scale = PIXEL_SIZE / channel_size
+    return int(scale * (val + .5))
+
+def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16):
+    """ Given a channel position, find the pixel location that corresponds to that channel. """
+    return get_pixel_loc(channel_pos[0], channel_size), get_pixel_loc(channel_pos[1], channel_size)
 
 def plot_pixel_dot(ax, row, col, color='r', size=50):
-    pixel_loc =  get_pixel_loc(col), get_pixel_loc(row)
+    """ Plot a dot on the pixel grid at the given row and column of the game grid. """
+    pixel_loc = get_pixel_coords((row, col))
     ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
 
 def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_layer):
-    """ Given a grid position, find the channel location that corresponds to that position. """
+    """ Given a grid position, find the channel location that corresponds to that position. pos is a tuple of  """
     # Ensure cheese_pos is valid
     assert pos[0] >= 0 and pos[0] < maze.WORLD_DIM and pos[1] >= 0 and pos[1] < maze.WORLD_DIM, f'Invalid position: {pos}'
 
@@ -70,7 +76,7 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     channel_pos = (pixel_pos[0] // px_per_channel_idx, pixel_pos[1] // px_per_channel_idx)
     return (int(channel_pos[0]), int(channel_pos[1]))
 
-def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True):
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True):
     """ Visualize the environment. 
     
     Parameters: 
@@ -80,6 +86,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     ax: The axis to plot on. If None, a new axis will be created.
     ax_size: The size of the axis to create, if ax is None.
     show_plot: Whether to show the plot. 
+    flip_numpy: Whether to vertically flip the numpy view.
     """
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
@@ -89,9 +96,9 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     if mode == "human":
         img = venv.env.get_info()[idx]['rgb']
     elif mode == "agent":
-        img = venv.reset()[idx].transpose(1,2,0)
+        img = venv.reset()[idx].transpose(1,2,0) # (C, H, W) -> (H, W, C)
     elif mode == "numpy":
-        img = maze.EnvState(venv.env.callmethod('get_state')[idx]).full_grid()[::-1, :]
+        img = maze.EnvState(venv.env.callmethod('get_state')[idx]).full_grid()[::(-1 if flip_numpy else 1), :]
     else:
         raise ValueError(f"Invalid mode {mode}")
 
@@ -234,7 +241,7 @@ class ActivationsPlotter:
         else:
             activations = self.activ_gen(label, self.hook, **self.act_kwargs) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers 
 
-        self.channel_slider.max = patch_utils.num_channels(hook=self.hook, layer_name=label) - 1 if len(shap) > 2 else 0
+        self.channel_slider.max = patch_utils.num_channels(hook=self.hook, layer_name=label) - 1 
         channel = self.channel_slider.value = min(self.channel_slider.value, self.channel_slider.max)
 
         if len(activations.shape) == 2: # Linear layer (batch, hidden_dim)

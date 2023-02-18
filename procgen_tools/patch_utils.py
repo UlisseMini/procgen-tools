@@ -111,23 +111,7 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
         values = values[:, channel, ...] # shape (batch, ...)
     random_vals = t.from_numpy(values[0, ...]) # shape (...)
 
-    """ 
-    rand_obs = (1, 3, 64, 64)
-    values = (1, 128, 16, 16)
-    if patch_single_channel: 
-        values = (1, 16, 16)
-        random_vals: (16, 16) 
-    else:
-        values: (1, 128, 16, 16)
-        random_vals: (128, 16, 16)
-    outp (96, 128, 16, 16)
-    
-    Want to apply patch to each output channel, so we need to broadcast the random values to the entire output
-    
-
-    """
-
-    def patch_fn(outp): 
+    def patch_fn(outp):
         return random_vals 
         
     # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
