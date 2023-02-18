@@ -21,10 +21,6 @@ import copy
 from warnings import warn
 from tqdm.auto import tqdm
 
-# import plotly.express as px
-# import hvplot.networkx as hvnx
-# from IPython.display import display
-
 # Constants in numeric maze representation
 CHEESE = 2
 EMPTY = 100

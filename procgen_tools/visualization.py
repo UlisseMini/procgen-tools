@@ -55,26 +55,33 @@ def get_pixel_loc(val : int, channel_size : int = 16):
     scale = PIXEL_SIZE / channel_size
     return int(scale * (val + .5))
 
-def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16):
-    """ Given a channel position, find the pixel location that corresponds to that channel. """
-    return get_pixel_loc(channel_pos[0], channel_size), get_pixel_loc(channel_pos[1], channel_size)
+def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16, flip_y : bool = True):
+    """ Given a channel position, find the pixel location that corresponds to that channel. If flip_y is True, the y-axis will be flipped from the underlying numpy coords to the conventional human rendering format. """
+    row, col = channel_pos
+    assert 0 <= row < channel_size and 0 <= col < channel_size, f"channel_pos {channel_pos} must be within the channel_size {channel_size}."
+
+    if flip_y: 
+        row = (channel_size - 1) - row
+
+    return get_pixel_loc(row, channel_size), get_pixel_loc(col, channel_size)
 
 def plot_pixel_dot(ax, row, col, color='r', size=50):
     """ Plot a dot on the pixel grid at the given row and column of the game grid. """
-    pixel_loc = get_pixel_coords((row, col))
-    ax.scatter(pixel_loc[0], pixel_loc[1], c=color, s=size)
+    row, col = get_pixel_coords((row, col))
+    ax.scatter(y=row, x=col, c=color, s=size)
 
 def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_layer):
-    """ Given a grid position, find the channel location that corresponds to that position. pos is a tuple of  """
+    """ Given a grid position, find the channel location that corresponds to that position. """
     # Ensure cheese_pos is valid
-    assert pos[0] >= 0 and pos[0] < maze.WORLD_DIM and pos[1] >= 0 and pos[1] < maze.WORLD_DIM, f'Invalid position: {pos}'
+    row, col = pos
+    assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {pos}'
 
     # Convert to pixel location
-    pixel_pos = ((pos[0] + .5) * maze.PX_PER_TILE, (pos[1] + .5) * maze.PX_PER_TILE)
+    px_row, px_col = ((row + .5) * maze.PX_PER_TILE, (col + .5) * maze.PX_PER_TILE)
 
     px_per_channel_idx = get_stride(layer) # How many pixels per channel index
-    channel_pos = (pixel_pos[0] // px_per_channel_idx, pixel_pos[1] // px_per_channel_idx)
-    return (int(channel_pos[0]), int(channel_pos[1]))
+    chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
+    return (int(chan_row), int(chan_col))
 
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True):
     """ Visualize the environment. 
@@ -132,7 +139,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         if callback is not None:
             callback(gridm)
         update_plot()
-        
+
     # Then make a callback which updates the render in-place when the maze is edited
     editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)
     # Set the editors so that they don't space out when the window is resized
