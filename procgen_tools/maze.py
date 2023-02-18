@@ -1084,14 +1084,15 @@ def get_random_obs_opts(
 
             # If we get here, we're ready to use this state
             state_bytes_list.append(env_state.state_bytes)
-            metadata_list.append(dict(
-                level_seed = this_level,
-                mouse_pos_outer = (mr, mc),
-                cheese_pos_outer = cheese_pos_outer_this,
-                next_pos_cheese_outer = next_pos_cheese_outer,
-                next_pos_corner_outer = next_pos_corner_outer,
-                maze_dim = maze_dim_this,
-            ))
+            if return_metadata:
+                metadata_list.append(dict(
+                    level_seed = this_level,
+                    mouse_pos_outer = (mr, mc),
+                    cheese_pos_outer = cheese_pos_outer_this,
+                    next_pos_cheese_outer = next_pos_cheese_outer,
+                    next_pos_corner_outer = next_pos_corner_outer,
+                    maze_dim = maze_dim_this,
+                ))
 
             pbar.update(1)
 
