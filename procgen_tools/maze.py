@@ -373,7 +373,7 @@ def get_cheese_pos(grid: np.ndarray, flip_y : bool = False) -> Square:
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
     row, col = np.where(grid == CHEESE)
     row, col = row[0], col[0]
-    return (maze.WORLD_DIM - row if flip_y else row), col
+    return ((maze.WORLD_DIM - 1) - row if flip_y else row), col 
 
 def remove_cheese(venv, idx : int = 0):
     """
