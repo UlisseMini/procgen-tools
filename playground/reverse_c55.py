@@ -14,7 +14,82 @@ setup() # create directory structure and download data
 
 # %% Super-long import code!
 from procgen_tools.imports import *
-from procgen_tools import patch_utils, visualization, vfield, maze
+from procgen_tools.procgen_imports import * # TODO doesn't let us autoreload
+
+def create_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): # TODO put in visualization.py?
+    """ Create a button that saves fig to a file. 
+    
+    Args:
+        prefix (str): The prefix of the filename.
+        fig (plt.Figure): The figure to save.
+        descriptors (defaultdict[str, float]): A dictionary of descriptors to add to the filename.
+    """
+    def save_fig(b):
+        """ Save the figure to a file. """
+        filename = f'{prefix}_'
+        for key, value in descriptors.items():
+            # Replace any dots with underscores
+            value = str(value).replace('.', '_')
+            filename += f'{key}_{value}_'
+        filename = filename[:-1] + '.png' # remove trailing underscore
+        fig.savefig(filename)
+        # Display the filename
+        display(Markdown(f'Figure saved to `{filename}`'))
+
+    button = Button(description='Save figure')
+    button.on_click(save_fig)
+    return button
+
+save_dir = 'playground/visualizations'
+AX_SIZE = 6
+
+# %% Patch a single channel we've found to track cheese
+cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8] 
+effective_channels = [77, 113, 88, 55]
+
+# %% 
+@interact
+def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=2.8), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel_list=Dropdown(options=[effective_channels, cheese_channels], value=effective_channels)):
+    patches = [patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) for channel in effective_channels]
+    combined_patch = patch_utils.compose_patches(*patches)
+
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=True, ax_size=AX_SIZE)
+
+    # Draw a red pixel at the location of the patch
+    for idx in (1,2):
+        visualization.plot_pixel_dot(axs[idx], 15 - row, col) 
+    plt.show()
+
+    button = create_button(prefix=f'{save_dir}/all_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
+    display(button)
+
+# %% 
+@interact
+def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=effective_channels, value=55)):
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+
+    # Draw a red pixel at the location of the patch
+    for idx in (1,2):
+        visualization.plot_pixel_dot(axs[idx], 15 - row, col) 
+    plt.show() 
+
+    # Add a button to save the figure to experiments/visualizations
+    button = create_button(prefix=f'{save_dir}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    display(button)
+
+
+
+# %% Multiplying c55, treating both positive and negative activations separately
+@interact
+def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
+    venv = get_cheese_venv_pair(seed=seed)
+    patches = get_multiply_patch(layer_name=default_layer, channel=55, multiplier=multiplier)
+    fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
+    plt.show()
+    # print(info['patched_vfield']['probs'])
 
 def create_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): # TODO put in visualization.py?
     """ Create a button that saves fig to a file. 
