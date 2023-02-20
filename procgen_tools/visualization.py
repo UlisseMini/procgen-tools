@@ -185,7 +185,6 @@ class ActivationsPlotter:
         act_kwargs: Keyword arguments to pass to the activations generator
         """
         self.fig = go.FigureWidget()
-
         self.plotter = plotter
         self.activ_gen = activ_gen
         self.act_kwargs = act_kwargs
@@ -195,9 +194,8 @@ class ActivationsPlotter:
         formatted_labels = format_labels(labels)
         self.label_widget = Dropdown(options=formatted_labels, value=formatted_labels[0], description="Layers")
         self.channel_slider = IntSlider(min=0, max=127, step=1, value=0, description="Channel")
+        
         # Add channel increment and decrement buttons
-        button_width = '10px'
-
         decrement_button, increment_button = [Button(description=descr_str, layout=Layout(width=button_width)) for descr_str in ("-", "+")]
         def add_to_slider(x : int):
             # Clip the value to the min and max
@@ -208,25 +206,30 @@ class ActivationsPlotter:
 
         self.widgets = [self.fig, self.label_widget, HBox([self.channel_slider, decrement_button, increment_button])]
 
+        # Add row and column sliders if enabled
         self.coords_enabled = coords_enabled
         if coords_enabled:
             self.col_slider, self.row_slider = (IntSlider(min=0, max=62, step=1, value=32, description="Column"), IntSlider(min=0, max=63, step=1, value=32, description="Row"))
             self.widgets.extend([self.col_slider, self.row_slider])
 
+        # Add a custom filename widget
         self.filename_widget = Text(value="", placeholder="Custom filename", disabled=False)
         self.filename_widget.layout.width = '150px'
-
         self.button = Button(description="Save image")
         self.button.on_click(self.save_image)
         self.widgets.append(HBox([self.filename_widget, self.button]))
 
+        # Set the default values for the plotter, if provided
         if defaults is not None:
             for key, value in defaults.items():
                 getattr(self, key).value = value
 
+        # Ensure that the plot is updated when the widgets are changed
         for widget in self.widgets:
             if widget != self.fig:
                 widget.observe(self.update_plotter, names='value')
+        
+        # Set the initial plot
         self.update_plotter()
 
     def display(self):
