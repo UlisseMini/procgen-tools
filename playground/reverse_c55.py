@@ -43,11 +43,51 @@ def create_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str,
 save_dir = 'playground/visualizations'
 AX_SIZE = 6
 
+# %% Patch a single channel we've found to track cheese
+cheese_channels = [77, 113, 44, 88, 55, 42, 7] # 44 does nothing? 42 is a bit weird, it doesnt do anything at -30 (might get relu'd) but screws things up at eg +20
+# 77 113 88 and 55 seem to work
+effective_channels = [77, 113, 88, 55]
+
+# %% 
+@interact
+def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=2.5), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
+    patches = [patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) for channel in effective_channels]
+    combined_patch = patch_utils.compose_patches(*patches)
+
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=True, ax_size=AX_SIZE)
+    plt.show()
+
+    # Draw a red pixel at the location of the patch
+    for idx in (1,2):
+        visualization.plot_pixel_dot(axs[idx], 15 - row, col) 
+
+    button = create_button(prefix=f'{save_dir}/all_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
+    display(button)
+
+# %% 
+@interact
+def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=effective_channels, value=55)):
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+
+    # Draw a red pixel at the location of the patch
+    for idx in (1,2):
+        visualization.plot_pixel_dot(axs[idx], 15 - row, col) 
+    plt.show() 
+
+    # Add a button to save the figure to experiments/visualizations
+    button = create_button(prefix=f'{save_dir}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    display(button)
+
+
+
 # %% Multiplying c55, treating both positive and negative activations separately
 @interact
-def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), pos_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5), neg_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
+def multiply_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), pos_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5), neg_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
-    patches = patch_utils.get_multiply_patch(layer_name=default_layer, channel=55, multiplier=None, pos_multiplier=pos_multiplier, neg_multiplier=neg_multiplier)
+    patches = patch_utils.get_multiply_patch(layer_name=default_layer, channel=55, pos_multiplier=pos_multiplier, neg_multiplier=neg_multiplier)
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 

@@ -66,7 +66,9 @@ def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16, fli
     return get_pixel_loc(row, channel_size), get_pixel_loc(col, channel_size)
 
 def plot_pixel_dot(ax, row, col, color='r', size=50):
-    """ Plot a dot on the pixel grid at the given row and column of the game grid. """
+    """ Plot a dot on the pixel grid at the given row and column of the game grid. 
+    
+    TODO fix issue where you have to flip """
     row, col = get_pixel_coords((row, col))
     ax.scatter(y=row, x=col, c=color, s=size)
 
@@ -141,7 +143,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)
+    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb) # NOTE can't block off initial mouse position? 
     # Set the editors so that they don't space out when the window is resized
     for editor in editors:
         editor.layout.height = "100%"

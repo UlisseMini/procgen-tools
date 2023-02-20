@@ -17,7 +17,6 @@ setup() # create directory structure and download data
 from procgen_tools.imports import *
 from procgen_tools.procgen_imports import *
 # %% Intervene on channel 55 of default_layer, setting its value manually 
-
 @interact
 def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
@@ -25,7 +24,7 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), va
     fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
     # Draw a red pixel at the location of the patch
-    plot_pixel_dot(axs[1], row, col)
+    plot_pixel_dot(axs[1], 15 - row, col) 
     plt.show() 
 
     # Add a button to save the figure to experiments/visualizations

@@ -73,6 +73,20 @@ def channel_patch_or_broadcast(layer_name : str,  patch_fn : Callable[[np.ndarra
         return outp
     return {layer_name: patch_fn_new} 
 
+import funcy as fn
+def compose_patches(*patches : List[dict]):
+    """ Compose a list of patches into a single patch. The order of the patches is the order in which they are applied. Note that the new patch only applies for the layers which are shared by all patches. """
+    # Find all shared keys
+    shared_keys = set.intersection(*[set(patch.keys()) for patch in patches])
+
+    # Compose patches
+    patch = {}
+    for key in shared_keys:
+        patch[key] = lambda outp: outp
+        for new_patch in patches:
+            patch[key] = fn.compose(new_patch[key], patch[key])
+    return patch
+
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
     """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). """
     cheese = values[0,...]
