@@ -44,8 +44,8 @@ save_dir = 'playground/visualizations'
 AX_SIZE = 6
 
 # %% Patch a single channel we've found to track cheese
-cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8] 
-effective_channels = [77, 113, 88, 55]
+cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
+effective_channels = [77, 113, 88, 55, 8, 82, 89]
 
 # %% 
 @interact
@@ -66,7 +66,7 @@ def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), val
 
 # %% 
 @interact
-def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=effective_channels, value=55)):
+def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=cheese_channels, value=55)):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
