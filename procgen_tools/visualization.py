@@ -1,3 +1,5 @@
+# %%
+
 from procgen_tools.imports import *
 from procgen_tools import maze, vfield, patch_utils
 
@@ -43,7 +45,7 @@ def get_stride(label : str):
         block_num -= 1
     return 2 ** block_num
 
-dummy_venv = patch_utils.get_cheese_venv_pair(seed=0) 
+dummy_venv = patch_utils.get_cheese_venv_pair(seed=0)
 human_view = dummy_venv.env.get_info()[0]['rgb']
 PIXEL_SIZE = human_view.shape[0] # width of the human view input image
 
@@ -73,7 +75,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     ax.axis('off')
     ax.set_title(mode.title() + " view")
-    
+
     if mode == "human":
         img = venv.env.get_info()[idx]['rgb']
     elif mode == "agent":
@@ -85,14 +87,14 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
 
     ax.imshow(img)
     if show_plot:
-        plt.show() 
+        plt.show()
 
 def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close('all')
-    if venv is None: 
+    if venv is None:
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
 
     # We want to update ax whenever the maze is edited
@@ -103,7 +105,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
             ax.clear()
             vfield.plot_vf(vf, ax=ax)
 
-            # Update the existing figure in place 
+            # Update the existing figure in place
             clear_output(wait=True)
             display(fig)
 
@@ -113,7 +115,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         if callback is not None:
             callback(gridm)
         update_plot()
-        
+
 
 
     # Then make a callback which updates the render in-place when the maze is edited
@@ -136,7 +138,7 @@ def plot_activations(activations: np.ndarray, fig: go.FigureWidget):
     """ Plot the activations given a single (non-batched) activation tensor. """
     fig.update(data=[go.Heatmap(z=activations)])
 
-def plot_nonzero_activations(activations: np.ndarray, fig: go.FigureWidget): 
+def plot_nonzero_activations(activations: np.ndarray, fig: go.FigureWidget):
     """ Plot the nonzero activations in a heatmap. """
     # Find nonzero activations and cast to floats
     nz = (activations != 0).astype(np.float32)
@@ -210,12 +212,12 @@ class ActivationsPlotter:
         print(f"Saved image to {filepath}")
 
         self.fig.layout.title = old_title # Clear the title
-        
+
         self.filename_widget.value = "" # Clear the filename_widget box
 
     def update_plotter(self, b=None):
         """ Update the plot with the current values of the widgets. """
-        label = expand_label(self.label_widget.value)        
+        label = expand_label(self.label_widget.value)
         self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
         if self.coords_enabled:
             col, row = self.col_slider.value, self.row_slider.value
@@ -241,21 +243,149 @@ class ActivationsPlotter:
 
 
         if label == 'fc_policy_out':
-            # Transform each index into the corresponding action label, according to maze.py 
-            self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
+            # Transform each index into the corresponding action label, according to maze.py
+            self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3]))
         else: # Reset the x-axis ticks to match the y-axis ticks
             yaxis_ticktext, yaxis_tickvals = self.fig.layout.yaxis.ticktext, self.fig.layout.yaxis.tickvals # TODO double the step of yaxis ticks?
             self.fig.update_xaxes(ticktext=yaxis_ticktext, tickvals=yaxis_tickvals)
 
         self.fig.update_xaxes(side="top") # Set the x ticks to the top
         self.fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange
-        
+
 
         self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
 
         # Set the min and max to be the min and max of all channels at this label
         bounds = np.abs(activations).max()
-        self.fig.update_traces(zmin=-1 * bounds, zmid=0, zmax=bounds)    
-        
+        self.fig.update_traces(zmin=-1 * bounds, zmid=0, zmax=bounds)
+
         # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
         self.fig.update_traces(colorscale='RdBu')
+
+
+# ==================== Integrated gradients ====================
+# %%
+
+from captum.attr import IntegratedGradients
+
+def added_action_probs(probs):
+    return t.stack([probs[..., np.array(act_indexes)].sum(-1) for _, act_indexes in models.MAZE_ACTION_INDICES.items()], dim=-1)
+
+class WrappedModel(t.nn.Module):
+    def __init__(self, hook: cmh.ModuleHook):
+        super().__init__()
+        assert isinstance(hook, cmh.ModuleHook), "Hook must be a ModuleHook"
+
+        self.hook = hook
+
+    def forward(self, in_act: t.Tensor, obs: t.Tensor, in_label: str, out_label: str):
+        # TODO/In-progress: Use out_label to make arbitrary activations targetable/available (ignored rn)
+        assert isinstance(obs, t.Tensor) and obs.dtype == t.float32, "Obs must be a tensor of dtype float32"
+        assert isinstance(in_act, t.Tensor) and in_act.dtype == t.float32, "Labelled activation must be a tensor of dtype float32"
+
+        # could be faster cached but I'm not taking chances with hook reuse bugs
+        mask = t.tensor(True) # mask all the things
+        patches = {in_label: cmh.PatchDef(value=in_act, mask=mask)}
+        with self.hook.set_hook_should_get_custom_data(), self.hook.use_patches(patches):
+            c, _ = self.hook.network(obs)
+
+        return added_action_probs(c.probs)
+        # return self.hook.get_value_by_label(out_label, convert=False)
+
+
+
+TARGETS = {k: i for i, k in enumerate(models.MAZE_ACTION_INDICES.keys())}
+
+
+def viz_attr(
+    target: str,
+    in_label: str,
+    out_label: str,
+    std_clip_low: float,
+    std_clip_high: float,
+    channel: int = 0,
+    update_counter: int = 0,
+    venv = None,
+    ig = None,
+    model = None,
+):
+    obs = t.tensor(venv.reset(), dtype=t.float32, requires_grad=True)
+    # TODO: Baseline/counterfactual for IG, defaults is zero and is not ideal.
+    with hook.set_hook_should_get_custom_data():
+        c, _ = hook.network(obs)
+        activ = model.hook.get_value_by_label(in_label, convert=False)
+        probs = added_action_probs(c.probs[0])
+
+    attr, delta = ig.attribute(activ, target=TARGETS[target], return_convergence_delta=True, additional_forward_args=(obs, in_label, out_label))
+    attr = attr.detach().numpy()
+
+    # Convert to numpy float image format; gaussian normalize to [0,1]
+    activ_im = activ[0].detach().numpy()[channel]
+    activ_im = (activ_im - activ_im.min()) / (activ_im.max() - activ_im.min())
+
+    attr_im = attr[0][channel]
+
+    # clip outliers
+    mean, std = attr_im.mean(), attr_im.std()
+    attr_im = np.clip(attr_im, mean - std_clip_low*std, mean + std_clip_high*std)
+    # normalize for display
+    # attr_im = (attr_im - attr_im.min())
+
+    if (attr_im.max() - attr_im.min()) != 0:
+        attr_im /= (attr_im.max() - attr_im.min())
+    else:
+        print("WARNING: attribution failed, image is constant zeros. try a different channel?")
+
+
+    # TODO: Maybe this should be log scale since model outputs probabilities? maybe model should output log probs?
+    # hard to interpret.
+
+    # alternative (non rgb) overlay
+    # overlay_im = alpha * attr_im + (1-alpha) * activ_im
+    # rb overlay
+    green = np.zeros_like(attr_im)
+    # TODO: Use green for activations, red for negative attributions, blue for positive attributions
+    # TODO: Logit view (you can decrease prob(LEFT) by increasing prob(RIGHT) logit)
+
+    # Show logits to the right of the image
+    probs_dict = {k: v.item() for k, v in zip(models.MAZE_ACTION_INDICES.keys(), probs)}
+    probs_str = "\n".join([f"P({k.title()}) = {v:.3f}" for k, v in probs_dict.items()])
+
+    # TODO: Use plotly and make hovorable
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[1].text(1.1, 0.5, f"{probs_str}", transform=plt.gca().transAxes, fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5))
+    ax[0].set_title('Activations')
+    ax[1].set_title(f'P({target}) Attributions')
+
+    fig.colorbar(ax[0].imshow(activ_im, cmap='RdBu'), ax=ax[0])
+    fig.colorbar(ax[1].imshow(attr_im, cmap='RdBu'), ax=ax[1])
+
+
+
+
+
+# Main: Run visualization widget
+# %%
+
+def main_ig_viz(venv, wrapped_model: WrappedModel):
+    ig = IntegratedGradients(wrapped_model)
+
+    update_counter_widget = widgets.fixed(0) # CURSED
+
+    interact(
+        viz_attr,
+        target=widgets.Dropdown(options=list(TARGETS.keys()), value='RIGHT', description='Target: '),
+        in_label=widgets.Dropdown(options=labels, value='embedder.block2.res1.resadd_out', description='Label: '),
+        out_label=widgets.Dropdown(options=labels, value='fc_policy_out', description='Label: '),
+        std_clip_low=widgets.FloatSlider(min=0, max=10, step=0.5, value=3), # NOTE: Feel free to make default settings better
+        std_clip_high=widgets.FloatSlider(min=0, max=10, step=0.5, value=5),
+        channel=widgets.IntSlider(min=0, max=128, step=1, value=55),
+        update_counter=update_counter_widget,
+        venv=fixed(venv), ig=fixed(ig), model=fixed(wrapped_model),
+    );
+
+    widget_box = custom_vfield(policy, venv=venv, callback=lambda _: update_counter_widget.set_trait('value', update_counter_widget.value + 1))
+    display(widget_box)
+
+if __name__ == '__main__': main_ig_viz(venv=maze.create_venv(1,0,1), wrapped_model=WrappedModel(hook))
+# %%
