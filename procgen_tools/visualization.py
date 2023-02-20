@@ -195,7 +195,18 @@ class ActivationsPlotter:
         formatted_labels = format_labels(labels)
         self.label_widget = Dropdown(options=formatted_labels, value=formatted_labels[0], description="Layers")
         self.channel_slider = IntSlider(min=0, max=127, step=1, value=0, description="Channel")
-        self.widgets = [self.fig, self.label_widget, self.channel_slider]
+        # Add channel increment and decrement buttons
+        button_width = '10px'
+
+        decrement_button, increment_button = [Button(description=descr_str, layout=Layout(width=button_width)) for descr_str in ("-", "+")]
+        def add_to_slider(x : int):
+            # Clip the value to the min and max
+            self.channel_slider.value = np.clip(self.channel_slider.value + x, self.channel_slider.min, self.channel_slider.max)
+            self.update_plotter()
+        decrement_button.on_click(lambda _: add_to_slider(-1))
+        increment_button.on_click(lambda _: add_to_slider(1))
+
+        self.widgets = [self.fig, self.label_widget, HBox([self.channel_slider, decrement_button, increment_button])]
 
         self.coords_enabled = coords_enabled
         if coords_enabled:
