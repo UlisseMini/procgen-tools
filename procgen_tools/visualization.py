@@ -174,7 +174,7 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
     plot_nonzero_activations(diffs, fig)
 
 class ActivationsPlotter:
-    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, **act_kwargs):
+    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, save_dir='experiments/visualizations', **act_kwargs):
         """
         labels: The labels of the layers to plot
         plotter: A function that takes a label, channel, and activations and plots them
@@ -189,6 +189,7 @@ class ActivationsPlotter:
         self.activ_gen = activ_gen
         self.act_kwargs = act_kwargs
         self.hook = hook
+        self.save_dir = save_dir
 
         # Remove the _out layer and "embedder." prefixes
         formatted_labels = format_labels(labels)
@@ -196,6 +197,7 @@ class ActivationsPlotter:
         self.channel_slider = IntSlider(min=0, max=127, step=1, value=0, description="Channel")
         
         # Add channel increment and decrement buttons
+        button_width = '10px'
         decrement_button, increment_button = [Button(description=descr_str, layout=Layout(width=button_width)) for descr_str in ("-", "+")]
         def add_to_slider(x : int):
             # Clip the value to the min and max
@@ -203,7 +205,6 @@ class ActivationsPlotter:
             self.update_plotter()
         decrement_button.on_click(lambda _: add_to_slider(-1))
         increment_button.on_click(lambda _: add_to_slider(1))
-
         self.widgets = [self.fig, self.label_widget, HBox([self.channel_slider, decrement_button, increment_button])]
 
         # Add row and column sliders if enabled
@@ -240,7 +241,7 @@ class ActivationsPlotter:
 
     def save_image(self, b): # Add a save button to save the image
         basename = self.filename_widget.value if self.filename_widget.value != "" else f"{self.label_widget.value}_{self.channel_slider.value}{f'_{self.col_slider.value}_{self.row_slider.value}' if self.coords_enabled else ''}"
-        filepath = f"experiments/visualizations/{basename}.png" # NOTE For some reason, PATH_PREFIX isn't necessary? Unsure why
+        filepath = f"{self.save_dir}/{basename}.png" # NOTE For some reason, PATH_PREFIX isn't necessary? Unsure why
 
         # Annotate to the outside of the plot
         old_title = self.fig.layout.title
