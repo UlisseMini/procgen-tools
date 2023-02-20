@@ -99,20 +99,27 @@ def get_mean_patch(layer_name: str, values: np.ndarray = None, channel : int = -
 
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=lambda outp: mean_vals) 
 
-def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1):
-    """ Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. """
+def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1, cheese_loc : Tuple[int, int] = None, num_obs : int = 1):
+    """ Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. If cheese_loc is specified, sample random observations with cheese at that location. Cycle through num_obs random observations, randomly generating the index of the observation to use at every invocation of the random patch. """
+    assert num_obs > 0, "Must sample at least one observation"
+    assert cheese_loc is None or (0 <= cheese_loc[0] < maze.WORLD_DIM and 0 <= cheese_loc[1] < maze.WORLD_DIM), "Cheese location is out of bounds."
+    
     patch_single_channel = channel >= 0
     
     # Get activations at this layer and channel for a randomly sampled observation
-    rand_obs = maze.get_random_obs(num_obs=1, on_training=False) # TODO switch to "opts"
+    rand_obs = maze.get_random_obs_opts(num_obs=num_obs, on_training=False, cheese_pos_outer=cheese_loc) 
     hook.run_with_input(rand_obs, func=forward_func_policy)
     values = hook.get_value_by_label(layer_name) # shape (batch, channels, ...)
     if patch_single_channel:
         values = values[:, channel, ...] # shape (batch, ...)
-    random_vals = t.from_numpy(values[0, ...]) # shape (...)
+    random_vals = t.from_numpy(values) # shape (batch, ...)
 
-    def patch_fn(outp):
-        return random_vals 
+    def patch_fn(outp): 
+        random_idx = np.random.randint(0, num_obs) # TODO i think this only invokes once
+        new_vals = random_vals[random_idx, ...]
+        # new_vals[new_vals < 0] = new_vals[new_vals < 0] * 5 # TODO make this a separate patch, with pos_coeff and neg_coeff instead of just pure multiplcition
+        # new_vals[new_vals > 0] = new_vals[new_vals > 0] * 5
+        return new_vals
         
     # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=patch_fn)
@@ -134,9 +141,16 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
 
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=new_corner_patch) # TODO make box activation
 
-def get_multiply_patch(layer_name : str, channel : int = -1, multiplier : float = 2):
-    """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. """
-    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=lambda outp: outp * multiplier)
+def get_multiply_patch(layer_name : str, channel : int = -1, pos_multiplier : float = None, neg_multiplier : float = None):
+    """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. If pos_multiplier is specified, multiply only positive activations by that value. If neg_multiplier is specified, multiply only negative activations by that value. """
+    def multiply_outp(outp : t.Tensor):
+        new_vals = outp 
+        if pos_multiplier is not None:
+            new_vals[outp > 0] = outp[outp > 0] * pos_multiplier
+        if neg_multiplier is not None:
+            new_vals[outp < 0] = outp[outp < 0] * neg_multiplier
+        return new_vals
+    return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=multiply_outp)
 
 # %% 
 # Infrastructure for running different kinds of seeds

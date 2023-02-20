@@ -43,15 +43,15 @@ def create_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str,
 save_dir = 'playground/visualizations'
 AX_SIZE = 6
 
-# %% Doubling c55
+# %% Multiplying c55, treating both positive and negative activations separately
 @interact
-def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
+def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), pos_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5), neg_multiplier=FloatSlider(min=-15, max=15, step=0.1, value=5.5)):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
-    patches = patch_utils.get_multiply_patch(layer_name=default_layer, channel=55, multiplier=multiplier)
+    patches = patch_utils.get_multiply_patch(layer_name=default_layer, channel=55, multiplier=None, pos_multiplier=pos_multiplier, neg_multiplier=neg_multiplier)
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = create_button(prefix=f'{save_dir}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, multiplier=multiplier))
+    button = create_button(prefix=f'{save_dir}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, pos=pos_multiplier, neg=neg_multiplier))
     display(button)
 
 # %% [markdown]
@@ -101,7 +101,7 @@ def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_
     channel = channel_slider.value = min(channel_slider.value, channel_slider.max)
 
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
-    patches = patch_utils.get_random_patch(layer_name=layer_name, hook=hook, channel=channel)
+    patches = patch_utils.get_random_patch(layer_name=layer_name, hook=hook, channel=channel) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
@@ -110,16 +110,16 @@ def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_
 
 # %% Causal scrub 55
 # We want to replace the channel 55 activations with the activations from a randomly generated maze with cheese at the same location
-GENERATE_NUM = 1 
 @interact
-def causal_scrub_55(target=IntSlider(min=0, max=100, step=1, value=0)):
-    venv = patch_utils.get_cheese_venv_pair(seed=target)
-    # Get the cheese location from the target seed
-    cheese_row, cheese_col = maze.get_cheese_pos_from_seed(target)
-    # Generate another seed with cheese at the same location, moving cheese to the appropriate locations 
-    seeds, grids = maze.generate_mazes_with_cheese_at_location((cheese_row, cheese_col), num_mazes = GENERATE_NUM, skip_seed=source_seed)
-    patches = patch_utils.get_causal_scrub_patch(layer_name=default_layer, channel=55, seed=target)
+def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=0)):
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    
+    cheese_row, cheese_col = maze.get_cheese_pos_from_seed(seed)
+    patches = patch_utils.get_random_patch(layer_name=default_layer, hook=hook, channel=55, cheese_loc=(cheese_row-3, cheese_col+5))
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = create_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](source=source, target=target))
+    button = create_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
+    display(button)
+
+# %%
