@@ -33,6 +33,62 @@ def get_residual_num(label : str):
     # The labels are formatted as embedder.block{blocknum}.{residual_block_num}
     return int(label.split(".")[2][-1])
 
+# Plotting
+def is_internal_activation(label : str):
+    """ Return True if the label is an internal activation, i.e. not an input or output. """
+    # Check if 'in' is in the label
+    if 'in' in label:
+        return False
+    # Check if 'out' is in the label
+    if 'out' in label and 'embedder' not in label:
+        return False
+    return True
+
+def plot_layer_stats(hook : cmh.ModuleHook, mode : str = "activations", fig : go.Figure = None):
+    """ Create and show a plotly bar chart of the number of activations per layer of policy. The default mode is "activations", which plots the number of activations per layer. If mode is "parameters", then the number of parameters per layer is plotted. """
+    if mode not in ("activations", "parameters"):
+        raise ValueError(f"mode must be either 'activations' or 'parameters', got {mode}.")
+
+    # Get the number of activations/parameters per layer
+    quantities = {}
+    zipped_list = filter(lambda tup: is_internal_activation(tup[0]), hook.values_by_label.items()) if mode == 'activations' else hook.network.named_parameters()
+    for name, quantity in zipped_list:
+        quantities[format_label(name)] = quantity.numel()
+    total_quantity = sum(quantities.values())
+
+    # Aggregate bias quantities
+    if mode == 'parameters':
+        bias_quants = {label: quantity for label, quantity in quantities.items() if 'bias' in label}
+        for label, quantity in bias_quants.items():
+            if 'bias' in label: # If the label is a bias, add the quantity to the corresponding weight
+                quantities[label.replace('bias', 'weight')] += quantity
+                del quantities[label]
+
+    key_list = [key.replace('.weight', '') if mode == 'parameters' else key for key in quantities.keys()][::-1]
+    values_list = list(quantities.values())[::-1]
+    fig = go.Figure(data=[go.Bar(y=key_list, x=values_list, orientation='h')])
+
+    # Format the total number of quantity to be e.g. 365M
+    formatted_total = format(total_quantity, ',')
+
+    # Set layout
+    fig.update_layout(
+        title={ 'text': f'Model {mode.title()} Per Layer (Total: {formatted_total})', 'y':0.9, 'x':0.5, 'xanchor': 'center', 'yanchor': 'top'}, 
+        xaxis_title=mode.title() if mode == "parameters" else "Activation count", 
+        yaxis_title="Layer" if mode == "parameters" else "Activations",
+        )
+
+    # Ensure there's enough height to see all the x labels
+    fig.update_layout(height=max(500, 20 * len(quantities)))
+
+    # Set mouse-over text to show the number of quantity
+    fig.update_traces(text=values_list, hovertemplate='%{text:,}' + f' {mode}<extra></extra>', hoverlabel=dict(bgcolor='white'), )
+
+    # Set x axis to be logarithmic
+    fig.update_xaxes(type="log")
+
+    fig.show()
+
 # Navigating the feature maps
 def get_stride(label : str):
     """Get the stride of the layer referred to by label. How many pixels required to translate a single entry in the feature maps of label. """
