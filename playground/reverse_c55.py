@@ -142,14 +142,17 @@ def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=60)):
     # TODO statistically measure cheese pos activations, and average negative activations?
     
     cheese_row, cheese_col = maze.get_cheese_pos_from_seed(seed, flip_y=False)  # TODO flip_y should be false here, and also false for visualization.plot_dots -- will simplify logic
-    patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=(cheese_row, cheese_col))
+    # resampling_loc = (14, 14)  
+    resampling_loc = (cheese_row, cheese_col)
+    patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=resampling_loc)
+    # patches = random_combined_px_patch(layer_name=default_layer, channels=list(range(128)), cheese_loc=resampling_loc)
     # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels) # Shows that cheese loc matters
     # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=(13, 13)) # easier to compare effects
 
     # patches = random_combined_px_patch(layer_name=default_layer, channels=[55])
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
 
-    visualization.plot_dots(axs[1:], (cheese_row, cheese_col), is_grid=True, flip_y=False)
+    visualization.plot_dots(axs[1:], resampling_loc, is_grid=True, flip_y=False)
     plt.show()
 
     button = visualization.create_save_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
