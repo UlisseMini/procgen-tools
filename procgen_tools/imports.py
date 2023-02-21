@@ -46,7 +46,7 @@ except NameError:
 PATH_PREFIX = '../' if in_jupyter else ''
 
 # Load model
-use_small = False # Use small model with 1/4 as many conv layers TODO check if this is actually true
+use_small = False # Use small model with 1/4 as many conv layers
 model_name = 'maze_i' if use_small else f'maze_I/model_rand_region_{RAND_REGION}'
 model_stub = f'trained_models/{model_name}.pth'
 try:

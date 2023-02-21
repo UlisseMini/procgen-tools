@@ -16,23 +16,8 @@ setup() # create directory structure and download data
 # %%
 from procgen_tools.imports import *
 from procgen_tools.procgen_imports import *
-# %% Intervene on channel 55 of default_layer, setting its value manually 
-@interact
-def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5)):
-    venv = patch_utils.get_cheese_venv_pair(seed=seed)
-    patches = get_channel_pixel_patch(layer_name=default_layer, channel=55, value=value, coord=(row, col)) 
-    fig, axs, info = compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=6)
 
-    # Draw a red pixel at the location of the patch
-    plot_pixel_dot(axs[1], 15 - row, col) 
-    plt.show() 
-
-    # Add a button to save the figure to experiments/visualizations
-    def save_fig(b):
-        fig.savefig(f'visualizations/c55_{seed}_{row}_{col}_{value}.png')
-    button = Button(description='Save figure')
-    button.on_click(save_fig)
-    display(button)
+save_dir = os.getcwd() + '/visualizations'
 
 # %% Automatically find the highest-change patch for each seed
 def argmax_coords(seed : int, value : float = 5.6, top_k : int = 5):
