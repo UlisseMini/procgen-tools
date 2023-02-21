@@ -5,7 +5,7 @@ NUM_ACTIONS = 15
 
 # LABEL HANDLING
 def format_label(label : str):
-    """Format a label for display in the visualization."""
+    """Format a label for display in the """
     return label.replace("embedder.", "")
 
 def expand_label(label : str):
@@ -15,7 +15,7 @@ def expand_label(label : str):
         return label
 
 def format_labels(labels : List[str]):
-    """Format labels for display in the visualization."""
+    """Format labels for display in the """
     return list(map(format_label, labels))
 
 AGENT_OBS_WIDTH = 64
@@ -69,6 +69,14 @@ def plot_pixel_dot(ax, row, col, color='r', size=50):
     """ Plot a dot on the pixel grid at the given row and column of the b2.res1.resadd_out channel. """
     row, col = get_pixel_coords((row, col))
     ax.scatter(y=row, x=col, c=color, s=size)
+
+def plot_dots(axes : List[plt.Axes], coord : Tuple[int, int], color : str = 'red', flip_y : bool = True, is_grid : bool = False):
+    """ Plot dots on the given axes, given a channel coordinate. If flip_y, flips the y-axis. If is_grid, assumes the coord is an outer grid coordinate. """
+    row, col = get_channel_from_grid_pos(pos=coord) if is_grid else coord
+    if flip_y: 
+        row = 15 - row # NOTE assumes that channel width is 16
+    for ax in axes:
+        plot_pixel_dot(ax, row=row, col=col, color=color)
 
 def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_layer):
     """ Given a grid position, find the channel location that corresponds to that position. """
@@ -171,8 +179,34 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
     diffs = activations[0] - activations[1]
     plot_nonzero_activations(diffs, fig)
 
+
+# Widget helpers
+def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): # TODO put in py?
+    """ Create a button that saves fig to a file. 
+    
+    Args:
+        prefix (str): The prefix of the filename.
+        fig (plt.Figure): The figure to save.
+        descriptors (defaultdict[str, float]): A dictionary of descriptors to add to the filename.
+    """
+    def save_fig(b):
+        """ Save the figure to a file. """
+        filename = f'{prefix}_'
+        for key, value in descriptors.items():
+            # Replace any dots with underscores
+            value = str(value).replace('.', '_')
+            filename += f'{key}_{value}_'
+        filename = filename[:-1] + '.png' # remove trailing underscore
+        fig.savefig(filename)
+        # Display the filename
+        display(Markdown(f'Figure saved to `{filename}`'))
+
+    button = Button(description='Save figure')
+    button.on_click(save_fig)
+    return button # TODO integrate with activationsPlotter
+
 class ActivationsPlotter:
-    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, save_dir='experiments/visualizations', **act_kwargs):
+    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, save_dir='experiments/', **act_kwargs):
         """
         labels: The labels of the layers to plot
         plotter: A function that takes a label, channel, and activations and plots them

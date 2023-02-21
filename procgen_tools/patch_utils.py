@@ -154,8 +154,8 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
 
 def combined_pixel_patch(layer_name : str, value : float, coord : Tuple[int, int], channels : List[int]):
     """ Get a patch that modifies multiple channels at once. """
-    patches = [patch_utils.get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord) for channel in channels]
-    combined_patch = patch_utils.compose_patches(*patches)
+    patches = [get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord) for channel in channels]
+    combined_patch = compose_patches(*patches)
     return combined_patch
 
 def get_multiply_patch(layer_name : str, channel : int = -1, pos_multiplier : float = None, neg_multiplier : float = None):

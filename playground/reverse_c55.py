@@ -18,66 +18,25 @@ import procgen_tools.visualization as visualization
 import procgen_tools.patch_utils as patch_utils
 import procgen_tools.maze as maze
 
-# %%
-def plot_dots(axes : List[plt.Axes], coord : Tuple[int, int], color : str = 'red', flip_y : bool = True, is_grid : bool = False):
-    """ Plot dots on the given axes, given a channel coordinate. If flip_y, flips the y-axis. If is_grid, assumes the coord is an outer grid coordinate. """
-    row, col = visualization.get_channel_from_grid_pos(pos=coord) if is_grid else coord
-    if flip_y: 
-        row = 15 - row # NOTE assumes that channel width is 16
-    for ax in axes:
-        visualization.plot_pixel_dot(ax, row=row, col=col, color=color)
-    
-def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): # TODO put in visualization.py?
-    """ Create a button that saves fig to a file. 
-    
-    Args:
-        prefix (str): The prefix of the filename.
-        fig (plt.Figure): The figure to save.
-        descriptors (defaultdict[str, float]): A dictionary of descriptors to add to the filename.
-    """
-    def save_fig(b):
-        """ Save the figure to a file. """
-        filename = f'{prefix}_'
-        for key, value in descriptors.items():
-            # Replace any dots with underscores
-            value = str(value).replace('.', '_')
-            filename += f'{key}_{value}_'
-        filename = filename[:-1] + '.png' # remove trailing underscore
-        fig.savefig(filename)
-        # Display the filename
-        display(Markdown(f'Figure saved to `{filename}`'))
-
-    button = Button(description='Save figure')
-    button.on_click(save_fig)
-    return button
-
 save_dir = 'playground/visualizations'
 AX_SIZE = 6
 
-# %% Helper function for patching subsets of channels
 cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
 effective_channels = [77, 113, 88, 55, 8, 82, 89]
-
-def get_combined_pixel_patch(layer_name : str, value : float, coord : Tuple[int, int], channels : List[int]):
-    """ Get a patch that modifies multiple channels at once. """
-    patches = [patch_utils.get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord) for channel in channels]
-    combined_patch = patch_utils.compose_patches(*patches)
-    return combined_patch
-
 
 # %% 
 @interact
 def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-10, max=10, step=0.1, value=1.1), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel_list=Dropdown(options=[effective_channels, cheese_channels], value=effective_channels)):
-    combined_patch = get_combined_pixel_patch(layer_name=default_layer, value=value, coord=(row, col), channels=channel_list)
+    combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(row, col), channels=channel_list)
 
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=True, ax_size=AX_SIZE)
 
     # Draw a red pixel at the location of the patch
-    plot_dots(axs[1:], (row, col)) 
+    visualization.plot_dots(axs[1:], (row, col)) 
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{save_dir}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
     display(button)
 
 # %% Try synthetically modifying each channel individually
@@ -88,11 +47,11 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), va
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
 
     # Draw a red pixel at the location of the patch
-    plot_dots(axs[1:], (row, col)) # TODO red dot not rendering
+    visualization.plot_dots(axs[1:], (row, col)) # TODO red dot not rendering
     plt.show() 
 
     # Add a button to save the figure to experiments/visualizations
-    button = create_save_button(prefix=f'{save_dir}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{save_dir}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
     display(button)
 
 # %% Multiplying c55, treating both positive and negative activations separately
@@ -103,7 +62,7 @@ def multiply_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), pos_mul
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, pos=pos_multiplier, neg=neg_multiplier))
+    button = visualization.create_save_button(prefix=f'{save_dir}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, pos=pos_multiplier, neg=neg_multiplier))
     display(button)
 
 # %% [markdown]
@@ -124,17 +83,17 @@ def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=20), value=FloatSli
         chan_col += 2
 
     # patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=55, coord=(chan_row, chan_col), value=value) 
-    combined_patch = get_combined_pixel_patch(layer_name=default_layer, value=value, coord=(chan_row, chan_col), channels=cheese_channels)
+    combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(chan_row, chan_col), channels=cheese_channels)
 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=True, ax_size=AX_SIZE)
-    plot_dots(axs[1:], (chan_row, chan_col))
+    visualization.plot_dots(axs[1:], (chan_row, chan_col))
 
     fig.suptitle(f'Cheese patch channels, position {chan_row}, {chan_col}')
     # fig.suptitle(f'Channel 55, position {chan_row}, {chan_col}') # TODO clean up / generalize
     
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/c55_pixel_synthetic', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
+    button = visualization.create_save_button(prefix=f'{save_dir}/c55_pixel_synthetic', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
     display(button)
 
 # %% Compare with patching a different channel with the same synthetic patch
@@ -149,7 +108,7 @@ def c55_patch_transfer_across_channels(seed=IntSlider(min=0, max=100, step=1, va
     fig.suptitle(f'Channel {channel}, position {channel_pos}')
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/c55_synthetic_cheese_transfer', fig=fig, descriptors=defaultdict[str, float](seed=seed, channel=channel))
+    button = visualization.create_save_button(prefix=f'{save_dir}/c55_synthetic_cheese_transfer', fig=fig, descriptors=defaultdict[str, float](seed=seed, channel=channel))
     display(button)
 
 # %% Random patching channels
@@ -165,7 +124,7 @@ def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/random_channel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, layer_name=layer_name, channel=channel))
+    button = visualization.create_save_button(prefix=f'{save_dir}/random_channel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, layer_name=layer_name, channel=channel))
     display(button)
 
 # %% Causal scrub 55
@@ -182,7 +141,7 @@ def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=60)):
 
     # TODO statistically measure cheese pos activations, and average negative activations?
     
-    cheese_row, cheese_col = maze.get_cheese_pos_from_seed(seed, flip_y=False)  # TODO flip_y should be false here, and also false for plot_dots -- will simplify logic
+    cheese_row, cheese_col = maze.get_cheese_pos_from_seed(seed, flip_y=False)  # TODO flip_y should be false here, and also false for visualization.plot_dots -- will simplify logic
     patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=(cheese_row, cheese_col))
     # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels) # Shows that cheese loc matters
     # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=(13, 13)) # easier to compare effects
@@ -190,10 +149,10 @@ def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=60)):
     # patches = random_combined_px_patch(layer_name=default_layer, channels=[55])
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
 
-    plot_dots(axs[1:], (cheese_row, cheese_col), is_grid=True, flip_y=False)
+    visualization.plot_dots(axs[1:], (cheese_row, cheese_col), is_grid=True, flip_y=False)
     plt.show()
 
-    button = create_save_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
+    button = visualization.create_save_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
     display(button) # TODO measure performance loss/ avg logit diff relative to eg random ablating same number of channels at the layer
 
 # %%
