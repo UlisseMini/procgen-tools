@@ -131,8 +131,6 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
     def patch_fn(outp): 
         random_idx = np.random.randint(0, num_obs) # TODO i think this only invokes once
         new_vals = random_vals[random_idx, ...]
-        # new_vals[new_vals < 0] = new_vals[new_vals < 0] * 5 # TODO make this a separate patch, with pos_coeff and neg_coeff instead of just pure multiplcition
-        # new_vals[new_vals > 0] = new_vals[new_vals > 0] * 5
         return new_vals
         
     # If patch_single_channel, this will be applied to the channel dimension; otherwise, it will be applied to the entire output

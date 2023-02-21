@@ -2,6 +2,7 @@ from typing import List, Tuple, Dict, Union, Optional, Callable
 import re 
 from collections import defaultdict
 import pickle
+import funcy as fn
 
 import numpy as np
 import pandas as pd

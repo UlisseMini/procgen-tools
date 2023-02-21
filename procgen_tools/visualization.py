@@ -66,9 +66,7 @@ def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16, fli
     return get_pixel_loc(row, channel_size), get_pixel_loc(col, channel_size)
 
 def plot_pixel_dot(ax, row, col, color='r', size=50):
-    """ Plot a dot on the pixel grid at the given row and column of the game grid. 
-    
-    TODO fix issue where you have to flip """
+    """ Plot a dot on the pixel grid at the given row and column of the b2.res1.resadd_out channel. """
     row, col = get_pixel_coords((row, col))
     ax.scatter(y=row, x=col, c=color, s=size)
 
@@ -205,7 +203,7 @@ class ActivationsPlotter:
             self.update_plotter()
         decrement_button.on_click(lambda _: add_to_slider(-1))
         increment_button.on_click(lambda _: add_to_slider(1))
-        self.widgets = [self.fig, self.label_widget, HBox([self.channel_slider, decrement_button, increment_button])]
+        self.widgets = [self.fig, self.label_widget, HBox([self.channel_slider, decrement_button, increment_button])] # TODO make this a helper for converting arbitrary sliders
 
         # Add row and column sliders if enabled
         self.coords_enabled = coords_enabled

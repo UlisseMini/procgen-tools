@@ -369,7 +369,7 @@ def get_cheese_pos(grid: np.ndarray, flip_y : bool = False) -> Square:
     assert num_cheeses == 1, f'num_cheeses={num_cheeses} should be 1'
     row, col = np.where(grid == CHEESE)
     row, col = row[0], col[0]
-    return ((maze.WORLD_DIM - 1) - row if flip_y else row), col 
+    return ((WORLD_DIM - 1) - row if flip_y else row), col 
 
 def remove_cheese(venv, idx : int = 0):
     """
@@ -855,10 +855,10 @@ def get_inner_grid_from_seed(seed : int):
     state = get_envstate_from_seed(seed)
     return state.inner_grid()
 
-def get_cheese_pos_from_seed(seed : int):
+def get_cheese_pos_from_seed(seed : int, flip_y : bool = False):
     """ Get the cheese position from a maze seed. """
     grid = get_full_grid_from_seed(seed)
-    return get_cheese_pos(grid)
+    return get_cheese_pos(grid, flip_y=flip_y)
 
 def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
     """ Generate a list of maze seeds with cheese at the specified location. """

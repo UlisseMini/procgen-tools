@@ -26,5 +26,6 @@ setup(
         "mistune==0.8.4", # intermediate dependency issue with ndconvert?
         "captum>=0.6.0",
         "kaleido>=0.2.1",
+        "funcy>=1.18",
     ]
 )
