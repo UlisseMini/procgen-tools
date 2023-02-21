@@ -237,17 +237,17 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
 
 
 # Widget helpers
-def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): # TODO put in py?
+def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): 
     """ Create a button that saves fig to a file. 
     
     Args:
-        prefix (str): The prefix of the filename.
+        prefix (str): The prefix of the filename. Typically "experiments" or "playground".
         fig (plt.Figure): The figure to save.
         descriptors (defaultdict[str, float]): A dictionary of descriptors to add to the filename.
     """
     def save_fig(b):
         """ Save the figure to a file. """
-        filename = f'{prefix}_'
+        filename = f'{prefix}/visualizations/'
         for key, value in descriptors.items():
             # Replace any dots with underscores
             value = str(value).replace('.', '_')
