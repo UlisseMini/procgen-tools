@@ -73,7 +73,6 @@ def channel_patch_or_broadcast(layer_name : str,  patch_fn : Callable[[np.ndarra
         return outp
     return {layer_name: patch_fn_new} 
 
-import funcy as fn
 def compose_patches(*patches : List[dict]):
     """ Compose a list of patches into a single patch. The order of the patches is the order in which they are applied. Note that the new patch only applies for the layers which are shared by all patches. """
     # Find all shared keys
@@ -152,6 +151,12 @@ def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coo
         return outp
 
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=new_corner_patch) # TODO make box activation
+
+def combined_pixel_patch(layer_name : str, value : float, coord : Tuple[int, int], channels : List[int]):
+    """ Get a patch that modifies multiple channels at once. """
+    patches = [patch_utils.get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord) for channel in channels]
+    combined_patch = patch_utils.compose_patches(*patches)
+    return combined_patch
 
 def get_multiply_patch(layer_name : str, channel : int = -1, pos_multiplier : float = None, neg_multiplier : float = None):
     """ Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. If pos_multiplier is specified, multiply only positive activations by that value. If neg_multiplier is specified, multiply only negative activations by that value. """
