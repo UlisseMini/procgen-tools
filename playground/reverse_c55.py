@@ -18,7 +18,7 @@ import procgen_tools.visualization as visualization
 import procgen_tools.patch_utils as patch_utils
 import procgen_tools.maze as maze
 
-SAVE_DIR = 'playground'
+SAVE_DIR = 'playground/visualizations/'
 AX_SIZE = 6
 
 cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 

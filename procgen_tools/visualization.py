@@ -235,11 +235,12 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
     diffs = activations[0] - activations[1]
     plot_nonzero_activations(diffs, fig)
 
-def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None, is_policy_out : bool = False, bounds : Tuple[int, int] = None):
+def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None, is_policy_out : bool = False, bounds : Tuple[int, int] = None, px_dims : Tuple[int, int] = None):
     """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. 
     
     If is_policy_out is True, the x-axis will be formatted as a policy output. If bounds is not None, the z-axis will be formatted to show the activations in the given bounds. """
-    fig.update_layout(height=500, width=500, title_text=title)
+    h, w = px_dims or (500, 500)
+    fig.update_layout(height=h, width=w, title_text=title)
     fig.update_xaxes(side="top")        
     
     if is_policy_out:
@@ -261,19 +262,32 @@ def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None
     # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
     fig.update_traces(colorscale='RdBu')
 
+def plot_patch(patch : dict, hook : cmh.ModuleHook, layer : str = default_layer, channel : int = 0, fig : go.FigureWidget = None, title : str = None, bounds : Tuple[int, int] = None, px_dims : Tuple[int, int] = None):
+    """ Plot the activations of a single patch, at the given layer and channel. Returns a figure. """
+    assert layer in patch, f"Layer {layer} not in patch {patch}"
+
+    if fig is None: 
+        fig = go.FigureWidget()
+    activations = patch[layer](hook.values_by_label[default_layer])
+    assert activations.shape[1] > channel, f"Channel {channel} not in activations {activations.shape}"
+
+    activations = activations[0, channel] # Shape is (h, w)
+    plot_activations(activations, fig)
+    format_plotter(fig, activations, title=title, bounds=bounds, px_dims=px_dims)
+    return fig
 
 # Widget helpers
 def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): 
     """ Create a button that saves fig to a file. 
     
     Args:
-        prefix (str): The prefix of the filename. Typically "experiments" or "playground".
+        prefix (str): The prefix of the filename. Typically "experiments/visualizations/" or "playground/visualizations".
         fig (plt.Figure): The figure to save.
         descriptors (defaultdict[str, float]): A dictionary of descriptors to add to the filename.
     """
     def save_fig(b):
         """ Save the figure to a file. """
-        filename = f'{prefix}/visualizations/'
+        filename = prefix
         for key, value in descriptors.items():
             # Replace any dots with underscores
             value = str(value).replace('.', '_')

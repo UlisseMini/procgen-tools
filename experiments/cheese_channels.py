@@ -28,7 +28,7 @@ from procgen_tools import visualization, patch_utils, maze
 cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
 effective_channels = [77, 113, 88, 55, 8, 82, 89]
 
-SAVE_DIR = 'experiments'
+SAVE_DIR = 'experiments/visualizations'
 AX_SIZE = 6
 
 # %% [markdown]
@@ -51,20 +51,32 @@ display(widget_box)
 custom_maze_plotter.display() 
 
 # %% [markdown]
-# # Intervening on 55
-# It turns out that channel 55 lets us retarget the agent somewhat reliably and strongly, moving around only a single activation in a single convolutional layer.
+# # Intervening on channel 55
+# `block2.res1.resadd_out` has 128 channels and 32,768 activations. It turns out that channel 55 lets us retarget the agent somewhat reliably and strongly, moving around only a single activation in a single channel.
 
-# %%
 # %% Try synthetically modifying each channel individually
+# Declare all the sliders separately 
+seed_slider = IntSlider(min=0, max=20, step=1, value=0)
+value_slider = FloatSlider(min=-30, max=30, step=0.1, value=5.6)
+row_slider = IntSlider(min=0, max=15, step=1, value=5)
+col_slider = IntSlider(min=0, max=15, step=1, value=5)
+channel_slider = Dropdown(options=cheese_channels, value=55)
+
+# # Display all of these in a VBox
+# box = VBox([seed_slider, value_slider, row_slider, col_slider, channel_slider])
+# # Display a go.FigureWidget next to it
+# act_fig = go.FigureWidget()
+# display(HBox([box, act_fig]))
+
 @interact
-def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=cheese_channels, value=55)):
+def interactive_channel_patch(seed=seed_slider, value=value_slider, row=row_slider, col=col_slider, channel=channel_slider):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
-    fig.suptitle(f'Synthetically patching {channel} (value={value})')
+    fig.suptitle(f'Synthetic patch on channel {channel} (value={value})')
 
     # Draw a red pixel at the location of the patch
-    visualization.plot_dots(axs[1:], (row, col), color='red')
+    visualization.plot_dots(axs[1:], (row, col))
     plt.show() 
 
     # Add a button to save the figure to experiments/visualizations
@@ -72,24 +84,47 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), va
     display(button)
     
     # Render the synthetic patch
-    synth_activations = patches[default_layer](hook.values_by_label[default_layer])
-    act_fig = go.Figure()
-    visualization.plot_activations(synth_activations[0,55], fig=act_fig)
-    visualization.format_plotter(fig=act_fig, activations=synth_activations, bounds=(-.8, .8)) 
-    display(act_fig)
+    visualization.plot_patch(patch=patches, hook=hook, channel=channel, title=f'Channel {channel} (patched)', px_dims=(300,300), bounds=(-.8, .8))
 
 # %%
-@interact
-def double_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), multiplier=FloatSlider(min=0, max=2, step=0.1, value=2)):
+gif_dir = f'{SAVE_DIR}/pixel_gifs'
+def save_channel_patch_image(seed : int, value : float, row : int, col : int, channel : int):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
-
-    patches = patch_utils.get_multiply_patch(layer_name=default_layer, channel=55, pos_multiplier=multiplier, neg_multiplier=multiplier)
+    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
-    plt.show()
+    fig.suptitle(f'Synthetic patch on channel {channel} (value={value})')
 
-    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/visualizations/double_c55/', fig=fig, descriptors={'seed': seed, 'multiplier': multiplier})
+    # Draw a red pixel at the location of the patch
+    visualization.plot_dots(axs[1:], (row, col))
+    save_dir = f'{gif_dir}'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    fname = f'{save_dir}/seed{seed}_col{col}.png'
+    fig.savefig(fname)
+    plt.close(fig)
+    
+    return fname 
 
+# %% 
+# Do the above, but animate it and save it to a gif
+import imageio
+
+channels = [55, 88, 42]
+seeds = (0, 20)
+coords = [(5, col) for col in range(4, 13)]
+
+for channel in channels:
+    for seed in seeds:
+        images = []
+
+        for row, col in coords:
+            fname = save_channel_patch_image(seed, 5.6, row, col, channel=channel)
+            images.append(imageio.imread(fname))
+            # Delete the file
+            os.remove(fname)
+
+        target = f'{gif_dir}/c{channel}_seed{seed}.gif'
+        # The PNG-FI format means 
+        imageio.mimsave(target, images, duration=0.5)
+        print(f'Saved {target}')
 # %%
-
-
-
