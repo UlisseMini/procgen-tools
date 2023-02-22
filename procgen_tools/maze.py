@@ -597,8 +597,13 @@ def venv_from_grid(grid: np.ndarray):
     return venv
 
 def get_padding(grid: np.ndarray) -> int:
-    """ Return the padding of the grid, i.e. the number of walls around the maze. """
+    """ Return the padding of the (inner) grid, i.e. the number of walls around the maze. """
     return (WORLD_DIM - grid.shape[0]) // 2
+
+def inside_inner_grid(grid: np.ndarray, row: int, col: int) -> bool:
+    """ Return True if the given row, col is inside the inner grid. """
+    padding = get_padding(grid)
+    return padding <= row < grid.shape[0] - padding and padding <= col < grid.shape[1] - padding
 
 def render_inner_grid(grid: np.ndarray):
     """ Extract the human-sensible view given grid, assumed to be an inner_grid. Return the human view."""

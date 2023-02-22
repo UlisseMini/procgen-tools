@@ -87,44 +87,5 @@ def interactive_channel_patch(seed=seed_slider, value=value_slider, row=row_slid
     visualization.plot_patch(patch=patches, hook=hook, channel=channel, title=f'Channel {channel} (patched)', px_dims=(300,300), bounds=(-.8, .8))
 
 # %%
-gif_dir = f'{SAVE_DIR}/pixel_gifs'
-def save_channel_patch_image(seed : int, value : float, row : int, col : int, channel : int):
-    venv = patch_utils.get_cheese_venv_pair(seed=seed)
-    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
-    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
-    fig.suptitle(f'Synthetic patch on channel {channel} (value={value})')
 
-    # Draw a red pixel at the location of the patch
-    visualization.plot_dots(axs[1:], (row, col), color='cyan')
-    save_dir = f'{gif_dir}'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    fname = f'{save_dir}/seed{seed}_col{col}.png'
-    fig.savefig(fname)
-    plt.close(fig)
-    
-    return fname 
-
-# %% 
-# Do the above, but animate it and save it to a gif
-import imageio
-
-channels = [55, 88, 42]
-seeds = (0, 20)
-coords = [(5, col) for col in range(4, 13)]
-
-for channel in channels:
-    for seed in seeds:
-        images = []
-
-        for row, col in coords:
-            fname = save_channel_patch_image(seed, 5.6, row, col, channel=channel)
-            images.append(imageio.imread(fname))
-            # Delete the file
-            os.remove(fname)
-
-        target = f'{gif_dir}/c{channel}_seed{seed}.gif'
-        # The PNG-FI format means 
-        imageio.mimsave(target, images, duration=0.5)
-        print(f'Saved {target}')
 # %%

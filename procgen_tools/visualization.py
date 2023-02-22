@@ -1,7 +1,6 @@
 from procgen_tools.imports import *
 from procgen_tools import maze, vfield, patch_utils
 
-NUM_ACTIONS = 15
 
 # LABEL HANDLING
 def format_label(label : str):
@@ -121,18 +120,33 @@ def get_pixel_coords(channel_pos : Tuple[int, int], channel_size : int = 16, fli
 
     return get_pixel_loc(row, channel_size), get_pixel_loc(col, channel_size)
 
-def plot_pixel_dot(ax, row, col, color='r', size=50):
-    """ Plot a dot on the pixel grid at the given row and column of the b2.res1.resadd_out channel. """
-    row, col = get_pixel_coords((row, col))
-    ax.scatter(y=row, x=col, c=color, s=size)
+def plot_pixel_dot(ax : plt.Axes, row : int, col : int, color : str = 'r', size : int = 50, hidden_padding : int = 0):
+    """ Plot a dot on the pixel grid at the given row and column of the block2.res1.resadd_out channel. hidden_padding is the number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call. """
+    px_row, px_col = get_pixel_coords((row, col))
+    padding_offset = (PIXEL_SIZE / maze.WORLD_DIM) * hidden_padding
+    dot_rescale_from_padding =  maze.WORLD_DIM / (maze.WORLD_DIM - hidden_padding)
+    
+    # Ensure the dot is within the bounds of the pixel grid
+    new_row, new_col = (coord - padding_offset for coord in (px_row, px_col))  
+    if 0 <= new_row <= PIXEL_SIZE and 0 <= new_col <= PIXEL_SIZE:
+        ax.scatter(y=new_row, x=new_col, c=color, s=size * dot_rescale_from_padding)
 
-def plot_dots(axes : List[plt.Axes], coord : Tuple[int, int], color : str = 'red', flip_y : bool = True, is_grid : bool = False):
-    """ Plot dots on the given axes, given a channel coordinate. If flip_y, flips the y-axis. If is_grid, assumes the coord is an outer grid coordinate. """
+def plot_dots(axes : List[plt.Axes], coord : Tuple[int, int], color : str = 'red', flip_y : bool = True, is_grid : bool = False, hidden_padding : int = 0):
+    """ Plot dots on the given axes, given a channel coordinate in the full grid. If flip_y, flips the y-axis. If is_grid, assumes the coord is an outer grid coordinate. 
+    
+    Args:
+        axes: The axes to plot on.
+        coord: The coordinate to plot.
+        color: The color of the dot.
+        flip_y: Whether to flip the y-axis.
+        is_grid: Whether the coord is a grid coordinate.
+        hidden_padding: The padding in this maze which should be ignored when plotting.
+    """
     row, col = get_channel_from_grid_pos(pos=coord) if is_grid else coord
     if flip_y: 
         row = 15 - row # NOTE assumes that channel width is 16
     for ax in axes:
-        plot_pixel_dot(ax, row=row, col=col, color=color)
+        plot_pixel_dot(ax, row=row, col=col, color=color, hidden_padding = hidden_padding)
 
 def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_layer):
     """ Given a grid position, find the channel location that corresponds to that position. """
@@ -160,7 +174,6 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     flip_numpy: Whether to vertically flip the numpy view.
     render_padding: Whether to render the padding in the human or numpy view.
     """
-
     assert not (mode == "agent" and not render_padding), "This parameter combination is unsupported; must render padding in agent mode."
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
@@ -246,6 +259,7 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
     diffs = activations[0] - activations[1]
     plot_nonzero_activations(diffs, fig)
 
+NUM_ACTIONS = 15
 def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None, is_policy_out : bool = False, bounds : Tuple[int, int] = None, px_dims : Tuple[int, int] = None):
     """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. 
     
@@ -272,6 +286,8 @@ def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None
     
     # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
     fig.update_traces(colorscale='RdBu')
+
+# To indicate that fig can be matplotlib or plotly, we use the type go.FigureWidget
 
 def plot_patch(patch : dict, hook : cmh.ModuleHook, layer : str = default_layer, channel : int = 0, fig : go.FigureWidget = None, title : str = None, bounds : Tuple[int, int] = None, px_dims : Tuple[int, int] = None):
     """ Plot the activations of a single patch, at the given layer and channel. Returns a figure. """
