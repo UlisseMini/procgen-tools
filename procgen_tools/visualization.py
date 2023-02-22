@@ -235,6 +235,32 @@ def plot_nonzero_diffs(activations: np.ndarray, fig: go.FigureWidget):
     diffs = activations[0] - activations[1]
     plot_nonzero_activations(diffs, fig)
 
+def format_plotter(fig : go.Figure, activations : np.ndarray, title : str = None, is_policy_out : bool = False, bounds : Tuple[int, int] = None):
+    """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. 
+    
+    If is_policy_out is True, the x-axis will be formatted as a policy output. If bounds is not None, the z-axis will be formatted to show the activations in the given bounds. """
+    fig.update_layout(height=500, width=500, title_text=title)
+    fig.update_xaxes(side="top")        
+    
+    if is_policy_out:
+        # Transform each index into the corresponding action label, according to maze.py 
+        fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
+    else: # Reset the x-axis ticks to match the y-axis ticks
+        yaxis_ticktext, yaxis_tickvals = fig.layout.yaxis.ticktext, fig.layout.yaxis.tickvals # TODO double the step of yaxis ticks?
+        fig.update_xaxes(ticktext=yaxis_ticktext, tickvals=yaxis_tickvals)
+
+    fig.update_xaxes(side="top") # Set the x ticks to the top
+    fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange        
+    
+    # Set the min and max to be the min and max of all channels at this label
+    if bounds is None: 
+        max_act = np.abs(activations).max()
+        bounds = (-1 * max_act, max_act)
+    fig.update_traces(zmin=bounds[0], zmid=0, zmax=bounds[1])    
+    
+    # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
+    fig.update_traces(colorscale='RdBu')
+
 
 # Widget helpers
 def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): 
@@ -367,27 +393,7 @@ class ActivationsPlotter:
                 activations = np.expand_dims(activations, axis=(1,2)) # Add a dummy dimension to the activations
 
         self.plotter(activations=activations[:, channel], fig=self.fig) # Plot the activations
-        self.format_fig(activations)
+        format_plotter(fig=self.fig, activations=activations, is_policy_out=self.label_widget.value == 'fc_policy_out', title=self.label_widget.value)
 
-    def format_fig(self, activations : np.ndarray):
-        """ Format the figure. Takes activations as input so that the x- and z-axes can be formatted according to the activations. """
-        self.fig.update_layout(height=500, width=500, title_text=self.label_widget.value)
-        self.fig.update_xaxes(side="top")        
-        
-        if self.label_widget.value == 'fc_policy_out':
-            # Transform each index into the corresponding action label, according to maze.py 
-            self.fig.update_xaxes(ticktext=[models.human_readable_action(i).title() for i in range(NUM_ACTIONS)], tickvals=np.arange(activations.shape[3])) 
-        else: # Reset the x-axis ticks to match the y-axis ticks
-            yaxis_ticktext, yaxis_tickvals = self.fig.layout.yaxis.ticktext, self.fig.layout.yaxis.tickvals # TODO double the step of yaxis ticks?
-            self.fig.update_xaxes(ticktext=yaxis_ticktext, tickvals=yaxis_tickvals)
 
-        self.fig.update_xaxes(side="top") # Set the x ticks to the top
-        self.fig.update_yaxes(autorange="reversed") # Reverse the row-axis autorange        
-        
-        # Set the min and max to be the min and max of all channels at this label
-        bounds = np.abs(activations).max()
-        self.fig.update_traces(zmin=-1 * bounds, zmid=0, zmax=bounds)    
-        
-        # Change the colorscale to split red (negative) -- white (zero) -- blue (positive)
-        self.fig.update_traces(colorscale='RdBu')
     

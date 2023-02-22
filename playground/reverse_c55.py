@@ -18,7 +18,7 @@ import procgen_tools.visualization as visualization
 import procgen_tools.patch_utils as patch_utils
 import procgen_tools.maze as maze
 
-save_dir = 'playground'
+SAVE_DIR = 'playground'
 AX_SIZE = 6
 
 cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
@@ -36,7 +36,7 @@ def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), val
     visualization.plot_dots(axs[1:], (row, col)) 
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
     display(button)
 
 # %% Try synthetically modifying each channel individually
@@ -45,13 +45,14 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=20, step=1, value=0), va
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+    fig.title(f'Synthetically patching {channel} (value={value})')
 
     # Draw a red pixel at the location of the patch
-    visualization.plot_dots(axs[1:], (row, col)) # TODO red dot not rendering
+    visualization.plot_dots(axs[1:], (row, col), color='red')
     plt.show() 
 
     # Add a button to save the figure to experiments/visualizations
-    button = visualization.create_save_button(prefix=f'{save_dir}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
     display(button)
 
 # %% Multiplying c55, treating both positive and negative activations separately
@@ -62,7 +63,7 @@ def multiply_channel_55(seed=IntSlider(min=0, max=100, step=1, value=0), pos_mul
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, pos=pos_multiplier, neg=neg_multiplier))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_multiplier', fig=fig, descriptors=defaultdict[str, float](seed=seed, pos=pos_multiplier, neg=neg_multiplier))
     display(button)
 
 # %% [markdown]
@@ -93,7 +94,7 @@ def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=20), value=FloatSli
     
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/c55_pixel_synthetic', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_pixel_synthetic', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value))
     display(button)
 
 # %% Compare with patching a different channel with the same synthetic patch
@@ -108,7 +109,7 @@ def c55_patch_transfer_across_channels(seed=IntSlider(min=0, max=100, step=1, va
     fig.suptitle(f'Channel {channel}, position {channel_pos}')
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/c55_synthetic_cheese_transfer', fig=fig, descriptors=defaultdict[str, float](seed=seed, channel=channel))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_synthetic_cheese_transfer', fig=fig, descriptors=defaultdict[str, float](seed=seed, channel=channel))
     display(button)
 
 # %% Random patching channels
@@ -124,7 +125,7 @@ def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/random_channel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, layer_name=layer_name, channel=channel))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/random_channel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, layer_name=layer_name, channel=channel))
     display(button)
 
 # %% Causal scrub 55
@@ -155,7 +156,7 @@ def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=60)):
     visualization.plot_dots(axs[1:], resampling_loc, is_grid=True, flip_y=False)
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{save_dir}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_causal_scrub', fig=fig, descriptors=defaultdict[str, float](seed=seed))
     display(button) # TODO measure performance loss/ avg logit diff relative to eg random ablating same number of channels at the layer
 
 # %%
