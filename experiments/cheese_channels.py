@@ -95,7 +95,7 @@ def save_channel_patch_image(seed : int, value : float, row : int, col : int, ch
     fig.suptitle(f'Synthetic patch on channel {channel} (value={value})')
 
     # Draw a red pixel at the location of the patch
-    visualization.plot_dots(axs[1:], (row, col))
+    visualization.plot_dots(axs[1:], (row, col), color='cyan')
     save_dir = f'{gif_dir}'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

@@ -1,0 +1,74 @@
+# %%
+%reload_ext autoreload
+%autoreload 2
+
+# %%
+try:
+    import procgen_tools
+except ImportError or ModuleNotFoundError:
+    get_ipython().run_line_magic(magic_name='pip', line='install -U git+https://github.com/ulissemini/procgen-tools')
+
+from procgen_tools.utils import setup
+
+setup() # create directory structure and download data 
+
+from procgen_tools.imports import *
+from procgen_tools import visualization, patch_utils, maze
+
+
+# %% Setup code for the rest of the notebook
+cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
+effective_channels = [77, 113, 88, 55, 8, 82, 89]
+
+SAVE_DIR = 'playground/visualizations'
+AX_SIZE = 6
+gif_dir = f'{SAVE_DIR}/pixel_gifs'
+
+def save_channel_patch_image(seed : int, value : float, row : int, col : int, channel : int):
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+    fig.suptitle(f'Synthetic patch on channel {channel} (value={value})')
+
+    # Draw a red pixel at the location of the patch
+    visualization.plot_dots(axs[1:], (row, col), color='cyan')
+    save_dir = f'{gif_dir}'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    fname = f'{save_dir}/seed{seed}_col{col}.png'
+    fig.savefig(fname)
+    plt.close(fig)
+    
+    return fname 
+
+import imageio
+
+def save_sweep(channel : int, seed : int, coords : List[Tuple[int, int]]):
+    """ Save a sweep of the maze, where the pixel patch moves from one coordinate to the next. """
+    images = []
+    for row, col in coords:
+        fname = save_channel_patch_image(seed, 5.6, row, col, channel=channel)
+        images.append(imageio.imread(fname))
+        # Delete the file
+        os.remove(fname)
+
+    target = f'{gif_dir}/c{channel}_seed{seed}.gif'
+    imageio.mimsave(target, images, duration=0.5)
+
+# %% 
+channels = [55, 88, 42]
+
+# Make a set of (x,y) coordinates which linearly interpolate from (4, 4) to (4, 12) to (12, 4) to (12, 12)
+z_coords = list((4, col) for col in range(4, 13))
+z_coords += list((4 + row, 12 - row) for row in range(1, 9))
+z_coords += list((12, col) for col in range(4, 13))
+
+# %%
+for seed in range(500,501):
+    for channel in channels:
+        save_sweep(channel=channel, seed=seed, coords=z_coords)
+
+# %% Show multiple channels get updated simultaneously
+# Make a maze editor and then render the maze using the human view
+venv = patch_utils.get_cheese_venv_pair(seed=0)
+editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb)

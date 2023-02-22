@@ -147,8 +147,8 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
     return (int(chan_row), int(chan_col))
 
-def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True):
-    """ Visualize the environment. 
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True):
+    """ Visualize the environment. Returns an img if show_plot is false. 
     
     Parameters: 
     venv: The environment to visualize
@@ -158,24 +158,35 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     ax_size: The size of the axis to create, if ax is None.
     show_plot: Whether to show the plot. 
     flip_numpy: Whether to vertically flip the numpy view.
+    render_padding: Whether to render the padding in the human or numpy view.
     """
+
+    assert not (mode == "agent" and not render_padding), "This parameter combination is unsupported; must render padding in agent mode."
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     ax.axis('off')
     ax.set_title(mode.title() + " view")
     
     if mode == "human":
-        img = venv.env.get_info()[idx]['rgb']
+        if render_padding:
+            inner_grid = maze.EnvState(venv.env.callmethod('get_state')[idx]).inner_grid() 
+            img = maze.render_inner_grid(inner_grid)
+        else:
+            img = venv.env.get_info()[idx]['rgb']
     elif mode == "agent":
         img = venv.reset()[idx].transpose(1,2,0) # (C, H, W) -> (H, W, C)
     elif mode == "numpy":
-        img = maze.EnvState(venv.env.callmethod('get_state')[idx]).full_grid()[::(-1 if flip_numpy else 1), :]
+        env_state = maze.EnvState(venv.env.callmethod('get_state')[idx])
+        grid = env_state.full_grid() if render_padding else env_state.inner_grid()
+        img = grid[::(-1 if flip_numpy else 1), :] # Flip the numpy view vertically
     else:
         raise ValueError(f"Invalid mode {mode}")
 
     ax.imshow(img)
     if show_plot:
         plt.show() 
+    else:
+        return img
 
 def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
