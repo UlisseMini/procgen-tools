@@ -24,14 +24,16 @@ SAVE_DIR = 'playground/visualizations'
 AX_SIZE = 6
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
 
-def save_channel_patch_image(seed : int, value : float, row : int, col : int, channel : int):
+def save_channel_patch_image(seed : int, value : float, row : int, col : int, channels : List[int]):
     """ Save an image of the maze with a pixel patch on the given channel at (row, col) in the block2.res1.resadd_out channel. """
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     padding = maze.get_padding(maze.get_inner_grid_from_seed(seed))
 
-    patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col)) 
-    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=False, ax_size=AX_SIZE, show_original=False) # Don't plot the original vfields
-    fig.suptitle(f'Synthetic patch on channel {channel}', fontsize=20)
+    patch = patch_utils.combined_pixel_patch(layer_name=default_layer, channels=channels, value=value, coord=(row, col)) 
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patch, hook, render_padding=False, ax_size=AX_SIZE, show_original=False) # Don't plot the original vfields
+    
+    channel_str = ','.join(str(channel) for channel in channels)
+    fig.suptitle(f'Synthetic patch on channel{"s" if len(channels) > 1 else ""} {channel_str}', fontsize=20)
     # Ensure the title is large and close to the figures
     fig.subplots_adjust(top=1)
 
@@ -42,8 +44,7 @@ def save_channel_patch_image(seed : int, value : float, row : int, col : int, ch
         os.makedirs(save_dir)
     fname = f'{save_dir}/seed{seed}_col{col}.png'
     fig.savefig(fname)
-    plt.show(fig)
-    # plt.close(fig)
+    plt.close(fig) # TODO just render image directly, don't save to file
     
     return fname 
 
@@ -51,7 +52,7 @@ def save_channel_patch_image(seed : int, value : float, row : int, col : int, ch
 import imageio
 
 def get_z_coords(seed : int, channel_coords : bool = False):
-    """ Get a list of (row, col) coordinates which trace the inner grid of the maze, first running along the top edge, then along the top-right to bottom-left diagonal, then to the bottom-right. """ # TODO this is wrong, need to do channel-wise coordinates
+    """ Get a list of (row, col) coordinates which trace the inner grid of the maze, first running along the top edge, then along the top-right to bottom-left diagonal, then to the bottom-right. """ 
     grid = maze.get_inner_grid_from_seed(seed)
     padding = maze.get_padding(grid)
     length = grid.shape[0] # Length of maze
@@ -72,55 +73,44 @@ def get_z_coords(seed : int, channel_coords : bool = False):
 
     return coords
 
-def save_sweep(channel : int, seed : int, coords : List[Tuple[int, int]] = None):
-    """ Save a sweep of the maze, where the pixel patch moves from one coordinate to the next. """
+def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] = None, value : float = 5.6, channels_str : str = None):
+    """ Save a sweep of the maze to a GIF, where the pixel patch moves from one coordinate to the next. 
+    
+    Args:
+        channels: The channels to patch.
+        seed: The seed of the maze.
+        coords: The coordinates to sweep through. If None, the default z-shaped coordinates are used.
+        value: The value to patch the channels with at the given coords.
+        channels_str: The string to use in the filename. If None, the channels are used.
+    """
+    target = f'{gif_dir}/c{str(channels)}_seed{seed}.gif'
+    print(target)
     if coords is None:
         coords = get_z_coords(seed, channel_coords = True)
 
     images = []
     grid = maze.get_inner_grid_from_seed(seed)
     for row, col in coords:
-        fname = save_channel_patch_image(seed, 5.6, row, col, channel=channel)
+        fname = save_channel_patch_image(seed, 5.6, row, col, channels=channels)
         images.append(imageio.imread(fname))
         # Delete the file
         os.remove(fname)
 
-    target = f'{gif_dir}/c{channel}_seed{seed}.gif'
+    channels_str = channels_str or f'c{str(channels)}'
+    target = f'{gif_dir}/{channels_str}_seed{seed}.gif'
     # Overwrite if necessary
     if os.path.exists(target):
         os.remove(target)
     imageio.mimsave(target, images, duration=0.5)
-    clear_output()
+    print(f'Saved {target}.')
+
+# %%
+save_sweep(channels=[42], seed=60)
 
 # %%
 for seed in (0, 20, 60):
-    for channel in [55, 88, 42]:
-        if True: # NOTE Flag for when running the notebook
-            save_sweep(channel=channel, seed=seed)
+    for channel in [55, 42]:
+        save_sweep(channels=[channel], seed=seed)
 
-# %% Show multiple channels get updated simultaneously
-# Make a maze editor and then render the maze using the human view
-venv = patch_utils.get_cheese_venv_pair(seed=0)
-venv.reset()
-editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1))
-display(HBox(editors))
-
-visualization.visualize_venv(venv, ax_size=3, show_padding=False, show_plot=False) 
-# Make subplots where the left view is a double-row axis, and the right side is two rows of half-height axes
-
-# %% Plot different channels at once
-channels_to_plot = [55, 88]
-assert len(channels_to_plot) % 2 == 0, 'Must have an even number of channels to plot'
-# Plot figure with subplots of different sizes
-
-fig, axs = plt.subplots(nrows=2, ncols=len(channels_to_plot)//2, sharex=True, sharey=True, figsize=(2*AX_SIZE, AX_SIZE*len(channels_to_plot)//2))
-
-ax = axs[0, 0]
-ax.set_title(f'Maze {seed}') 
-visualization.visualize_venv(venv, ax=ax, show_plot=False, show_padding=False, ax_size=AX_SIZE)
-
-for i, channel in enumerate(channels_to_plot):
-    ax = axs[(i + 1) % 2, (i + 1) // 2]
-    values 
-    ax.set_title(f'Channel {channel}')
-    ax.set_xlabel('')
+# %%
+save_sweep(channels=cheese_channels, seed=0, value=1.5, channels_str='cheese_channels')
