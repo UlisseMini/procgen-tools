@@ -182,8 +182,19 @@ def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook): # TODO r
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
 
-def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True):
-    """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. """
+def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True, show_original : bool = True):
+    """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. 
+    
+    Args:
+        venv: The venv to use for the vector field.
+        patches: A dictionary of patches to apply to the network.
+        hook: The hook to use to get the activations.
+        render_padding: Whether to render the padding around the maze.
+        ax_size: The size of each axis in the plot.
+        reuse_first: Whether to reuse the first environment in the venv for the patched vfield.
+        show_diff: Whether to show the difference between the two vector fields.
+        show_original: Whether to show the original vector field.
+    """
 
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
     venv1, venv2 = maze.copy_venv(venv, 0), maze.copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
@@ -192,7 +203,7 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
 
-    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff)
+    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff, show_original=show_original)
 
     obj = {
         'patches': patches,
