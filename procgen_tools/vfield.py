@@ -45,7 +45,6 @@ def _device(policy):
     return next(policy.parameters()).device
 
 
-# TODO: with the right APIs, this should be a few lines
 def vector_field(venv, policy):
     """
     Get the vector field induced by the policy on the maze in venv env number 1.
@@ -53,17 +52,27 @@ def vector_field(venv, policy):
     return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
 
 
-def get_arrows_and_probs(legal_mouse_positions, c_probs):
+def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor):
+    """ Get the arrows and probabilities for each mouse position. 
+    
+    Args:
+        legal_mouse_positions: A list of (x, y) tuples, each an outer grid coordinate. # TODO check this
+        c_probs: A tensor of shape (len(legal_mouse_positions), 15) of post-softmax probabilities, one for each mouse position.
+
+    Returns:
+        arrows: A list of (x, y) tuples, one for each mouse position
+        deltas: A list of lists of probability-weighted basis vectors -- an (x, y) tuple, one for each mouse position
+        probs: A list of dicts of action -> probability, one for each mouse position
+     """
     # FIXME: Vectorize this loop. It isn't as critical as the model though
-    arrows = []
-    probs = []
+    arrows, deltas, probs = [], [], []
     for i in range(len(legal_mouse_positions)):
-        probs_dict = models.human_readable_actions(c_probs[i])
-        probs_dict = {k: v.item() for k, v in probs_dict.items()}
-        deltas = [_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]
-        arrows.append(_tadd(*deltas))
-        probs.append(tuple(probs_dict.values()))
-    return arrows, probs
+        probs_dict = models.human_readable_actions(c_probs[i]) # Dict of action -> probability for this mouse position
+        probs_dict = {k: v.item() for k, v in probs_dict.items()} # Convert to floats
+        deltas.append([_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]) # Multiply each basis vector by the probability of that action, and append this list of arrows to deltas
+        arrows.append(_tadd(*deltas[-1])) # Append the probability-weighted sum of the basis vectors
+        probs.append(tuple(probs_dict.values())) # Append the {(action : str): (probability : float)} dict
+    return arrows, deltas, probs
 
 
 # TODO: with the right APIs, this should be a few lines
