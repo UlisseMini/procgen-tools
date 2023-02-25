@@ -136,25 +136,40 @@ def get_random_patch(layer_name : str, hook : cmh.ModuleHook, channel : int = -1
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=patch_fn)
 
 
-def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0)):
-    """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. """
+def get_channel_pixel_patch(layer_name: str, channel : int, value : int = 1, coord : Tuple[int, int] = (0, 0), default : float = None):
+    """ Values has shape (batch, channels, ....). Returns a patch which sets the activations at layer_name to 1 in the top left corner of the given channel. 
+    
+    args:
+        layer_name: name of the layer to patch
+        channel: channel to patch
+        value: value to set the pixel at coord 
+        coord: coordinate of the pixel to set
+        default: value to set all other pixels to. If None, set to the value of the pixel at coord in the original activations.
+    """
     assert channel >= 0
     WIDTH = NUM_CHANNEL_DICT[layer_name]
     assert 0 <= coord[0] < WIDTH and 0 <= coord[1] < WIDTH, "Coordinate is out of bounds"    
 
-    default = -.2
     def new_corner_patch(outp): 
         """ outp has shape (batch, ...) -- without a channel dimension. """
-        new_features = t.ones_like(outp[0, ...]) * default
+        new_features = t.ones_like(outp[0, ...]) * default if default is not None else outp[0,...].clone()
         new_features[coord] = value
         outp[:, ...] = new_features
         return outp
 
     return channel_patch_or_broadcast(layer_name, channel=channel, patch_fn=new_corner_patch) # TODO make box activation
 
-def combined_pixel_patch(layer_name : str, value : float, coord : Tuple[int, int], channels : List[int]):
-    """ Get a patch that modifies multiple channels at once. """
-    patches = [get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord) for channel in channels]
+def combined_pixel_patch(layer_name : str, value : float, coord : Tuple[int, int], channels : List[int], default : float = None):
+    """ Get a patch that modifies multiple channels at once. 
+    
+    args: 
+        layer_name: name of the layer to patch
+        value: value to set the pixel at coord
+        coord: coordinate of the pixel to set
+        channels: list of channels to patch
+        default: value to set all other pixels to. If None, preserve the values at all other pixels.
+    """
+    patches = [get_channel_pixel_patch(layer_name=layer_name, channel=channel, value=value, coord=coord, default=default) for channel in channels]
     combined_patch = compose_patches(*patches)
     return combined_patch
 

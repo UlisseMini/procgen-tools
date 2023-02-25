@@ -24,15 +24,15 @@ SAVE_DIR = 'playground/visualizations'
 AX_SIZE = 6
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
 
-def save_channel_patch_image(seed : int, value : float, row : int, col : int, channels : List[int]):
+def save_channel_patch_image(seed : int, value : float, row : int, col : int, channels : List[int], default : float = None):
     """ Save an image of the maze with a pixel patch on the given channel at (row, col) in the block2.res1.resadd_out channel. """
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     padding = maze.get_padding(maze.get_inner_grid_from_seed(seed))
 
-    patch = patch_utils.combined_pixel_patch(layer_name=default_layer, channels=channels, value=value, coord=(row, col)) 
+    patch = patch_utils.combined_pixel_patch(layer_name=default_layer, channels=channels, value=value, coord=(row, col), default=default) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patch, hook, render_padding=False, ax_size=AX_SIZE, show_original=False) # Don't plot the original vfields
     
-    channel_str = ','.join(str(channel) for channel in channels)
+    channel_str = ', '.join(str(channel) for channel in channels)
     fig.suptitle(f'Synthetic patch on channel{"s" if len(channels) > 1 else ""} {channel_str}', fontsize=20)
     # Ensure the title is large and close to the figures
     fig.subplots_adjust(top=1)
@@ -73,7 +73,7 @@ def get_z_coords(seed : int, channel_coords : bool = False):
 
     return coords
 
-def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] = None, value : float = 5.6, channels_str : str = None):
+def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] = None, value : float = 5.6, channels_str : str = None, default : float = None):
     """ Save a sweep of the maze to a GIF, where the pixel patch moves from one coordinate to the next. 
     
     Args:
@@ -83,21 +83,19 @@ def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] 
         value: The value to patch the channels with at the given coords.
         channels_str: The string to use in the filename. If None, the channels are used.
     """
-    target = f'{gif_dir}/c{str(channels)}_seed{seed}.gif'
-    print(target)
     if coords is None:
         coords = get_z_coords(seed, channel_coords = True)
 
     images = []
     grid = maze.get_inner_grid_from_seed(seed)
     for row, col in coords:
-        fname = save_channel_patch_image(seed, 5.6, row, col, channels=channels)
+        fname = save_channel_patch_image(seed=seed, value=value, row=row, col=col, channels=channels, default=default)
         images.append(imageio.imread(fname))
         # Delete the file
         os.remove(fname)
 
     channels_str = channels_str or f'c{str(channels)}'
-    target = f'{gif_dir}/{channels_str}_seed{seed}.gif'
+    target = f'{gif_dir}/{channels_str}_seed{seed}_val{str(value).replace(".", "_")}_default{default}.gif'
     # Overwrite if necessary
     if os.path.exists(target):
         os.remove(target)
@@ -105,12 +103,12 @@ def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] 
     print(f'Saved {target}.')
 
 # %%
-save_sweep(channels=[42], seed=60)
-
-# %%
 for seed in (0, 20, 60):
     for channel in [55, 42]:
         save_sweep(channels=[channel], seed=seed)
 
 # %%
-save_sweep(channels=cheese_channels, seed=0, value=1.5, channels_str='cheese_channels')
+for seed in (0, 20, 60):
+    save_sweep(channels=cheese_channels, seed=seed, value=.9, channels_str='cheese_channels')
+
+# %%
