@@ -1,20 +1,14 @@
-# %%
-# Imports
-
 from procgen_tools import models, maze
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
-from typing import Callable
+from typing import Callable, List, Tuple
 
 from procgen import ProcgenGym3Env
 from warnings import warn
 import torch
 import os
 
-
-# %%
-# Get model probs for every mouse position in the maze
 
 def forward_func_policy(network, inp):
     hidden = network.embedder(inp)
@@ -52,18 +46,18 @@ def vector_field(venv, policy):
     return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
 
 
-def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor):
+def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor) -> List[dict]: # TODO turn this into a list of dicts
     """ Get the arrows and probabilities for each mouse position. 
     
     Args:
-        legal_mouse_positions: A list of (x, y) tuples, each an outer grid coordinate. # TODO check this
+        legal_mouse_positions: A list of (x, y) tuples, each assumed to be an outer grid coordinate. 
         c_probs: A tensor of shape (len(legal_mouse_positions), 15) of post-softmax probabilities, one for each mouse position.
 
     Returns:
         arrows: A list of (x, y) tuples, one for each mouse position
         deltas: A list of lists of probability-weighted basis vectors -- an (x, y) tuple, one for each mouse position
         probs: A list of dicts of action -> probability, one for each mouse position
-     """
+    """
     # FIXME: Vectorize this loop. It isn't as critical as the model though
     arrows, deltas, probs = [], [], []
     for i in range(len(legal_mouse_positions)):
@@ -73,7 +67,6 @@ def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs 
         arrows.append(_tadd(*deltas[-1])) # Append the probability-weighted sum of the basis vectors
         probs.append(tuple(probs_dict.values())) # Append the {(action : str): (probability : float)} dict
     return arrows, deltas, probs
-
 
 # TODO: with the right APIs, this should be a few lines
 def vector_field_tup(venv_all_tup, policy):
@@ -90,17 +83,17 @@ def vector_field_tup(venv_all_tup, policy):
     with torch.no_grad():
         c, _ = policy(batched_obs)
 
-    arrows, probs = get_arrows_and_probs(legal_mouse_positions, c.probs)
+    arrows, deltas, probs = get_arrows_and_probs(legal_mouse_positions, c.probs)
 
     # make vfield object for returning
-    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs}
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs, 'deltas': deltas}
 
 
 
 # %%
 # Plot vector field for every mouse position
 
-def plot_vector_field(venv, policy, ax=None, env_num=0):
+def plot_vector_field(venv, policy, ax=None, env_num : int = 0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
@@ -129,8 +122,16 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
     ax.set_xticks([])
     ax.set_yticks([])
 
-def map_vf_to_human(vf : dict, render_padding : bool = False):
-    "Map the vector field vf to the human view coordinate system."
+def map_vf_to_human(vf : dict, account_for_padding : bool = False):
+    """Map the vector field vf to the human view coordinate system.
+    
+    Args:
+        vf: A vector field dict with the maze coordinate system.
+        account_for_padding: Whether to account for the padding in the human view coordinate system.
+
+    Returns:
+        vf: A vector field dict with the human view coordinate system.
+    """
     legal_mouse_positions, arrows, grid = vf['legal_mouse_positions'], vf['arrows'], vf['grid']
 
     # We need to transform the arrows to the human view coordinate system
@@ -142,7 +143,7 @@ def map_vf_to_human(vf : dict, render_padding : bool = False):
     rescale = human_view.shape[0] / maze.WORLD_DIM
 
     legal_mouse_positions = [((grid.shape[1] - 1) - row, col) for row, col in legal_mouse_positions] # flip y axis
-    if render_padding: 
+    if account_for_padding: 
         legal_mouse_positions = [(row + padding, col + padding) for row, col in legal_mouse_positions]
     legal_mouse_positions = [((row+.5) * rescale, (col+.5) * rescale) for row, col in legal_mouse_positions]
     arrows = [_tmul(arr, rescale) for arr in arrows]
@@ -151,7 +152,7 @@ def map_vf_to_human(vf : dict, render_padding : bool = False):
 
 def plot_vf(vf: dict, ax=None, human_render : bool = True, render_padding: bool = False):
     "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
-    render_arrows(map_vf_to_human(vf, render_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
+    render_arrows(map_vf_to_human(vf, account_for_padding=render_padding) if human_render else vf, ax=ax, human_render=human_render, render_padding=render_padding, color='white' if human_render else 'red')
 
 def get_vf_diff(vf1 : dict, vf2 : dict):
     """ Get the difference "vf1 - vf2" between two vector fields. """
@@ -192,7 +193,7 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax=None, human_render : bool = True, re
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 
     vf_diff = get_vf_diff(vf1, vf2)
 
-    render_arrows(map_vf_to_human(vf_diff, render_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
+    render_arrows(map_vf_to_human(vf_diff, account_for_padding=render_padding) if human_render else vf_diff, ax=ax, human_render=human_render, render_padding=render_padding, color='lime' if human_render else 'red')
 
     return vf_diff
 
@@ -217,34 +218,3 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding)
     return fig, axs, (vf_diff if show_diff else None)
-
-
-# %%
-# Load policy and maze, then plot vector field for a bunch of mazes
-
-if __name__ == '__main__':
-    import pickle
-    from tqdm import tqdm
-
-    rand_region = 5
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    policy = models.load_policy(f'../trained_models/maze_I/model_rand_region_{rand_region}.pth', 15, torch.device('cpu'))
-    policy.to(device)
-
-    venv = ProcgenGym3Env(num=100, start_level=1, num_levels=0, env_name='maze', distribution_mode='hard', num_threads=1, render_mode='rgb_array')
-    venv = maze.wrap_venv(venv)
-
-    for i in tqdm(range(venv.num_envs)):
-        plt.clf()
-        vf_new = plot_vector_field(venv, policy, env_num=i)
-        # plt.show()
-        plt.savefig(f'../figures/maze_{i}_vfield.png', dpi=300)
-        plt.close()
-
-        # TESTING
-        # vf_old = _vector_field_old(maze.copy_venv(venv, i), policy)
-        # assert pickle.dumps(vf_new) == pickle.dumps(vf_old), f'pickle compare failed for i={i}'
-
-# %%
-
