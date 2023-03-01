@@ -60,7 +60,6 @@ def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs 
         # Convert to floats
         probs_dict = {k: v.item() for k, v in probs_dict.items()} 
         
-<<<<<<< HEAD
         # Multiply each basis vector by the probability of that action, and append this list of action component arrows
         action_arrows.append([_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]) 
         # Append the {(action : str): (probability : float)} dict
@@ -69,19 +68,6 @@ def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs 
     return action_arrows, probs
 
 def vector_field_tup(venv_all : ProcgenGym3Env, legal_mouse_positions : List[Tuple[int, int]], grid : np.ndarray, policy : nn.Module):
-=======
-        # Multiply each basis vector by the probability of that action, and append this list of arrows to deltas
-        deltas.append([_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]) 
-        
-        # Append the probability-weighted sum of the basis vectors
-        arrows.append(_tadd(*deltas[-1])) 
-        # Append the {(action : str): (probability : float)} dict
-        probs.append(tuple(probs_dict.values()))
-
-    return arrows, deltas, probs
-
-def vector_field_tup(venv_all : ProcgenGym3Env, legal_mouse_positions : List[int, int], grid : np.ndarray, policy : nn.Module):
->>>>>>> 3efef3eb78c94b8b722d972ccaea194b4f240bcb
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
 
@@ -131,7 +117,6 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
     ax = ax or plt.gca()
 
     arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
-<<<<<<< HEAD
 
     inner_size = grid.shape[0] # The size of the inner grid
     arrow_rescale = maze.WORLD_DIM / (inner_size * 1.8) # Rescale arrow width and other properties to be relative to the size of the maze 
@@ -149,21 +134,6 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
         ax.quiver(
             [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
             [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy', width=width
-=======
-    if show_components:
-        act_arrows = vf['action arrows']
-        # A list of length-four lists of (x, y) tuples, one for each mouse position
-        # Graph each component of the vector field separately
-        for i in range(len(act_arrows)):
-            ax.quiver(
-                [legal_mouse_positions[i][1]], [legal_mouse_positions[i][0]],
-                [arr[1] for arr in act_arrows[i]], [arr[0] for arr in act_arrows[i]], color=color, scale=1, scale_units='xy'
-            )
-    else:
-        ax.quiver(
-            [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-            [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy'
->>>>>>> 3efef3eb78c94b8b722d972ccaea194b4f240bcb
         )
 
     if human_render:
