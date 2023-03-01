@@ -10,36 +10,28 @@ import torch
 import os
 
 
-def forward_func_policy(network, inp):
+def forward_func_policy(network : nn.Module, inp : torch.Tensor):
+    """ Forward function for the policy network. """
     hidden = network.embedder(inp)
     return network.fc_policy(hidden)
-
-def set_mouse_pos(venv, pos, env_num=0):
-    "FIXME: This should be in a library, and this should be two lines with more enlightened APIs."
-    state_bytes_list = venv.env.callmethod('get_state')
-
-    state = maze.EnvState(state_bytes_list[env_num])
-    grid = state.inner_grid(with_mouse=False)
-    assert grid[pos] == maze.EMPTY
-    grid[pos] = maze.MOUSE
-    state.set_grid(grid, pad=True)
-
-    state_bytes_list[env_num] = state.state_bytes
-    venv.env.callmethod('set_state', state_bytes_list)
 
 # %%
 # Get vector field
 
-# really stupid way to do this tbh, should use numpy somehow
-def _tmul(tup: tuple, s: float):
-    return tuple(s * x for x in tup)
-def _tadd(*tups):
+# FIXME really stupid way to do this tbh, should use numpy somehow
+def _tmul(tup: tuple, scalar: float):
+    """ Multiply a tuple by a scalar. """
+    return tuple(scalar * x for x in tup)
+
+def _tadd(*tups : List[Tuple[int,int]]):
+    """ Add a list of tuples elementwise. """
     return tuple(sum(axis) for axis in zip(*tups))
-def _device(policy):
+
+def _device(policy : nn.Module):
     return next(policy.parameters()).device
 
 
-def vector_field(venv, policy):
+def vector_field(venv : ProcgenGym3Env, policy : nn.Module):
     """
     Get the vector field induced by the policy on the maze in venv env number 1.
     """
@@ -47,7 +39,7 @@ def vector_field(venv, policy):
     return vector_field_tup(venv_all, legal_mouse_positions, grid, policy)
 
 
-def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor) -> List[dict]: # TODO turn this into a list of dicts
+def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor) -> List[dict]: 
     """ Get the arrows and probabilities for each mouse position. 
     
     Args:
@@ -62,14 +54,21 @@ def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs 
     # FIXME: Vectorize this loop. It isn't as critical as the model though
     arrows, deltas, probs = [], [], []
     for i in range(len(legal_mouse_positions)):
-        probs_dict = models.human_readable_actions(c_probs[i]) # Dict of action -> probability for this mouse position
-        probs_dict = {k: v.item() for k, v in probs_dict.items()} # Convert to floats
-        deltas.append([_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]) # Multiply each basis vector by the probability of that action, and append this list of arrows to deltas
-        arrows.append(_tadd(*deltas[-1])) # Append the probability-weighted sum of the basis vectors
-        probs.append(tuple(probs_dict.values())) # Append the {(action : str): (probability : float)} dict
+        # Dict of action -> probability for this mouse position
+        probs_dict = models.human_readable_actions(c_probs[i]) 
+        # Convert to floats
+        probs_dict = {k: v.item() for k, v in probs_dict.items()} 
+        
+        # Multiply each basis vector by the probability of that action, and append this list of arrows to deltas
+        deltas.append([_tmul(models.MAZE_ACTION_DELTAS[act], p) for act, p in probs_dict.items()]) 
+        
+        # Append the probability-weighted sum of the basis vectors
+        arrows.append(_tadd(*deltas[-1])) 
+        # Append the {(action : str): (probability : float)} dict
+        probs.append(tuple(probs_dict.values()))
+
     return arrows, deltas, probs
 
-# TODO: with the right APIs, this should be a few lines
 def vector_field_tup(venv_all : ProcgenGym3Env, legal_mouse_positions : List[int, int], grid : np.ndarray, policy : nn.Module):
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
@@ -97,8 +96,7 @@ def vector_field_tup(venv_all : ProcgenGym3Env, legal_mouse_positions : List[int
 
 # %%
 # Plot vector field for every mouse position
-
-def plot_vector_field(venv, policy, ax=None, env_num : int = 0):
+def plot_vector_field(venv : ProcgenGym3Env, policy : nn.Module, ax : plt.Axes = None, env_num : int = 0):
     """
     Plot the vector field induced by the policy on the maze in venv env number i.
     """
@@ -122,12 +120,19 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
 
     arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
     if show_components:
-        arrows = vf['component arrows']
-
-    ax.quiver(
-        [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
-        [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy'
-    )
+        act_arrows = vf['action arrows']
+        # A list of length-four lists of (x, y) tuples, one for each mouse position
+        # Graph each component of the vector field separately
+        for i in range(len(act_arrows)):
+            ax.quiver(
+                [legal_mouse_positions[i][1]], [legal_mouse_positions[i][0]],
+                [arr[1] for arr in act_arrows[i]], [arr[0] for arr in act_arrows[i]], color=color, scale=1, scale_units='xy'
+            )
+    else:
+        ax.quiver(
+            [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
+            [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy'
+        )
 
     if human_render:
         human_view = maze.render_outer_grid(grid) if render_padding else maze.render_inner_grid(grid)
