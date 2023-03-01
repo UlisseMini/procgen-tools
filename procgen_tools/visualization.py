@@ -202,8 +202,17 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     else:
         return img
 
-def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None):
-    """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. """
+def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None, show_components : bool = False):
+    """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. 
+    
+    Args:
+        policy: The policy to use to compute the vector field.
+        venv: The environment to use to compute the vector field. If None, a new environment will be created.
+        seed: The seed to use to create the environment.
+        ax_size: The size of the vector field plot.
+        callback: A callback to call whenever the maze is edited.
+        show_components: Whether to show the vectors for each action.
+    """
     output = Output()
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close('all')
@@ -216,7 +225,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         with output:
             vf = vfield.vector_field(venv, policy)
             ax.clear()
-            vfield.plot_vf(vf, ax=ax)
+            vfield.plot_vf(vf, ax=ax, show_components=show_components)
 
             # Update the existing figure in place 
             clear_output(wait=True)
