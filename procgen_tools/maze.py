@@ -31,7 +31,7 @@ WORLD_DIM = 25
 AGENT_PX_WIDTH = 64 # width of the agent view input image
 PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
 
-DEBUG = False # slows everything down by ensuring parse & seri
+DEBUG = False # slows everything down by ensuring parse & serialize are inverses.
 
 # Types and things
 

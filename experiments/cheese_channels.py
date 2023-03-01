@@ -80,7 +80,7 @@ def interactive_channel_patch(seed=seed_slider, value=value_slider, row=row_slid
     plt.show() 
 
     # Add a button to save the figure to experiments/visualizations
-    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict[str, float](seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c{channel}_pixel_patch', fig=fig, descriptors=defaultdict(seed=seed, value=value, row=row, col=col))
     display(button)
     
     # Render the synthetic patch
