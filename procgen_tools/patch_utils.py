@@ -197,7 +197,7 @@ def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook): # TODO r
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
 
-def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True, show_original : bool = True):
+def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True, show_original : bool = True, show_components : bool = False):
     """ Takes as input a venv with one or two maze environments. If one and reuse_first is true, we compare vfields for original/patched on that fixed venv. If two, we show the vfield for the original on the first venv environment, and the patched on the second, and the difference between the two. 
     
     Args:
@@ -207,8 +207,10 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
         render_padding: Whether to render the padding around the maze.
         ax_size: The size of each axis in the plot.
         reuse_first: Whether to reuse the first environment in the venv for the patched vfield.
+
         show_diff: Whether to show the difference between the two vector fields.
         show_original: Whether to show the original vector field.
+        show_components: Whether to show the action-based components of the vector field.
     """
 
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
@@ -218,7 +220,7 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     with hook.use_patches(patches):
         patched_vfield = vfield.vector_field(venv2, hook.network)
 
-    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff, show_original=show_original)
+    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff, show_original=show_original, show_components=show_components)
 
     obj = {
         'patches': patches,
@@ -230,13 +232,13 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     return fig, axs, obj
 
 
-def plot_patched_vfields(seed: int, coeff: float, layer_name: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5):
+def plot_patched_vfields(seed: int, coeff: float, layer_name: str, hook: cmh.ModuleHook, values: Optional[np.ndarray] = None, venv: Optional[ProcgenGym3Env] = None, show_title: bool = False, title:str = '', render_padding: bool = False, ax_size : int = 5, show_components : bool = False):
     """ Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, layer_name, hook) if values is None else values
     patches = get_values_diff_patch(values, coeff, layer_name) 
     venv = maze.copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
-    fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size)
+    fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size, show_components=show_components)
     obj.update({
         'seed': seed,
         'coeff': coeff,
