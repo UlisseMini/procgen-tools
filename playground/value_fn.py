@@ -26,7 +26,7 @@ def plot(policy, venv, exp=False):
     # c, v = hook.network(obs_all)
     c, v = policy(obs_all)
 
-    vf = vfield.vector_field_tup((venv_all, (legal_mouse_positions, grid)), policy)
+    vf = vfield.vector_field_tup(venv_all, legal_mouse_positions, grid, policy)
 
     g = grid.copy()
     g[g==maze.BLOCKED] = 0 # 50 screws up plot

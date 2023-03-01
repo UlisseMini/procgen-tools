@@ -43,7 +43,8 @@ def vector_field(venv, policy):
     """
     Get the vector field induced by the policy on the maze in venv env number 1.
     """
-    return vector_field_tup(maze.venv_with_all_mouse_positions(venv), policy)
+    venv_all, (legal_mouse_positions, grid) = maze.venv_with_all_mouse_positions(venv)
+    return vector_field_tup(venv_all, legal_mouse_positions, grid, policy)
 
 
 def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs : torch.Tensor) -> List[dict]: # TODO turn this into a list of dicts
@@ -69,24 +70,28 @@ def get_arrows_and_probs(legal_mouse_positions : List[Tuple[int, int]], c_probs 
     return arrows, deltas, probs
 
 # TODO: with the right APIs, this should be a few lines
-def vector_field_tup(venv_all_tup, policy):
+def vector_field_tup(venv_all : ProcgenGym3Env, legal_mouse_positions : List[int, int], grid : np.ndarray, policy : nn.Module):
     """
     Plot the vector field induced by the policy on the maze in venv env number 1.
-    """
-    venv_all, (legal_mouse_positions, grid) = venv_all_tup
 
+    Args:
+        venv_all: The venv to use to get the grid and legal mouse positions. Deleted after use.
+        legal_mouse_positions: a list of (x, y) tuples, each assumed to be an outer grid coordinate.
+        grid: The outer grid to use to compute the vector field.
+        policy: The policy to use to compute the vector field.
+    """
     # TODO: Hypothetically, this step could run in parallel to the others (cpu vs. gpu)
     batched_obs = torch.tensor(venv_all.reset(), dtype=torch.float32, device=_device(policy))
     del venv_all
 
     # use stacked obs list as a tensor
     with torch.no_grad():
-        c, _ = policy(batched_obs)
+        categorical, _ = policy(batched_obs)
 
-    arrows, deltas, probs = get_arrows_and_probs(legal_mouse_positions, c.probs)
+    arrows, deltas, probs = get_arrows_and_probs(legal_mouse_positions, categorical.probs)
 
     # make vfield object for returning
-    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs, 'deltas': deltas}
+    return {'arrows': arrows, 'legal_mouse_positions': legal_mouse_positions, 'grid': grid, 'probs': probs, 'action arrows': deltas}
 
 
 
@@ -102,11 +107,22 @@ def plot_vector_field(venv, policy, ax=None, env_num : int = 0):
     vf = vector_field(venv, policy)
     return plot_vf(vf, ax=ax)
 
-def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding : bool = False, color : str = 'white'):
-    """ Render the arrows in the vector field. """
+def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding : bool = False, color : str = 'white', show_components : bool = False):
+    """ Render the arrows in the vector field. 
+    
+    args:
+        vf: The vector field dict
+        ax: The matplotlib axis to render on
+        human_render: Whether to render the grid in a human-readable way (high-res pixel view) or a machine-readable way (grid view)
+        render_padding: Whether to render the padding around the grid
+        color: The color of the arrows
+        show_components: Whether to show one arrow for each cardinal action. If False, show one arrow for each action.
+    """
     ax = ax or plt.gca()
 
     arrows, legal_mouse_positions, grid = vf['arrows'], vf['legal_mouse_positions'], vf['grid']
+    if show_components:
+        arrows = vf['component arrows']
 
     ax.quiver(
         [pos[1] for pos in legal_mouse_positions], [pos[0] for pos in legal_mouse_positions],
