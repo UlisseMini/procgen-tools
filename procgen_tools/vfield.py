@@ -204,10 +204,7 @@ def get_vf_diff(vf1 : dict, vf2 : dict):
             vfs[other_vf_idx]['arrows'] = [arr for pos, arr in zip(vfs[other_vf_idx]['legal_mouse_positions'], vfs[other_vf_idx]['arrows']) if pos != cheese_location]
             vfs[other_vf_idx]['legal_mouse_positions'] = [pos for pos in vfs[other_vf_idx]['legal_mouse_positions'] if pos != cheese_location]
 
-    arrow_diffs = [_tmul((a1[0] - a2[0], a1[1] - a2[1]), 1) for a1, a2 in zip(vf1['arrows'], vf2['arrows'])] # Halve the difference so it's easier to see
-    
-    # Check if any of the diffs have components greater than 2 (which would be a bug)
-    assert all(abs(a[0]) <= 2 and abs(a[1]) <= 2 for a in arrow_diffs), "Arrow diffs must be less than 2 in each component."
+    arrow_diffs = [[(a1[0] - a2[0], a1[1] - a2[1]) for a1, a2 in zip(arrs1, arrs2)] for arrs1, arrs2 in zip(vf1['arrows'], vf2['arrows'])] 
 
     return {'arrows': arrow_diffs, 'legal_mouse_positions': vf2['legal_mouse_positions'], 'grid': vf2['grid']}
 
@@ -220,7 +217,7 @@ def plot_vf_diff(vf1 : dict, vf2 : dict, ax : plt.Axes = None, human_render : bo
 
     return vf_diff
 
-def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5, show_diff : bool = True, show_original : bool = True):
+def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding : bool = False, ax_size : int = 5, show_diff : bool = True, show_original : bool = True, show_components : bool = False):
     """ Plot two vector fields and, if show_diff is True, their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field. If show_original is False, don't plot the original vector field. """
     num_cols = 1 + show_diff + show_original
     fontsize = 16
@@ -229,16 +226,16 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
     idx = 0
     if show_original:
         axs[idx].set_xlabel("Original", fontsize=fontsize)
-        plot_vf(vf1, ax=axs[0], human_render=human_render, render_padding=render_padding)
+        plot_vf(vf1, ax=axs[0], human_render=human_render, render_padding=render_padding, show_components=show_components)
         idx += 1
     
     axs[idx].set_xlabel("Patched", fontsize=fontsize)
-    plot_vf(vf2, ax=axs[idx], human_render=human_render, render_padding=render_padding)
+    plot_vf(vf2, ax=axs[idx], human_render=human_render, render_padding=render_padding,     show_components=show_components)
     idx += 1
 
     if show_diff:
         axs[idx].set_xlabel("Patched vfield minus original", fontsize=fontsize)
         # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
-        vf_diff = plot_vf_diff(vf2, vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding)
+        vf_diff = plot_vf_diff(vf2, vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
     return fig, axs, (vf_diff if show_diff else None)
 # %%
