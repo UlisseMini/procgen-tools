@@ -1,5 +1,6 @@
 from procgen_tools.imports import *
 from procgen_tools import maze, vfield, patch_utils
+from typing import Dict
 
 
 # LABEL HANDLING
@@ -304,7 +305,7 @@ def plot_patch(patch : dict, hook : cmh.ModuleHook, layer : str = default_layer,
     return fig
 
 # Widget helpers
-def create_save_button(prefix : str, fig : plt.Figure, descriptors : defaultdict[str, float]): 
+def create_save_button(prefix : str, fig : plt.Figure, descriptors : Dict[str, float]): 
     """ Create a button that saves fig to a file. 
     
     Args:

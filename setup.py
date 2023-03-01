@@ -10,8 +10,8 @@ setup(
     install_requires=[
         "gym==0.26.*",
         "gym3==0.3.3",
-        "torch==1.13.1",
-        "numpy==1.24.1",
+        'numpy>=1.22.1',
+        'torch>=1.13.1',
         "matplotlib==3.3.2", # colab broken on latest :(
         "tqdm==4.64.1",
         "ipywidgets==7.*", # v8 causes vscode bug
