@@ -113,13 +113,17 @@ def plotly_fig_gen() -> go.Figure:
 
 def get_probs_original_and_patched(vfields : List[dict], coeff : float) -> Tuple[np.ndarray, np.ndarray]:
     """ Get the original and patched decision probabilities from vfields, given a cheese vector coefficient. """
-    dprobs_original, dprobs_patched = vs.get_decision_probs_original_and_patched(vfields, coeff=coeff)
+    dprobs_original, dprobs_patched = get_decision_probs_original_and_patched(vfields, coeff=coeff)
     probs_original, probs_patched = [np.stack([dprobs[:,0], dprobs[:,1], 1-dprobs[:,0]-dprobs[:,1]], axis=1) for dprobs in (dprobs_original, dprobs_patched)] # convert to 3-class probs
+    # Clip all probabilities to [0,1]
+    probs_original = np.clip(probs_original, 0, 1)
+    probs_patched = np.clip(probs_patched, 0, 1)
     return probs_original, probs_patched
 
 def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
     """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
     probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
+    
 
     for i in range(3):
         # Make the original colored blue and the patched colored orange
