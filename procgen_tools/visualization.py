@@ -202,7 +202,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     else:
         return img
 
-def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = 2, callback : Callable = None, show_components : bool = False):
+def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = None, callback : Callable = None, show_components : bool = False):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. 
     
     Args:
@@ -214,10 +214,16 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         show_components: Whether to show the vectors for each action.
     """
     output = Output()
-    fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
-    plt.close('all')
     if venv is None: 
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+
+    # Dynamically compute ax_size if not provided
+    if ax_size is None:
+        inner_grid_size = maze.state_from_venv(venv, idx=0).inner_grid().shape[0]
+        ax_size = 4 * inner_grid_size / 16
+    fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
+    plt.close('all')
+
 
     # We want to update ax whenever the maze is edited
     def update_plot():
@@ -339,7 +345,7 @@ def create_save_button(prefix : str, fig : plt.Figure, descriptors : Dict[str, f
     return button # TODO integrate with activationsPlotter
 
 class ActivationsPlotter:
-    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, save_dir='experiments/', **act_kwargs):
+    def __init__(self, labels: List[str], plotter: Callable, activ_gen: Callable, hook, coords_enabled: bool=False, defaults : dict = None, save_dir='experiments/visualizations', **act_kwargs):
         """
         labels: The labels of the layers to plot
         plotter: A function that takes a label, channel, and activations and plots them

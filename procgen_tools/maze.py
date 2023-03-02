@@ -362,6 +362,12 @@ class EnvState():
 
 # ============== Grid helpers ==============
 
+def state_from_venv(venv, idx : int = 0) -> EnvState:
+    """
+    Get the maze state from the venv.
+    """
+    state_bytes_list = venv.env.callmethod("get_state")
+    return EnvState(state_bytes_list[idx])
 
 def get_cheese_pos(grid: np.ndarray, flip_y : bool = False) -> Square:
     "Get (row, col) position of the cheese in the grid. Note that the numpy grid is flipped along the y-axis, relative to rendered images."
@@ -376,7 +382,7 @@ def remove_cheese(venv, idx : int = 0):
     Remove the cheese from the grid, modifying venv in-place.
     """
     state_bytes_list = venv.env.callmethod("get_state")
-    state = EnvState(state_bytes_list[idx])
+    state = state_from_venv(venv, idx)
 
     # TODO(uli): The multiple sources of truth here suck. Ideally one object linked to venv auto-updates(?)
     grid = state.full_grid()
@@ -591,7 +597,7 @@ def venv_from_grid(grid: np.ndarray):
     assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
 
     venv = create_venv(num=1, num_levels=1, start_level=0)
-    state = EnvState(venv.env.callmethod("get_state")[0])
+    state = state_from_venv(venv, idx=0)
     state.set_grid(grid, pad=True)
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
@@ -732,11 +738,6 @@ def maze_grid_to_graph(inner_grid):
         edges.extend([(n0, n1) for n0, n1 in zip(node0s, node1s)])
     graph = nx.Graph()
     graph.add_edges_from(edges)
-    #nx.draw_networkx()
-    # colors_by_node = {(0, 0): 'green', get_cheese_pos(inner_grid): 'yellow',
-    #     (inner_grid.shape[0]-1, inner_grid.shape[1]-1): 'red'}
-    # node_colors = [colors_by_node.get(node, 'blue') for node in graph.nodes]
-    # nx.draw_kamada_kawai(graph, node_color=node_colors, node_size=10)
     return graph
 
 def grid_graph_has_decision_square(inner_grid, graph):
@@ -746,16 +747,6 @@ def grid_graph_has_decision_square(inner_grid, graph):
     return (not cheese_node in pth)
 
 def get_path_to_cheese(inner_grid, graph, start_node=(0, 0)):
-    # px.imshow(inner_grid).show()
-    # pos = nx.layout.kamada_kawai_layout(graph)
-    # # Calculate node colors 
-    # colors_by_node = {(0, 0): 'green', get_cheese_pos(inner_grid): 'yellow',
-    #     (inner_grid.shape[0]-1, inner_grid.shape[1]-1): 'red'}
-    # node_colors = [colors_by_node.get(node, 'blue') for node in graph.nodes]
-    # # Create the plot
-    # viz = hvnx.draw(graph, pos, node_color=node_colors, node_size=50,
-    #     arrowhead_length=0.01 ,width=800, height=800)
-    # display(viz)
     cheese_node = get_cheese_pos(inner_grid)
     return nx.shortest_path(graph, start_node, cheese_node)
 
@@ -849,8 +840,7 @@ def get_cheese_pos_from_seq_of_states(state_bytes_seq):
     
 def get_envstate_from_seed(seed : int):
     seed_env = create_venv(num=1, start_level=seed, num_levels=1)
-    state_bytes = seed_env.env.callmethod("get_state")[0]
-    return EnvState(state_bytes)
+    return state_from_venv(venv=seed_env, idx=0)
 
 def get_full_grid_from_seed(seed : int):
     state = get_envstate_from_seed(seed)
@@ -1010,7 +1000,7 @@ def get_random_obs_opts(
     with tqdm(total=num_obs, disable=not show_pbar) as pbar:
         while len(state_bytes_list) < num_obs:
             venv, this_level = next(venv_gen)
-            env_state = EnvState(venv.env.callmethod('get_state')[0])
+            env_state = state_from_venv(venv, idx=0)
             full_grid = env_state.full_grid(with_mouse=False)
             inner_grid = env_state.inner_grid(with_mouse=False)
 
@@ -1116,7 +1106,7 @@ def get_random_obs(num_obs : int = 1, on_training : bool = True, rand_region : i
     # Randomly place the mouse in each environment 
     state_bytes_list = []
     for i in range(num_obs):
-        env_state = EnvState(venvs.env.callmethod('get_state')[i])
+        env_state = state_from_venv(venvs, i)
         grid = env_state.full_grid(with_mouse=False)
         legal_mouse_positions = get_legal_mouse_positions(grid)
 
