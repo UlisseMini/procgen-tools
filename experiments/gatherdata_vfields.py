@@ -27,10 +27,12 @@ if __name__ == '__main__':
     parser.add_argument('--save-figures', default=True, action='store_false')
     args = parser.parse_args()
 
+    rand_region = 5
     device = t.device(args.device)
     seeds = range(args.num_levels)
     coeffs = [float(c) for c in args.coeffs.split(',')]
     label = args.label
+    path_prefix = ''
 
     policy = models.load_policy(path_prefix + args.model_file, 15, device)
     hook = cmh.ModuleHook(policy)
@@ -39,9 +41,11 @@ if __name__ == '__main__':
         fig, _, obj = plot_patched_vfields(seed, coeff, label, hook)
         name = f"seed-{seed}_coeff-{coeff}_rr-{rand_region}_label-{label}"
         with open(f'{path_prefix}data/vfields/{name}.pkl', 'wb') as fp:
+            del obj['patches'] # can't pickle lambda
             pickle.dump(obj, fp)
 
         if args.save_figures:
             fig.savefig(f"{path_prefix}figures/{name}.png")
         plt.clf()
         plt.close()
+
