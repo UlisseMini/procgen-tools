@@ -103,21 +103,62 @@ def plot_dprobs_box(dpo, dpp, ax=None):
         ax[i].set_xticks([1, 2])
         ax[i].set_xticklabels(['original', 'patched'])
 
+# Plotly
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from typing import List, Tuple
+
+def plotly_fig_gen() -> go.Figure:
+    return make_subplots(rows=1, cols=3, subplot_titles=['P(cheese | decision-square)', 'P(top-right | decision-square)', 'P(other | decision-square)'], shared_yaxes=True)
+
+def get_probs_original_and_patched(vfields : List[dict], coeff : float) -> Tuple[np.ndarray, np.ndarray]:
+    """ Get the original and patched decision probabilities from vfields, given a cheese vector coefficient. """
+    dprobs_original, dprobs_patched = vs.get_decision_probs_original_and_patched(vfields, coeff=coeff)
+    probs_original, probs_patched = [np.stack([dprobs[:,0], dprobs[:,1], 1-dprobs[:,0]-dprobs[:,1]], axis=1) for dprobs in (dprobs_original, dprobs_patched)] # convert to 3-class probs
+    return probs_original, probs_patched
+
+def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
+    """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
+    probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
+
+    for i in range(3):
+        # Make the original colored blue and the patched colored orange
+        fig.add_trace(go.Histogram(x=probs_original[:,i], name='original', marker_color='blue', histnorm='probability'), row=1, col=i+1)
+        fig.add_trace(go.Histogram(x=probs_patched[:,i], name='patched', marker_color='orange', histnorm='probability'), row=1, col=i+1)
+
+    fig.update_layout(barmode='overlay')
+    fig.update_traces(opacity=0.75)
+    # Add x-axis titlerange=[0,1])
+    fig.update_xaxes(title_text="Probability at decision square", row=1, col=2, range=[0,1])
+
+    return fig
+
+def scatterplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
+    """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
+    probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
+
+    # now make the three plots side-by-side
+    for i in range(3):
+        # Make the original colored blue and the patched colored orange
+        fig.add_trace(go.Scatter(x=probs_original[:,i], y=probs_patched[:,i], mode='markers', name='original', marker_color='blue', hovertext=[f'seed: {vfields[idx]["seed"]}, (original {probs_original[idx,i]:.3f}, patched {probs_patched[idx,i]:.3f})' for idx in range(len(probs_original))]), row=1, col=i+1) 
+        # Format the hovertext to show the seed, and also the original and patched probabilities to 3 decimal places
+        fig.update_traces(hovertemplate='%{hovertext}<extra></extra>', hoverlabel=dict(bgcolor='white'), hoverlabel_align='left', hoverlabel_font_size=14, hoverlabel_font_family='monospace', hoverlabel_font_color='black') 
 
 
-def plot_vfs(vfs: dict):
-    """
-    Plot the original and patched vfields for a data entry saved by gatherdata_vfields.py
-    """
-    fig, ax = plt.subplots(1,2, figsize=(10,5))
-    for a in ax:
-        a.set_xticks([])
-        a.set_yticks([])
+    # Label left-most y-axis as "patched" and central x-axis as "original"
+    fig.update_yaxes(title_text='patched', row=1, col=1)
+    fig.update_xaxes(title_text='original', row=1, col=2)
 
-    for i, vf in enumerate((vfs['original_vfield'], vfs['patched_vfield'])):
-        vfield.plot_vf(vf, ax=ax[i])
-        ax[i].set_xlabel("Original vfield" if i == 0 else "Patched vfield")
-        
+    return fig
 
-    plt.title(f"Seed {vfs['seed']}, coeff {vfs['coeff']}")
+def boxplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
+    """ Plot boxplots of decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
+    probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
+
+    # now make the three plots side-by-side
+    for i in range(3):
+        # Make the original colored blue and the patched colored orange
+        fig.add_trace(go.Box(y=probs_original[:,i], name='original', marker_color='blue'), row=1, col=i+1)
+        fig.add_trace(go.Box(y=probs_patched[:,i], name='patched', marker_color='orange'), row=1, col=i+1)
+    
     return fig
