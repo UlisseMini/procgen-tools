@@ -120,11 +120,14 @@ def get_probs_original_and_patched(vfields : List[dict], coeff : float) -> Tuple
     probs_patched = np.clip(probs_patched, 0, 1)
     return probs_original, probs_patched
 
+def format_fig(fig : go.Figure, coeff : float):
+    fig.update_layout(showlegend=False)
+    fig.update_layout(title_text=f'Cheese vector coefficient: {2*coeff}')#FIXME doubling until we fix the data
+
 def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
     """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
     probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
     
-
     for i in range(3):
         # Make the original colored blue and the patched colored orange
         fig.add_trace(go.Histogram(x=probs_original[:,i], name='original', marker_color='blue', histnorm='probability'), row=1, col=i+1)
@@ -132,9 +135,12 @@ def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plot
 
     fig.update_layout(barmode='overlay')
     fig.update_traces(opacity=0.75)
-    # Add x-axis titlerange=[0,1])
-    fig.update_xaxes(title_text="Probability at decision square", row=1, col=2, range=[0,1])
+    fig.update_xaxes(title_text="Probability at decision square", row=1, col=2)
+    # Bound x to [0,1]
+    for i in range(3):
+        fig.update_xaxes(range=[0,1], row=1, col=i+1)
 
+    format_fig(fig=fig, coeff=coeff)
     return fig
 
 def scatterplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
@@ -153,6 +159,7 @@ def scatterplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = pl
     fig.update_yaxes(title_text='patched', row=1, col=1)
     fig.update_xaxes(title_text='original', row=1, col=2)
 
+    format_fig(fig=fig, coeff=coeff)
     return fig
 
 def boxplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
@@ -165,4 +172,5 @@ def boxplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly
         fig.add_trace(go.Box(y=probs_original[:,i], name='original', marker_color='blue'), row=1, col=i+1)
         fig.add_trace(go.Box(y=probs_patched[:,i], name='patched', marker_color='orange'), row=1, col=i+1)
     
+    format_fig(fig=fig, coeff=coeff)
     return fig
