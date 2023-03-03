@@ -11,7 +11,7 @@ except ImportError or ModuleNotFoundError:
 
 from procgen_tools.utils import setup
 
-setup() # create directory structure and download data 
+setup(download_data=False) # create directory structure and download data 
 
 from procgen_tools.imports import *
 from procgen_tools import visualization, patch_utils, maze, vfield
