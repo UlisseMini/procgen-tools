@@ -64,16 +64,17 @@ def setup_dir():
         os.chdir('procgen-tools')
 
 
-def setup(force: bool = False):
+def setup(force: bool = False, download_data : bool = True):
     """
     cd into the procgen-tools directory then download and extract data files.
     """
     setup_dir()
     assert Path.cwd().name == 'procgen-tools', 'must be in procgen-tools'
 
-    _fetch('https://nerdsniper.net/mats/episode_data.tgz', force=force)
-    _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
-    _fetch('https://nerdsniper.net/mats/data.tgz', force=force)
+    if download_data:
+        _fetch('https://nerdsniper.net/mats/episode_data.tgz', force=force)
+        _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
+        _fetch('https://nerdsniper.net/mats/data.tgz', force=force)
     _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth', force=force)
 
 
