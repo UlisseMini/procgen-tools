@@ -115,6 +115,7 @@ def get_probs_original_and_patched(vfields : List[dict], coeff : float) -> Tuple
     """ Get the original and patched decision probabilities from vfields, given a cheese vector coefficient. """
     dprobs_original, dprobs_patched = get_decision_probs_original_and_patched(vfields, coeff=coeff)
     probs_original, probs_patched = [np.stack([dprobs[:,0], dprobs[:,1], 1-dprobs[:,0]-dprobs[:,1]], axis=1) for dprobs in (dprobs_original, dprobs_patched)] # convert to 3-class probs
+
     # Clip all probabilities to [0,1]
     probs_original = np.clip(probs_original, 0, 1)
     probs_patched = np.clip(probs_patched, 0, 1)
@@ -136,6 +137,7 @@ def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plot
     fig.update_layout(barmode='overlay')
     fig.update_traces(opacity=0.75)
     fig.update_xaxes(title_text="Probability at decision square", row=1, col=2)
+
     # Bound x to [0,1]
     for i in range(3):
         fig.update_xaxes(range=[0,1], row=1, col=i+1)
@@ -147,13 +149,12 @@ def scatterplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = pl
     """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
     probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
 
-    # now make the three plots side-by-side
     for i in range(3):
         # Make the original colored blue and the patched colored orange
-        fig.add_trace(go.Scatter(x=probs_original[:,i], y=probs_patched[:,i], mode='markers', name='original', marker_color='blue', hovertext=[f'seed: {vfields[idx]["seed"]}, (original {probs_original[idx,i]:.3f}, patched {probs_patched[idx,i]:.3f})' for idx in range(len(probs_original))]), row=1, col=i+1) 
+        fig.add_trace(go.Scatter(x=probs_original[:,i], y=probs_patched[:,i], mode='markers', name='original', marker_color='blue', hovertext=[f'seed: {vfields[idx]["seed"]}, (original {probs_original[idx,i]:.3f}, patched {probs_patched[idx,i]:.3f})' for idx in range(len(probs_original))], opacity=0.6), row=1, col=i+1) 
+
         # Format the hovertext to show the seed, and also the original and patched probabilities to 3 decimal places
         fig.update_traces(hovertemplate='%{hovertext}<extra></extra>', hoverlabel=dict(bgcolor='white'), hoverlabel_align='left', hoverlabel_font_size=14, hoverlabel_font_family='monospace', hoverlabel_font_color='black') 
-
 
     # Label left-most y-axis as "patched" and central x-axis as "original"
     fig.update_yaxes(title_text='patched', row=1, col=1)
@@ -166,7 +167,6 @@ def boxplot_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly
     """ Plot boxplots of decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
     probs_original, probs_patched = get_probs_original_and_patched(vfields, coeff=coeff)
 
-    # now make the three plots side-by-side
     for i in range(3):
         # Make the original colored blue and the patched colored orange
         fig.add_trace(go.Box(y=probs_original[:,i], name='original', marker_color='blue'), row=1, col=i+1)
