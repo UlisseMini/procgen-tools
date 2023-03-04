@@ -176,4 +176,5 @@ figs/*.png
 *.json
 *.mp4
 *.png
+*.pkl
 *~
