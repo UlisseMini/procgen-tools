@@ -71,13 +71,25 @@ def setup(force: bool = False, download_data : bool = True):
     setup_dir()
     assert Path.cwd().name == 'procgen-tools', 'must be in procgen-tools'
 
+    # Check that data.tgz is newer than 2023-03-04
+    # (this is the date of the last data update, previous data was bugged)
+    force_redownload_vfields = False
+    data_tgz = Path('data.tgz')
+    if data_tgz.exists() and data_tgz.stat().st_mtime < 1677968658:
+        force_redownload_vfields = True
+
     if download_data:
         _fetch('https://nerdsniper.net/mats/episode_data.tgz', force=force)
         _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
-        _fetch('https://nerdsniper.net/mats/data.tgz', force=force)
+        _fetch('https://nerdsniper.net/mats/data.tgz', force=force or force_redownload_vfields)
+
     _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth', force=force)
 
 
     
+
+# %%
+
+setup()
 
 # %%
