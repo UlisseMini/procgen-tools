@@ -32,7 +32,8 @@ AGENT_PX_WIDTH = 64 # width of the agent view input image
 AGENT_PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
 
 HUMAN_PX_WIDTH = 512
-HUMAN_PX_PER_TILE = HUMAN_PX_WIDTH / WORLD_DIM
+REAL_PX_WIDTH = 500 # The actual size of the maze in pixels; the rest is padding
+HUMAN_PX_PER_TILE = REAL_PX_WIDTH / WORLD_DIM
 
 DEBUG = False # slows everything down by ensuring parse & serialize are inverses.
 

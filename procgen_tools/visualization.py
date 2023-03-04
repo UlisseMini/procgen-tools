@@ -179,8 +179,13 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int
         row = (maze.WORLD_DIM - 1) - row
     row, col = row - removed_padding, col - removed_padding
 
-    row_lb, row_ub = (math.floor(row * maze.HUMAN_PX_PER_TILE), math.ceil((row + 1) * maze.HUMAN_PX_PER_TILE))
-    col_lb, col_ub = (math.floor(col * maze.HUMAN_PX_PER_TILE), math.ceil((col + 1) * maze.HUMAN_PX_PER_TILE))
+    row_lb, row_ub = (row * maze.HUMAN_PX_PER_TILE, (row + 1) * maze.HUMAN_PX_PER_TILE)
+    col_lb, col_ub = (col * maze.HUMAN_PX_PER_TILE, (col + 1) * maze.HUMAN_PX_PER_TILE)
+    # Cast as ints 
+    row_lb, row_ub, col_lb, col_ub = (int(coord) for coord in (row_lb, row_ub, col_lb, col_ub))
+    
+    if removed_padding == 0: # add 6 to the bounds to account for the 6 pixel border
+        row_lb, row_ub, col_lb, col_ub = (row_lb + 6, row_ub + 6, col_lb + 6, col_ub + 6)
     return img[row_lb:row_ub, col_lb:col_ub,:]
 
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
@@ -199,24 +204,38 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     """
     assert not (mode == "agent" and not render_padding), "This parameter combination is unsupported; must render padding in agent mode."
     if not render_mouse: assert mode == "human", "render_mouse is only supported in human mode."
-    
+
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     ax.axis('off')
     ax.set_title(mode.title() + " view")
     
+    env_state = maze.state_from_venv(venv, idx=0)
+    full_grid = env_state.full_grid()
+    inner_grid = env_state.inner_grid()
+
     if mode == "human":
         if render_padding:
             img = venv.env.get_info()[idx]['rgb']
         else:
-            inner_grid = maze.EnvState(venv.env.callmethod('get_state')[idx]).inner_grid() 
             img = maze.render_inner_grid(inner_grid)
+        if not render_mouse:
+            # First get the mouse position and the corresponding pixels
+            mouse_pos = maze.get_mouse_pos(grid=full_grid)
+            pad = 0 if render_padding else maze.get_padding(grid=inner_grid)
+            mouse_px = pixels_at_grid(*mouse_pos, img=img, removed_padding=pad)
+
+            # Now get an empty position and the corresponding pixels
+            empty_pos = maze.get_object_pos_in_grid(full_grid, maze.EMPTY)
+            empty_px = pixels_at_grid(*empty_pos, img=img, removed_padding=pad)
+
+            # Now replace the mouse pixels with the empty pixels
+            mouse_px[:] = empty_px
     elif mode == "agent":
         img = venv.reset()[idx].transpose(1,2,0) # (C, H, W) -> (H, W, C)
     elif mode == "numpy":
-        env_state = maze.EnvState(venv.env.callmethod('get_state')[idx])
-        grid = env_state.full_grid() if render_padding else env_state.inner_grid()
-        img = grid[::(-1 if flip_numpy else 1), :] # Flip the numpy view vertically
+        rendered_grid = full_grid if render_padding else inner_grid
+        img = rendered_grid[::(-1 if flip_numpy else 1), :] # Flip the numpy view vertically
     else:
         raise ValueError(f"Invalid mode {mode}")
 
