@@ -112,3 +112,7 @@ for seed in (0, 20, 60):
     save_sweep(channels=cheese_channels, seed=seed, value=.9, channels_str='cheese_channels')
 
 # %%
+
+# Randomly generate 5 mazes and save a GIF for each
+for seed in np.random.randint(0, 100000, 5):
+    save_sweep(channels=cheese_channels, seed=seed, value=.9, channels_str='cheese_channels')
