@@ -162,6 +162,23 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
     return (int(chan_row), int(chan_col))
 
+def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int = 0, flip_y : bool = True):
+    """ Get the pixels in the image corresponding to the given grid position. 
+    
+    Args:
+        row: The row of the grid position.
+        col: The column of the grid position.
+        img: The image to get the pixels from.
+        removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
+    """
+    if flip_y:
+        row = (maze.WORLD_DIM - 1) - row
+    
+    px_row, px_col = ((row + .5) * maze.PX_PER_TILE, (col + .5) * maze.PX_PER_TILE)
+    padding_offset = (PIXEL_SIZE / maze.WORLD_DIM) * removed_padding
+    px_row, px_col = (coord - padding_offset for coord in (px_row, px_col))
+    return img[px_row, px_col]
+
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True):
     """ Visualize the environment. Returns an img if show_plot is false. 
     
@@ -183,10 +200,10 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     
     if mode == "human":
         if render_padding:
+            img = venv.env.get_info()[idx]['rgb']
+        else:
             inner_grid = maze.EnvState(venv.env.callmethod('get_state')[idx]).inner_grid() 
             img = maze.render_inner_grid(inner_grid)
-        else:
-            img = venv.env.get_info()[idx]['rgb']
     elif mode == "agent":
         img = venv.reset()[idx].transpose(1,2,0) # (C, H, W) -> (H, W, C)
     elif mode == "numpy":
