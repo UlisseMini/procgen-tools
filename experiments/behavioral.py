@@ -67,3 +67,4 @@ button.on_click(lambda _: generate_plots(max_size = slider.value))
 display(HBox([button, checkbox]))
 
 generate_plots(max_size = slider.value)
+# %%

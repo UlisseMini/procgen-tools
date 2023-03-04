@@ -156,7 +156,7 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {pos}'
 
     # Convert to pixel location
-    px_row, px_col = ((row + .5) * maze.PX_PER_TILE, (col + .5) * maze.PX_PER_TILE)
+    px_row, px_col = ((row + .5) * maze.AGENT_PX_PER_TILE, (col + .5) * maze.AGENT_PX_PER_TILE)
 
     px_per_channel_idx = get_stride(layer) # How many pixels per channel index
     chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
@@ -168,18 +168,22 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int
     Args:
         row: The row of the grid position.
         col: The column of the grid position.
-        img: The image to get the pixels from.
+        img: The image to get the pixels from, assumed to be rendered from the human view.
         removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
     """
+    assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {row, col}'
+    assert img.shape[2] == 3, f'Image must have 3 channels, but has {img.shape[2]}' # Ensure image is RGB
+    assert maze.WORLD_DIM // 2 > removed_padding >= 0, f'removed_padding must be non-negative, but is {removed_padding}'
+
     if flip_y:
         row = (maze.WORLD_DIM - 1) - row
-    
-    px_row, px_col = ((row + .5) * maze.PX_PER_TILE, (col + .5) * maze.PX_PER_TILE)
-    padding_offset = (PIXEL_SIZE / maze.WORLD_DIM) * removed_padding
-    px_row, px_col = (coord - padding_offset for coord in (px_row, px_col))
-    return img[px_row, px_col]
+    row, col = row - removed_padding, col - removed_padding
 
-def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True):
+    row_lb, row_ub = (math.floor(row * maze.HUMAN_PX_PER_TILE), math.ceil((row + 1) * maze.HUMAN_PX_PER_TILE))
+    col_lb, col_ub = (math.floor(col * maze.HUMAN_PX_PER_TILE), math.ceil((col + 1) * maze.HUMAN_PX_PER_TILE))
+    return img[row_lb:row_ub, col_lb:col_ub,:]
+
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
     """ Visualize the environment. Returns an img if show_plot is false. 
     
     Parameters: 
@@ -191,8 +195,11 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     show_plot: Whether to show the plot. 
     flip_numpy: Whether to vertically flip the numpy view.
     render_padding: Whether to render the padding in the human or numpy view.
+    render_mouse: Whether to render the mouse in the human view.
     """
     assert not (mode == "agent" and not render_padding), "This parameter combination is unsupported; must render padding in agent mode."
+    if not render_mouse: assert mode == "human", "render_mouse is only supported in human mode."
+    
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     ax.axis('off')
