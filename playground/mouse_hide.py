@@ -1,4 +1,8 @@
 # %%
+%load_ext autoreload
+%autoreload 2
+
+# %%
 try:
     import procgen_tools
 except ImportError or ModuleNotFoundError:
@@ -41,7 +45,9 @@ for ax, mode in zip(axs, ['human', 'agent', 'numpy']):
 plt.show()
 
 # %%
-venv = maze.create_venv(num=1, start_level=5, num_levels=1)
-visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=True, render_mouse=False)
+for seed in range(20):
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+
+    visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=False, render_mouse=False)
 
 # %%

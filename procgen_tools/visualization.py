@@ -178,14 +178,14 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int
     if flip_y:
         row = (maze.WORLD_DIM - 1) - row
     row, col = row - removed_padding, col - removed_padding
-
+ 
     row_lb, row_ub = (row * maze.HUMAN_PX_PER_TILE, (row + 1) * maze.HUMAN_PX_PER_TILE)
     col_lb, col_ub = (col * maze.HUMAN_PX_PER_TILE, (col + 1) * maze.HUMAN_PX_PER_TILE)
-    # Cast as ints 
-    row_lb, row_ub, col_lb, col_ub = (int(coord) for coord in (row_lb, row_ub, col_lb, col_ub))
     
-    if removed_padding == 0: # add 6 to the bounds to account for the 6 pixel border
-        row_lb, row_ub, col_lb, col_ub = (row_lb + 6, row_ub + 6, col_lb + 6, col_ub + 6)
+    # add 12 to the bounds to account for the 6 pixel border, and cast as ints
+    row_lb, row_ub = (int(coord + 12) for coord in (row_lb, row_ub))
+    col_lb, col_ub = (math.floor(coord + 1) for coord in (col_lb, col_ub)) # FIXME e.g. seed 19 still has a few pixels off
+
     return img[row_lb:row_ub, col_lb:col_ub,:]
 
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
