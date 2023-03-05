@@ -183,7 +183,7 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int
     col_lb, col_ub = (col * maze.HUMAN_PX_PER_TILE, (col + 1) * maze.HUMAN_PX_PER_TILE)
     
     # add 12 to the bounds to account for the 6 pixel border, and cast as ints
-    row_lb, row_ub = (int(coord + 12) for coord in (row_lb, row_ub))
+    row_lb, row_ub = (int(coord + maze.HUMAN_PX_PADDING*2) for coord in (row_lb, row_ub))
     col_lb, col_ub = (math.floor(coord + 1) for coord in (col_lb, col_ub)) # FIXME e.g. seed 19 still has a few pixels off
 
     return img[row_lb:row_ub, col_lb:col_ub,:]
@@ -242,8 +242,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     ax.imshow(img)
     if show_plot:
         plt.show() 
-    else:
-        return img
+    return img
 
 def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = None, callback : Callable = None, show_components : bool = False):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. 

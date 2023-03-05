@@ -31,8 +31,9 @@ WORLD_DIM = 25
 AGENT_PX_WIDTH = 64 # width of the agent view input image
 AGENT_PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
 
-HUMAN_PX_WIDTH = 512
-REAL_PX_WIDTH = 500 # The actual size of the maze in pixels; the rest is padding
+HUMAN_PX_WIDTH = 512 # Not actually divisible by WORLD_DIM, so I infer there's padding on the sides
+HUMAN_PX_PADDING = 6 # Just my guess for what the padding is
+REAL_PX_WIDTH = HUMAN_PX_WIDTH - 2*HUMAN_PX_PADDING 
 HUMAN_PX_PER_TILE = REAL_PX_WIDTH / WORLD_DIM
 
 DEBUG = False # slows everything down by ensuring parse & serialize are inverses.
@@ -605,6 +606,14 @@ def venv_from_grid(grid: np.ndarray):
     state.set_grid(grid, pad=True)
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
+
+def get_empty_venv() -> ProcgenGym3Env:
+    """ Get a venv with an empty maze. """
+    grid = get_full_grid_from_seed(seed=0)
+    for block_type in (BLOCKED, CHEESE):
+        grid[grid == block_type] = EMPTY
+
+    return venv_from_grid(grid=grid)
 
 def get_padding(grid: np.ndarray) -> int:
     """ Return the padding of the (inner) grid, i.e. the number of walls around the maze. """

@@ -1,4 +1,4 @@
-from procgen_tools import models, maze
+from procgen_tools import models, maze, visualization
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
@@ -136,11 +136,8 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
             [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy', width=width
         )
 
-    if human_render:
-        human_view = maze.render_outer_grid(grid) if render_padding else maze.render_inner_grid(grid)
-        ax.imshow(human_view)
-    else: 
-        ax.imshow(grid, origin='lower')
+    venv = maze.venv_from_grid(grid)
+    visualization.visualize_venv(venv, ax=ax, mode='human' if human_render else 'numpy', render_padding=render_padding, render_mouse=False)
 
     ax.set_xticks([])
     ax.set_yticks([])

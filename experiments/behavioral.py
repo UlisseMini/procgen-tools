@@ -45,9 +45,9 @@ def generate_plots(max_size : int = 18, min_size : int = 3, cols : int = 2, rows
             seed = np.random.randint(0, 100000)
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
         vf = vfield.vector_field(venv, policy=hook.network)
-        vfield.plot_vf(vf, ax=ax, show_components=checkbox.value, render_padding = True)
+        vfield.plot_vf(vf, ax=ax, show_components=checkbox.value, render_padding = False)
         ax.set_title(f'Seed: {seed:,}')
-        ax.axis('off') 
+        ax.axis('off')  # TODO only rendering one right now, probably issue with vfield.render_arrows
 
     # Indicate that the plots are done being generated
     text_out.clear_output()
@@ -65,5 +65,11 @@ button = widgets.Button(description='Generate new plots')
 button.on_click(lambda _: generate_plots(max_size = slider.value))
 display(HBox([button, checkbox]))
 
-generate_plots(max_size = 25, min_size = 25)
-# %%
+generate_plots(max_size = slider.value)
+# %% Make a totally empty venv and then visualize it
+grid = maze.get_full_grid_from_seed(seed=0)
+for block_type in (maze.WALL, maze.CHEESE):
+    grid[grid == block_type] = maze.EMPTY
+
+venv = maze.venv_from_grid(grid=grid)
+visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=True, render_mouse=True)
