@@ -219,15 +219,16 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
     num_cols = 1 + show_diff + show_original
     fontsize = 16
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
-
+    
+    plot_vf_curried = partial(plot_vf, human_render=human_render, render_padding=render_padding, show_components=show_components)
     idx = 0
     if show_original:
         axs[idx].set_xlabel("Original", fontsize=fontsize)
-        plot_vf(vf1, ax=axs[0], human_render=human_render, render_padding=render_padding, show_components=show_components)
+        plot_vf_curried(vf1, ax=axs[idx])
         idx += 1
     
     axs[idx].set_xlabel("Patched", fontsize=fontsize)
-    plot_vf(vf2, ax=axs[idx], human_render=human_render, render_padding=render_padding,     show_components=show_components)
+    plot_vf_curried(vf2, ax=axs[idx])
     idx += 1
 
     if show_diff:
