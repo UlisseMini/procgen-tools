@@ -10,13 +10,11 @@ except ImportError or ModuleNotFoundError:
 
 from procgen_tools.utils import setup
 
-setup() # create directory structure and download data 
+setup(download_data=False) # create directory structure and download data 
 
-# %% Super-long import code!
+# %% 
 from procgen_tools.imports import *
-import procgen_tools.visualization as visualization
-import procgen_tools.patch_utils as patch_utils
-import procgen_tools.maze as maze
+from procgen_tools import visualization, patch_utils, maze, vfield
 
 SAVE_DIR = 'playground/visualizations/'
 AX_SIZE = 6
