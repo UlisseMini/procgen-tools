@@ -156,13 +156,39 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {pos}'
 
     # Convert to pixel location
-    px_row, px_col = ((row + .5) * maze.PX_PER_TILE, (col + .5) * maze.PX_PER_TILE)
+    px_row, px_col = ((row + .5) * maze.AGENT_PX_PER_TILE, (col + .5) * maze.AGENT_PX_PER_TILE)
 
     px_per_channel_idx = get_stride(layer) # How many pixels per channel index
     chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
     return (int(chan_row), int(chan_col))
 
-def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True):
+def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int = 0, flip_y : bool = True):
+    """ Get the pixels in the image corresponding to the given grid position. 
+    
+    Args:
+        row: The row of the grid position.
+        col: The column of the grid position.
+        img: The image to get the pixels from, assumed to be rendered from the human view.
+        removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
+    """
+    assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {row, col}'
+    assert img.shape[2] == 3, f'Image must have 3 channels, but has {img.shape[2]}' # Ensure image is RGB
+    assert maze.WORLD_DIM // 2 > removed_padding >= 0, f'removed_padding must be non-negative, but is {removed_padding}'
+
+    if flip_y:
+        row = (maze.WORLD_DIM - 1) - row
+    row, col = row - removed_padding, col - removed_padding
+ 
+    row_lb, row_ub = (row * maze.HUMAN_PX_PER_TILE, (row + 1) * maze.HUMAN_PX_PER_TILE)
+    col_lb, col_ub = (col * maze.HUMAN_PX_PER_TILE, (col + 1) * maze.HUMAN_PX_PER_TILE)
+    
+    # add 12 to the bounds to account for the 6 pixel border, and cast as ints
+    row_lb, row_ub = (int(coord + maze.HUMAN_PX_PADDING*2) for coord in (row_lb, row_ub))
+    col_lb, col_ub = (math.floor(coord + 1) for coord in (col_lb, col_ub)) # FIXME e.g. seed 19 still has a few pixels off
+
+    return img[row_lb:row_ub, col_lb:col_ub,:]
+
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
     """ Visualize the environment. Returns an img if show_plot is false. 
     
     Parameters: 
@@ -174,33 +200,49 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     show_plot: Whether to show the plot. 
     flip_numpy: Whether to vertically flip the numpy view.
     render_padding: Whether to render the padding in the human or numpy view.
+    render_mouse: Whether to render the mouse in the human view.
     """
     assert not (mode == "agent" and not render_padding), "This parameter combination is unsupported; must render padding in agent mode."
+    if not render_mouse: assert mode == "human", "render_mouse is only supported in human mode."
+
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     ax.axis('off')
     ax.set_title(mode.title() + " view")
     
+    env_state = maze.state_from_venv(venv, idx=0)
+    full_grid = env_state.full_grid()
+    inner_grid = env_state.inner_grid()
+
     if mode == "human":
         if render_padding:
-            inner_grid = maze.EnvState(venv.env.callmethod('get_state')[idx]).inner_grid() 
-            img = maze.render_inner_grid(inner_grid)
-        else:
             img = venv.env.get_info()[idx]['rgb']
+        else:
+            img = maze.render_inner_grid(inner_grid)
+        if not render_mouse:
+            # First get the mouse position and the corresponding pixels
+            mouse_pos = maze.get_mouse_pos(grid=full_grid)
+            pad = 0 if render_padding else maze.get_padding(grid=inner_grid)
+            mouse_px = pixels_at_grid(*mouse_pos, img=img, removed_padding=pad)
+
+            # Now get an empty position and the corresponding pixels
+            empty_pos = maze.get_object_pos_in_grid(full_grid, maze.EMPTY)
+            empty_px = pixels_at_grid(*empty_pos, img=img, removed_padding=pad)
+
+            # Now replace the mouse pixels with the empty pixels
+            mouse_px[:] = empty_px
     elif mode == "agent":
         img = venv.reset()[idx].transpose(1,2,0) # (C, H, W) -> (H, W, C)
     elif mode == "numpy":
-        env_state = maze.EnvState(venv.env.callmethod('get_state')[idx])
-        grid = env_state.full_grid() if render_padding else env_state.inner_grid()
-        img = grid[::(-1 if flip_numpy else 1), :] # Flip the numpy view vertically
+        rendered_grid = full_grid if render_padding else inner_grid
+        img = rendered_grid[::(-1 if flip_numpy else 1), :] # Flip the numpy view vertically
     else:
         raise ValueError(f"Invalid mode {mode}")
 
     ax.imshow(img)
     if show_plot:
         plt.show() 
-    else:
-        return img
+    return img
 
 def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = None, callback : Callable = None, show_components : bool = False):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. 

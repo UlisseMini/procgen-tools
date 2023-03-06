@@ -1,4 +1,4 @@
-from procgen_tools import models, maze
+from procgen_tools import models, maze, visualization
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
@@ -136,11 +136,8 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
             [arr[1] for arr in arrows], [arr[0] for arr in arrows], color=color, scale=1, scale_units='xy', width=width
         )
 
-    if human_render:
-        human_view = maze.render_outer_grid(grid) if render_padding else maze.render_inner_grid(grid)
-        ax.imshow(human_view)
-    else: 
-        ax.imshow(grid, origin='lower')
+    venv = maze.venv_from_grid(grid)
+    visualization.visualize_venv(venv, ax=ax, mode='human' if human_render else 'numpy', render_padding=render_padding, render_mouse=False, show_plot=False)
 
     ax.set_xticks([])
     ax.set_yticks([])
@@ -222,15 +219,16 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
     num_cols = 1 + show_diff + show_original
     fontsize = 16
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
-
+    
+    plot_vf_curried = partial(plot_vf, human_render=human_render, render_padding=render_padding, show_components=show_components)
     idx = 0
     if show_original:
         axs[idx].set_xlabel("Original", fontsize=fontsize)
-        plot_vf(vf1, ax=axs[0], human_render=human_render, render_padding=render_padding, show_components=show_components)
+        plot_vf_curried(vf1, ax=axs[idx])
         idx += 1
     
     axs[idx].set_xlabel("Patched", fontsize=fontsize)
-    plot_vf(vf2, ax=axs[idx], human_render=human_render, render_padding=render_padding,     show_components=show_components)
+    plot_vf_curried(vf2, ax=axs[idx])
     idx += 1
 
     if show_diff:

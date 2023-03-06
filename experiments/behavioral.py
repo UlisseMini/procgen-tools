@@ -3,7 +3,6 @@
 %autoreload 2
 
 # %%
-
 try:
     import procgen_tools
 except ImportError or ModuleNotFoundError:
@@ -30,25 +29,24 @@ text_out = widgets.Output()
 display(text_out)
 display(fig_out)
 
-def generate_plots(max_size : int = 18, cols : int = 2, rows : int = 1):
-    """ Generate rows*cols plots for random seeds with inner grid size at most max_size. """
-    # Ensure no double-shown plots
-    assert max_size >= 3, f"The smallest mazes have size 3; {max_size} is too small!"
+def generate_plots(max_size : int = 18, min_size : int = 3, cols : int = 2, rows : int = 1):
+    """ Generate rows*cols plots for random seeds with inner grid size at most max_size and at least min_size. """
+    assert 3 <= min_size <= max_size <= maze.WORLD_DIM, 'Invalid min/max size'
 
     # Indicate that the plots are being generated    
     with text_out:
-        print(f'Generating {rows*cols} plots with max inner grid size {max_size}...')
+        print(f'Generating {rows*cols} plots...')
 
     fig, axs = plt.subplots(rows, cols, figsize=(AX_SIZE*cols, AX_SIZE*rows))
     for idx, ax in enumerate(axs.flatten()): 
         seed = np.random.randint(0, 100000)
-        while maze.get_inner_grid_from_seed(seed=seed).shape[0] > max_size:
+        while maze.get_inner_grid_from_seed(seed=seed).shape[0] > max_size or maze.get_inner_grid_from_seed(seed=seed).shape[0] < min_size:
             seed = np.random.randint(0, 100000)
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
         vf = vfield.vector_field(venv, policy=hook.network)
-        vfield.plot_vf(vf, ax=ax, show_components=checkbox.value)
+        vfield.plot_vf(vf, ax=ax, show_components=checkbox.value, render_padding = False)
         ax.set_title(f'Seed: {seed:,}')
-        ax.axis('off') 
+        ax.axis('off')  
 
     # Indicate that the plots are done being generated
     text_out.clear_output()
@@ -67,3 +65,10 @@ button.on_click(lambda _: generate_plots(max_size = slider.value))
 display(HBox([button, checkbox]))
 
 generate_plots(max_size = slider.value)
+# %% Make a totally empty venv and then visualize it
+for fill_type in (maze.EMPTY, maze.CHEESE):
+    venv = maze.get_filled_venv(fill_type=fill_type)
+    img = visualization.visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=True, render_mouse=True)
+
+# %%
+

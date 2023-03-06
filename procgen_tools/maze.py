@@ -21,6 +21,8 @@ import copy
 from warnings import warn
 from tqdm.auto import tqdm
 
+from procgen import ProcgenGym3Env
+
 # Constants in numeric maze representation
 CHEESE = 2
 EMPTY = 100
@@ -29,7 +31,12 @@ MOUSE = 25 # UNOFFICIAL. The mouse isn't in the grid in procgen.
 
 WORLD_DIM = 25
 AGENT_PX_WIDTH = 64 # width of the agent view input image
-PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
+AGENT_PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
+
+HUMAN_PX_WIDTH = 512 # Not actually divisible by WORLD_DIM, so I infer there's padding on the sides
+HUMAN_PX_PADDING = 6 # Just my guess for what the padding is
+REAL_PX_WIDTH = HUMAN_PX_WIDTH - 2*HUMAN_PX_PADDING 
+HUMAN_PX_PER_TILE = REAL_PX_WIDTH / WORLD_DIM
 
 DEBUG = False # slows everything down by ensuring parse & serialize are inverses.
 
@@ -602,6 +609,16 @@ def venv_from_grid(grid: np.ndarray):
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
+def get_filled_venv(fill_type : int = EMPTY) -> ProcgenGym3Env:
+    """ Get a venv with a grid filled with fill_type (either EMPTY or CHEESE; BLOCKED throws an error for some reason). """
+    assert fill_type in (CHEESE, EMPTY), "fill_type must be EMPTY or CHEESE"
+    grid = get_full_grid_from_seed(seed=0)
+    mouse_pos = get_mouse_pos(grid)
+    for block_type in (BLOCKED, CHEESE, EMPTY):
+        grid[grid == block_type] = fill_type
+    grid[mouse_pos] = MOUSE # Don't overwrite the mouse
+    return venv_from_grid(grid=grid)
+
 def get_padding(grid: np.ndarray) -> int:
     """ Return the padding of the (inner) grid, i.e. the number of walls around the maze. """
     return (WORLD_DIM - grid.shape[0]) // 2
@@ -631,7 +648,6 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
-    # Hex dark yellow is 
     CELL_TO_COLOR = {EMPTY: '#D9D9D6', BLOCKED: '#A47449', CHEESE: '#EAAA00', MOUSE: '#393D47'}
     CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀', MOUSE: '🐭'}
 
@@ -677,7 +693,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-def venv_editors(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
+def venv_editors(venv : ProcgenGym3Env, check_on_dist : bool = True, env_nums=None, callback : Callable = None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
