@@ -119,6 +119,7 @@ def get_predict(plcy):
             act = dist.mode.numpy()
         else:
             act = dist.sample().numpy()
+        print(act)
         return act, None, dist.logits.detach().numpy()
     return predict
 

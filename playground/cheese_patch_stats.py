@@ -42,19 +42,6 @@ hook = cmh.ModuleHook(policy)
 # %%
 # Functions for running stats on cheese patching
 
-def remove_cheese_from_state(state):
-    grid = state.full_grid()
-    grid[grid == maze.CHEESE] = maze.EMPTY
-    state.set_grid(grid)
-    return state
-
-def move_cheese_in_state(state, new_cheese_pos):
-    grid = state.full_grid()
-    grid[grid == maze.CHEESE] = maze.EMPTY
-    grid[new_cheese_pos] = maze.CHEESE
-    state.set_grid(grid)
-    return state
-
 def stack(array, dims_can_stack=['level_seed', 'mouse_pos', 'cheese_pos']):
     dims_to_stack = [dim for dim in dims_can_stack
         if dim in array.dims]

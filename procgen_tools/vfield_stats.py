@@ -123,7 +123,7 @@ def get_probs_original_and_patched(vfields : List[dict], coeff : float) -> Tuple
 
 def format_fig(fig : go.Figure, coeff : float):
     fig.update_layout(showlegend=False)
-    fig.update_layout(title_text=f'Cheese vector coefficient: {2*coeff}')#FIXME doubling until we fix the data
+    fig.update_layout(title_text=f'Cheese vector coefficient: {coeff}')
 
 def histogram_plotly(coeff : float, vfields : List[dict], fig : go.Figure = plotly_fig_gen()):
     """ Plot decision probabilities, given a cheese vector coefficient. Plot the cheese, top-right, and other probabilities in three separate plots. """
