@@ -2,7 +2,8 @@ from procgen_tools import models, maze, visualization
 import matplotlib.pyplot as plt
 from ipywidgets import *
 from IPython.display import display, clear_output
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple 
+from functools import partial
 
 from procgen import ProcgenGym3Env
 from warnings import warn
