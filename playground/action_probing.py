@@ -47,6 +47,7 @@ import procgen_tools.models as models
 import procgen_tools.maze as maze
 import procgen_tools.patch_utils as patch_utils
 import procgen_tools.vfield as vfield
+import procgen_tools.rollout_utils as rollout_utils
 from procgen import ProcgenGym3Env
 
 path_prefix = '../'
@@ -60,7 +61,7 @@ num_obs_dec = 5000
 obs_batch_size = 5000
 
 hook_batch_size = 100
-value_label = 'embedder.relufc_out'
+value_labels = ['embedder.flatten_out', 'embedder.relufc_out']
 logits_value_label = 'fc_policy_out'
 
 REDO_OBS = False
@@ -120,37 +121,49 @@ if not os.path.isfile(cache_fn) or REDO_OBS:
             md['next_pos_corner_outer'])
         for md in obs_meta])
 
-    # Run observations through a hooked network, extract the fc layer activations 
-    # as the training/test data.  Do it batches to avoid running out of RAM!
+    # Run observations through a hooked network, extract the fc layer activations
+    # and the flatten layer activations as potential training/test data.  
+    # Do it batches to avoid running out of RAM!
     print('Run observations through hooked network, in batches...')
-    value_list = []
+    value_lists = {value_label: [] for value_label in value_labels}
     logits_list = []
     for batch_start_ind in tqdm(range(0, obs.shape[0], hook_batch_size)):
         hook.run_with_input(obs[batch_start_ind:(batch_start_ind+hook_batch_size)], 
-            values_to_store=[value_label, logits_value_label])
-        value_list.append(hook.get_value_by_label(value_label))
+            values_to_store=value_labels+[logits_value_label])
+        for value_label in value_labels:
+            value_lists[value_label].append(hook.get_value_by_label(value_label))
         logits_list.append(hook.get_value_by_label(logits_value_label))
-    value = np.concatenate(value_list, axis=0)
+    values_by_label = {value_label: np.concatenate(value_lists[value_label], axis=0) 
+                       for value_label in value_labels}
     logits = np.concatenate(logits_list, axis=0)
     
     with open(cache_fn, 'wb') as fl:
-        pickle.dump((obs, value, logits, next_action_cheese, next_action_corner), fl)
+        pickle.dump((obs, values_by_label, logits, next_action_cheese, next_action_corner), fl)
 
 else:
     with open(cache_fn, 'rb') as fl:
-        obs, value, logits, next_action_cheese, next_action_corner = pickle.load(fl)
+        obs, values_by_label, logits, next_action_cheese, next_action_corner = pickle.load(fl)
 
 
 # %%
 # Train a probe!
-inds_slice = slice(None)
+# value_label = 'embedder.relufc_out'
+# inds_slice = slice(None)
+
+value_label = 'embedder.flatten_out'
+inds_slice = slice(None) #slice(-10000, None)
+
+value = values_by_label[value_label]
+
 probe_result = cpr.linear_probe(value[inds_slice], next_action_cheese[inds_slice], 
-    model_type='classifier', C=0.01, class_weight='balanced', test_size=0.3)
+    model_type='classifier', C=0.01, class_weight='balanced', test_size=0.3, random_state=42)
 
 model = probe_result['model']
 
 print(probe_result['train_score'], probe_result['test_score'])
 print(probe_result['conf_matrix'])
+
+
 
 # %%
 # What about a more complex probe?
@@ -192,14 +205,26 @@ model_logits = probe_result_logits['model']
 # RESULT: so far, the resulting policy performs quite badly, which is suprising as
 # it predicts the correct "next action towards cheese" better than the actual policy!
 # I think this is worth some debugging...
+# 2023-03-04: we can get 90% cheese-action accuracy learning a single linear map from the 
+# flattened conv layer output, but even so it looks like we still get stuck sometimes?
+# Level 2: it seems like it's *trying* to get the cheese, but it can't quite
+# overcome the resistence to going up the cheese-holding branch.  I wonder if there's 
+# actually something in the conv net that basically obscures the cheese from view when
+# the mouse is at that junction square?
+# Level 17: it gets stuck on the decision square, which is actually pretty similar to
+# level 2... is there a pattern here?
+# Level 5: new policy finds the cheese, old one doesn't, so that's interesting...
+# Level 12: stuck near the decision square, normal doesn't get cheese
+# Level 13: get's cheese, normal doesn't... 
+# Test this more systematically...
 
-level = 17
+levels = range(200)
 random_seed = 42
 rng = np.random.default_rng(random_seed)
 
 model_to_use = model
 
-def predict(obs, deterministic):
+def predict_cheese(obs, deterministic):
     obs = t.FloatTensor(obs)
     with hook.store_specific_values([value_label]):
         hook.network(obs)
@@ -216,15 +241,34 @@ def predict(obs, deterministic):
             break
     return act, None
 
-venv = maze.create_venv(1, start_level=level, num_levels=1)
-seq, _, _ = cro.run_rollout(predict, venv, max_episodes=1, max_steps=256)
-vid_fn, fps = cro.make_video_from_renders(seq.renders)
-display(Video(vid_fn, embed=True))
+predict_normal = rollout_utils.get_predict(policy)
+
+results = []
+for level in tqdm(levels):
+    result = {'level': level}
+    for desc, pred in {'normal': predict_normal, 'retrain': predict_cheese}.items():
+        venv = maze.create_venv(1, start_level=level, num_levels=1)
+        seq, _, _ = cro.run_rollout(pred, venv, max_episodes=1, max_steps=256, show_pbar=False)
+        result[f'{desc}_found_cheese'] = seq.rewards.sum().item() > 0.
+    results.append(result)
+df = pd.DataFrame(results)
+display(df)
+
+
+# %%
+# Pick a few levels to show side-by-side rollouts on
+vid_levels = [0]
+
+for level in vid_levels:
+    vid, seqs = rollout_utils.side_by_side_rollout({
+        'normal': predict_normal, 'cheese-retrained': predict_cheese}, level)
+    display(vid)
+
 
 # %%
 # Try comparing vfields
 
-level = 17
+level = 2
 
 def forward(obs):
     obs = t.FloatTensor(obs)
