@@ -137,7 +137,7 @@ def render_arrows(vf : dict, ax=None, human_render: bool = True, render_padding 
         )
 
     venv = maze.venv_from_grid(grid)
-    visualization.visualize_venv(venv, ax=ax, mode='human' if human_render else 'numpy', render_padding=render_padding, render_mouse=False)
+    visualization.visualize_venv(venv, ax=ax, mode='human' if human_render else 'numpy', render_padding=render_padding, render_mouse=False, show_plot=False)
 
     ax.set_xticks([])
     ax.set_yticks([])

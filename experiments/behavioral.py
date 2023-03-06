@@ -3,7 +3,6 @@
 %autoreload 2
 
 # %%
-
 try:
     import procgen_tools
 except ImportError or ModuleNotFoundError:
@@ -47,7 +46,7 @@ def generate_plots(max_size : int = 18, min_size : int = 3, cols : int = 2, rows
         vf = vfield.vector_field(venv, policy=hook.network)
         vfield.plot_vf(vf, ax=ax, show_components=checkbox.value, render_padding = False)
         ax.set_title(f'Seed: {seed:,}')
-        ax.axis('off')  # TODO only rendering one right now, probably issue with vfield.render_arrows
+        ax.axis('off')  
 
     # Indicate that the plots are done being generated
     text_out.clear_output()
@@ -67,9 +66,9 @@ display(HBox([button, checkbox]))
 
 generate_plots(max_size = slider.value)
 # %% Make a totally empty venv and then visualize it
-grid = maze.get_full_grid_from_seed(seed=0)
-for block_type in (maze.WALL, maze.CHEESE):
-    grid[grid == block_type] = maze.EMPTY
+for fill_type in (maze.EMPTY, maze.CHEESE):
+    venv = maze.get_filled_venv(fill_type=fill_type)
+    img = visualization.visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=True, render_mouse=True)
 
-venv = maze.venv_from_grid(grid=grid)
-visualize_venv(venv, mode='human', idx=0, show_plot=True, render_padding=True, render_mouse=True)
+# %%
+

@@ -21,6 +21,8 @@ import copy
 from warnings import warn
 from tqdm.auto import tqdm
 
+from procgen import ProcgenGym3Env
+
 # Constants in numeric maze representation
 CHEESE = 2
 EMPTY = 100
@@ -607,12 +609,14 @@ def venv_from_grid(grid: np.ndarray):
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
-def get_empty_venv() -> ProcgenGym3Env:
-    """ Get a venv with an empty maze. """
+def get_filled_venv(fill_type : int = EMPTY) -> ProcgenGym3Env:
+    """ Get a venv with a grid filled with fill_type (either EMPTY or CHEESE; BLOCKED throws an error for some reason). """
+    assert fill_type in (CHEESE, EMPTY), "fill_type must be EMPTY or CHEESE"
     grid = get_full_grid_from_seed(seed=0)
-    for block_type in (BLOCKED, CHEESE):
-        grid[grid == block_type] = EMPTY
-
+    mouse_pos = get_mouse_pos(grid)
+    for block_type in (BLOCKED, CHEESE, EMPTY):
+        grid[grid == block_type] = fill_type
+    grid[mouse_pos] = MOUSE # Don't overwrite the mouse
     return venv_from_grid(grid=grid)
 
 def get_padding(grid: np.ndarray) -> int:
@@ -644,7 +648,6 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
-    # Hex dark yellow is 
     CELL_TO_COLOR = {EMPTY: '#D9D9D6', BLOCKED: '#A47449', CHEESE: '#EAAA00', MOUSE: '#393D47'}
     CELL_TO_CHAR = {EMPTY: 'Empty', BLOCKED: 'Blocked', CHEESE: '🧀', MOUSE: '🐭'}
 
@@ -690,7 +693,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     return HBox([wgrid, output])
 
 
-def venv_editors(venv, check_on_dist=True, env_nums=None, callback=None, **kwargs):
+def venv_editors(venv : ProcgenGym3Env, check_on_dist : bool = True, env_nums=None, callback : Callable = None, **kwargs):
     """
     Run maze_editor on a venv, possibly with multiple mazes. Keep everything in sync.
     """
