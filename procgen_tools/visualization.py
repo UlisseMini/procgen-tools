@@ -188,7 +188,7 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int
 
     return img[row_lb:row_ub, col_lb:col_ub,:]
 
-def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = True, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
+def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = False, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
     """ Visualize the environment. Returns an img if show_plot is false. 
     
     Parameters: 

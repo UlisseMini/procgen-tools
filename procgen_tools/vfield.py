@@ -227,7 +227,7 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         axs[idx].set_xlabel("Original", fontsize=fontsize)
         idx += 1
     
-    plot_vf(vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
+    plot_vf(vf2, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
     axs[idx].set_xlabel("Patched", fontsize=fontsize)
     idx += 1
 
@@ -236,4 +236,3 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
         axs[idx].set_xlabel("Patched vfield minus original", fontsize=fontsize)
     return fig, axs, (vf_diff if show_diff else None)
-# %%
