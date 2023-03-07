@@ -237,6 +237,10 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
     else:
         raise ValueError(f"Invalid mode {mode}")
 
+    # Remove x and y ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
+
     ax.imshow(img)
     if show_plot:
         plt.show() 
@@ -276,7 +280,6 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
                 vfield.plot_vf(vf, ax=ax, show_components=show_components)
             else: 
                 visualize_venv(venv, ax=ax, ax_size=ax_size, show_plot=False, render_padding=False)
-                ax.axis('off') # TODO make it so visualize_venv does this automatically
 
             # Update the existing figure in place 
             clear_output(wait=True)
@@ -299,10 +302,10 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
 
     return widget_vbox
 
-### Activation management
+### activation management
 def get_activations(obs : np.ndarray, hook: cmh.ModuleHook, layer_name: str):
-    hook.run_with_input(obs) # Run the model with the given obs
-    return hook.get_value_by_label(layer_name) # Shape is (b, c, h, w) at conv layers, (b, activations) at linear layers
+    hook.run_with_input(obs) # run the model with the given obs
+    return hook.get_value_by_label(layer_name) # shape is (b, c, h, w) at conv layers, (b, activations) at linear layers
 
 ### Plotters
 def plot_activations(activations: np.ndarray, fig: go.FigureWidget):
