@@ -10,7 +10,7 @@ except ImportError:
 
 from procgen_tools.utils import setup
 
-setup(download_data=False) # create directory structure and download data 
+setup(dl_data=False) # create directory structure and download data 
 
 # %%
 from procgen_tools.imports import *

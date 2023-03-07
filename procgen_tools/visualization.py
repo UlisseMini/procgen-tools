@@ -207,8 +207,6 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
 
     if ax is None:
         fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
-    ax.axis('off')
-    ax.set_title(mode.title() + " view")
     
     env_state = maze.state_from_venv(venv, idx=0)
     full_grid = env_state.full_grid()

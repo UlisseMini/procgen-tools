@@ -221,20 +221,19 @@ def plot_vfs(vf1 : dict, vf2 : dict, human_render : bool = True, render_padding 
     fontsize = 16
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size*num_cols, ax_size))
     
-    plot_vf_curried = partial(plot_vf, human_render=human_render, render_padding=render_padding, show_components=show_components)
     idx = 0
     if show_original:
+        plot_vf(vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
         axs[idx].set_xlabel("Original", fontsize=fontsize)
-        plot_vf_curried(vf1, ax=axs[idx])
         idx += 1
     
+    plot_vf(vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
     axs[idx].set_xlabel("Patched", fontsize=fontsize)
-    plot_vf_curried(vf2, ax=axs[idx])
     idx += 1
 
     if show_diff:
-        axs[idx].set_xlabel("Patched vfield minus original", fontsize=fontsize)
         # Pass in vf2 first so that the difference is vf2 - vf1, or the difference between the patched and original vector fields
         vf_diff = plot_vf_diff(vf2, vf1, ax=axs[idx], human_render=human_render, render_padding=render_padding, show_components=show_components)
+        axs[idx].set_xlabel("Patched vfield minus original", fontsize=fontsize)
     return fig, axs, (vf_diff if show_diff else None)
 # %%
