@@ -64,7 +64,7 @@ def setup_dir():
         os.chdir('procgen-tools')
 
 
-def setup(force: bool = False, download_data : bool = True):
+def setup(force: bool = False, dl_data : bool = False, dl_episode_data : bool = False, dl_patch_data : bool = False):
     """
     cd into the procgen-tools directory then download and extract data files.
     """
@@ -78,9 +78,11 @@ def setup(force: bool = False, download_data : bool = True):
     if data_tgz.exists() and data_tgz.stat().st_mtime < 1677968658:
         force_redownload_vfields = True
 
-    if download_data:
+    if dl_episode_data:
         _fetch('https://nerdsniper.net/mats/episode_data.tgz', force=force)
+    if dl_patch_data:
         _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
+    if dl_data:
         _fetch('https://nerdsniper.net/mats/data.tgz', force=force or force_redownload_vfields)
 
     _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth', force=force)
