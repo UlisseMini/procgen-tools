@@ -66,11 +66,11 @@ def plot_layer_stats(hook : cmh.ModuleHook, mode : str = "activations", fig : go
 
     key_list = [key.replace('.weight', '') if mode == 'parameters' else key for key in quantities.keys()][::-1]
     values_list = list(quantities.values())[::-1]
-    fig = go.Figure(data=[go.Bar(y=key_list, x=values_list, orientation='h')])
 
-    # Format the total number of quantity to be e.g. 365M
+    fig = go.Figure(data=[go.Bar(y=key_list, x=values_list, orientation='h', textposition='outside', texttemplate='%{text:,}')])
+
+
     formatted_total = format(total_quantity, ',')
-
     # Set layout
     fig.update_layout(
         title={ 'text': f'Model {mode.title()} Per Layer (Total: {formatted_total})', 'y':0.9, 'x':0.5, 'xanchor': 'center', 'yanchor': 'top'}, 
