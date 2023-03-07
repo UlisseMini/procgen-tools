@@ -40,8 +40,7 @@ policy = models.load_policy('../trained_models/maze_I/model_rand_region_5.pth', 
     t.device('cpu'))
 hook = cmh.ModuleHook(policy)
 
-# Helper predict function that matches the interface for selecting 
-# an action that is expected by run_rollout from circrl.
+# Helper predict function that matches the interface for selecting # an action that is expected by run_rollout from circrl.
 # Uses the hooked network so patching can be applied if needed,
 # and activations can be accessed.
 def predict(obs, deterministic):

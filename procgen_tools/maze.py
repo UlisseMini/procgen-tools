@@ -346,7 +346,7 @@ class EnvState():
         Set the grid of the maze.
         """
         if pad:
-            grid = outer_grid(grid, self.world_dim)
+            grid = outer_grid(grid, self.world_dim, assert_=False)
         assert grid.shape == (self.world_dim, self.world_dim)
 
         state_vals = self.state_vals
@@ -413,8 +413,6 @@ def remove_all_cheese(venv):
         state_bytes_list[i] = s.state_bytes
     venv.env.callmethod("set_state", state_bytes_list)
     return venv
-    
-
 
 def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
     "Get (x, y) position of the mouse in the grid"
