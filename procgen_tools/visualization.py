@@ -162,22 +162,17 @@ def get_channel_from_grid_pos(pos : Tuple[ int, int ], layer : str = default_lay
     chan_row, chan_col = (px_row // px_per_channel_idx, px_col // px_per_channel_idx)
     return (int(chan_row), int(chan_col))
 
-def pixels_at_grid(row : int, col : int, img : np.ndarray, inner_grid_size : int = 25, flip_y : bool = True) -> np.ndarray:
+def pixels_at_grid(row : int, col : int, img : np.ndarray, removed_padding : int = 0, flip_y : bool = True):
     """ Get the pixels in the image corresponding to the given grid position. 
     
     Args:
         row: The row of the grid position.
         col: The column of the grid position.
         img: The image to get the pixels from, assumed to be rendered from the human view.
-        inner_grid_size: The size of the inner grid, which is the size of the grid that is actually rendered in the human view.
-
-    Returns:
-        The pixels in the image corresponding to the given grid position, in an ndarray of shape (H, W, 3).
+        removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
     """
     assert 0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM, f'Invalid position: {row, col}'
     assert img.shape[2] == 3, f'Image must have 3 channels, but has {img.shape[2]}' # Ensure image is RGB
-
-    removed_padding = (maze.WORLD_DIM - inner_grid_size) // 2 # How many padding squares are removed from each side
     assert maze.WORLD_DIM // 2 > removed_padding >= 0, f'removed_padding must be non-negative, but is {removed_padding}'
 
     if flip_y:
@@ -187,18 +182,12 @@ def pixels_at_grid(row : int, col : int, img : np.ndarray, inner_grid_size : int
     row_lb, row_ub = (row * maze.HUMAN_PX_PER_TILE, (row + 1) * maze.HUMAN_PX_PER_TILE)
     col_lb, col_ub = (col * maze.HUMAN_PX_PER_TILE, (col + 1) * maze.HUMAN_PX_PER_TILE)
     
-    # Clean pixel size
-    clean_px_size = maze.HUMAN_PX_PER_TILE * inner_grid_size 
-    extra_px_size = img.shape[0] - clean_px_size # How many extra pixels are in the image
-    buffer = extra_px_size // 2 
-    
-    row_lb, row_ub = (int(coord + buffer) for coord in (row_lb, row_ub))
+    # add 12 to the bounds to account for the 6 pixel border, and cast as ints
+    # FIXME 512x512 is only for full level; smaller levels are different (?!) Thus subtracting 12 can lead to row_ub being too large for img, leading to a ValueError from shape mismatch in parent. 
+    row_lb, row_ub = (int(coord + maze.HUMAN_PX_PADDING*2) for coord in (row_lb, row_ub))
     col_lb, col_ub = (math.floor(coord + 1) for coord in (col_lb, col_ub)) # FIXME e.g. seed 19 still has a few pixels off
-    print(f'Row {row}, with row lb of {row_lb} and row ub of {row_ub}')
-    print(f'Col {col}, with col lb of {col_lb} and col ub of {col_ub}')
-    print(f'Image shape of {img.shape}, slice shape of {img[row_lb:row_ub, col_lb:col_ub,:].shape}')
-    
-    return img[row_lb:row_ub, col_lb:col_ub,:] 
+
+    return img[row_lb:row_ub, col_lb:col_ub,:]
 
 def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax : plt.Axes = None, ax_size : int = 3, show_plot : bool = False, flip_numpy : bool = True, render_padding : bool = True, render_mouse : bool = True):
     """ Visualize the environment. Returns an img if show_plot is false. 
@@ -233,11 +222,11 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
             # First get the mouse position and the corresponding pixels
             mouse_pos = maze.get_mouse_pos(grid=full_grid)
             pad = 0 if render_padding else maze.get_padding(grid=inner_grid)
-            mouse_px = pixels_at_grid(*mouse_pos, img=img, inner_grid_size=inner_grid.shape[1])
+            mouse_px = pixels_at_grid(*mouse_pos, img=img, removed_padding=pad)
 
             # Now get an empty position and the corresponding pixels
             empty_pos = maze.get_object_pos_in_grid(full_grid, maze.EMPTY)
-            empty_px = pixels_at_grid(*empty_pos, img=img, inner_grid_size=inner_grid.shape[1])
+            empty_px = pixels_at_grid(*empty_pos, img=img, removed_padding=pad)
 
             # Now replace the mouse pixels with the empty pixels
             mouse_px[:] = empty_px

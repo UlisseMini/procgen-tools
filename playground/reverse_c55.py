@@ -44,7 +44,7 @@ def interactive_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), v
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col), default=None) 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
-    fig.suptitle(f'Synthetically patching {channel} (value={value})')
+    fig.suptitle(f'Synthetically patching {channel} (value={value})', fontsize=20)
 
     # Draw a red pixel at the location of the patch
     visualization.plot_dots(axs[1:], (row, col), color='red')
