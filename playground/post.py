@@ -119,30 +119,30 @@ def gather_grid_data(env : ProcgenGym3Env, **kwargs):
 
 custom_data_funcs = {'grid': gather_grid_data}
 
-# Define a list of patches to apply to the network
+def get_grid_seq(seed : int, target_locations : List[Tuple[int, int]], timesteps : int = 50) -> np.ndarray:
+    """ Generate a sequence of grids for a given seed, taking timesteps steps for each target_location. """
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+
+    # Run the rollout and show the video
+    for idx, loc in enumerate(target_locations):
+        patch = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=55, value=5.6, coord=loc)
+
+        # Run a patched rollout
+        with hook.use_patches(patch):
+            new_seq, _, _ = cro.run_rollout(predict, venv, max_steps=timesteps, deterministic=False, custom_data_funcs=custom_data_funcs)
+        new_grids = new_seq.custom['grid']
+
+        # Append more observational data to the first DataArray
+        grid_seq = xr.concat([grid_seq, new_grids], dim='step') if idx > 0 else new_grids # "step" is the existing dimension
+    return grid_seq.values # Return the numpy array
+
+# %%
+seed = 65
 target_locations = [(5, 5), (5, 11), (4, 9), (4, 11), (8, 11), (8, 9), (4, 8), (5, 5)]
 timesteps = 50
-
-
-# Initialize the venv of choice
-seed = 0
-venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-
-# Run the rollout and show the video
-for idx, loc in enumerate(target_locations):
-    patch = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=55, value=5.6, coord=loc)
-
-    # Run a patched rollout
-    with hook.use_patches(patch):
-        new_seq, _, _ = cro.run_rollout(predict, venv, max_steps=timesteps, deterministic=False, custom_data_funcs=custom_data_funcs)
-    new_grids = new_seq.custom['grid']
-
-    # Append more observational data to the first DataArray
-    grid_seq = xr.concat([grid_seq, new_grids], dim='step') if idx > 0 else new_grids # "step" is the existing dimension
+np_grids = get_grid_seq(seed=seed, target_locations=target_locations, timesteps=timesteps)
 
 #%% Make a gif from the grid sequence
-# Render all of the observations -- somehow we need to get grids or smth so that we avoid the padding?
-np_grids = grid_seq.values
 inner_grid = maze.get_inner_grid_from_seed(seed)
 padding = maze.get_padding(grid=inner_grid)
 
@@ -162,6 +162,7 @@ for idx, grid in enumerate(np_grids):
     visualization.plot_dots(axes=[ax], coord=target_locations[idx // timesteps], hidden_padding=padding, color='cyan')
     
     # Get the axis as an image
+    fig.tight_layout()
     fig.canvas.draw()
     img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     imgs.append(img)
@@ -170,6 +171,32 @@ for idx, grid in enumerate(np_grids):
 import imageio
 SAVE_DIR = 'playground/visualizations'
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
-target = f'{gif_dir}/retargeting_rollout.gif'
+target = f'{gif_dir}/retargeting_rollout_{seed}.gif'
 imageio.mimsave(target, imgs, duration=0.08)
+
+# %%
+SAVE_DIR = 'playground/visualizations'
+AX_SIZE = 6
+
+cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
+effective_channels = [77, 113, 88, 55, 8, 82, 89]
+
+@interact
+def apply_all_cheese_patches(seed=IntSlider(min=0, max=100, step=1, value=0), value=FloatSlider(min=-10, max=10, step=0.1, value=2.3), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel_list=Dropdown(options=[effective_channels, cheese_channels], value=effective_channels), mask_channels=Checkbox(value=False)):
+    render_padding = False
+    padding = maze.get_padding(grid=maze.get_inner_grid_from_seed(seed))
+
+    combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(row, col), channels=channel_list, default=-.2 if mask_channels else None)
+
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=render_padding, ax_size=AX_SIZE)
+
+    # Draw a red pixel at the location of the patch
+    visualization.plot_dots(axs[1:], (row, col), hidden_padding=0 if render_padding else padding) # Note this can go out of bounds if render_padding is False 
+    plt.show()
+
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches_', fig=fig, descriptors=defaultdict(seed=seed, value=value, row=row, col=col, mask_channels=mask_channels))
+    display(button)
+interesting_settings = [{'seed': 83, 'value': 2, 'row': 7, 'col': 7, 'channel_list': cheese_channels, 'mask_channels': True}]
+
 # %%

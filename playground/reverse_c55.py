@@ -16,15 +16,15 @@ setup() # create directory structure and download data
 from procgen_tools.imports import *
 from procgen_tools import visualization, patch_utils, maze, vfield
 
-SAVE_DIR = 'playground/visualizations/'
+SAVE_DIR = 'playground/visualizations'
 AX_SIZE = 6
 
-cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 
-effective_channels = [77, 113, 88, 55, 8, 82, 89]
+cheese_channels = [7, 8, 42, 44, 55, 77, 82, 88, 89, 99, 113]
+effective_channels = [8, 55, 77, 82, 88, 89, 113]
 
 # %% 
 @interact
-def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), value=FloatSlider(min=-10, max=10, step=0.1, value=1.1), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel_list=Dropdown(options=[effective_channels, cheese_channels], value=effective_channels)):
+def apply_all_cheese_patches(seed=IntSlider(min=0, max=100, step=1, value=0), value=FloatSlider(min=-10, max=10, step=0.1, value=1.1), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel_list=Dropdown(options=[effective_channels, cheese_channels], value=effective_channels)):
     combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(row, col), channels=channel_list, default=None)
 
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
@@ -34,7 +34,7 @@ def apply_all_cheese_patches(seed=IntSlider(min=0, max=20, step=1, value=0), val
     visualization.plot_dots(axs[1:], (row, col)) 
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches', fig=fig, descriptors=defaultdict(seed=seed, value=value, row=row, col=col))
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/{"all" if channel_list == cheese_channels else "effective"}_cheese_patches_', fig=fig, descriptors=defaultdict(seed=seed, value=value, row=row, col=col))
     display(button)
 
 # %% Try synthetically modifying each channel individually
@@ -135,27 +135,45 @@ def random_combined_px_patch(layer_name : str, channels : List[int], cheese_loc 
     combined_patch = patch_utils.compose_patches(*patches)
     return combined_patch
 
-@interact
-def causal_scrub_55(seed=IntSlider(min=0, max=100, step=1, value=60)):
-    venv = patch_utils.get_cheese_venv_pair(seed=seed)
-
-    # TODO statistically measure cheese pos activations, and average negative activations?
+def resample_activations(seed : int, channels : List[int], different_location : bool = False):
+    """ Resample activations for default_layer with the given channels. 
     
-    cheese_row, cheese_col = maze.get_cheese_pos_from_seed(seed, flip_y=False)  # TODO flip_y should be false here, and also false for visualization.plot_dots -- will simplify logic
-    # resampling_loc = (14, 14)  
-    resampling_loc = (cheese_row, cheese_col)
-    patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=resampling_loc)
-    # patches = random_combined_px_patch(layer_name=default_layer, channels=list(range(128)), cheese_loc=resampling_loc)
-    # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels) # Shows that cheese loc matters
-    # patches = random_combined_px_patch(layer_name=default_layer, channels=cheese_channels, cheese_loc=(13, 13)) # easier to compare effects
+    Args:
+        seed (int): The seed for the maze
+        channels (List[int]): The channels to resample
+        different_location (bool, optional): If True, then the resampling location is randomly sampled. Otherwise, it is the cheese location. Defaults to False.
+    """
+    render_padding = False
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
+    padding = maze.get_padding(maze.get_inner_grid_from_seed(seed))
+    
+    
+    resampling_loc = (14, 14) if different_location else maze.get_cheese_pos_from_seed(seed, flip_y=False)  # NOTE assumes cheese loc isn't near (14, 14)
+    patches = random_combined_px_patch(layer_name=default_layer, channels=channels, cheese_loc=resampling_loc)
 
     # patches = random_combined_px_patch(layer_name=default_layer, channels=[55])
-    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=AX_SIZE)
+    channel_description = f'channels {channels}' if len(channels) > 1 else f'channel {channels[0]}'
+    fig.suptitle(f'Resampling {channel_description} on seed {seed}', fontsize=20)
 
-    visualization.plot_dots(axs[1:], resampling_loc, is_grid=True, flip_y=False)
+    visualization.plot_dots(axs[1:], resampling_loc, is_grid=True, flip_y=False, hidden_padding = 0 if render_padding else padding)
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_causal_scrub', fig=fig, descriptors=defaultdict(seed=seed))
-    display(button) # TODO measure performance loss/ avg logit diff relative to eg random ablating same number of channels at the layer
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_causal_scrub', fig=fig, descriptors=defaultdict(seed=seed, different_location=different_location))
+    display(button)
+
+# %% Resample activations interactively
+interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, [55]], value=cheese_channels), different_location=Checkbox(value=False))
+# %% See how resampling works for a range of seeds
+for seed in range(0, 30):
+    resample_activations(seed=seed, channels=cheese_channels)
+    plt.close('all')
+# %% Choose three random seeds and compare resampling properly with resampling a random location
+seeds = np.random.choice(range(100), size=3, replace=False)
+for seed in seeds:
+    seed = int(seed)
+    resample_activations(seed=seed, channels=cheese_channels)
+    resample_activations(seed=seed, channels=cheese_channels, different_location=True)
+    plt.close('all')
 
 # %%
