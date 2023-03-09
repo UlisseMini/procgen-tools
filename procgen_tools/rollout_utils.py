@@ -39,7 +39,7 @@ def rollout_video_clip(predict, level, remove_cheese=False,
     # Rollout
     seq, _, _ = cro.run_rollout(predict, venv, max_episodes=1, max_steps=256)
     vid_fn, fps = cro.make_video_from_renders(seq.renders)
-    rollout_clip = VideoFileClip(vid_fn)
+    rollout_clip = VideoFileClip(vid_fn).margin(10)
     # try:
     #     txt_clip = TextClip("GeeksforGeeks", fontsize = 75, color = 'black') 
     #     txt_clip = txt_clip.set_pos('center').set_duration(10) 
@@ -51,20 +51,25 @@ def rollout_video_clip(predict, level, remove_cheese=False,
     return seq, final_clip
 
 # Run rollouts with multiple predict functions, stack the videos side-by-side and return
-def side_by_side_rollout(predicts_dict, level, remove_cheese=False, num_cols=2,
+def side_by_side_rollout(predicts_dict, levels, remove_cheese=False, num_cols=2,
         mouse_inner_pos=None,
         mouse_outer_pos=None):
     policy_descs = list(predicts_dict.keys())
     policy_descs_grid = [policy_descs[x:x+num_cols] for x in 
         range(0, len(policy_descs), num_cols)]
-    print(f'Level:{level}, cheese:{not remove_cheese}, policies:{policy_descs_grid}')
+    print(f'Levels:{levels}, cheese:{not remove_cheese}, policies:{policy_descs_grid}')
     clips = []
     seqs = []
-    for desc, predict in predicts_dict.items():
-        seq, clip = rollout_video_clip(predict, level, remove_cheese, mouse_inner_pos,
-            mouse_outer_pos)
-        clips.append(clip)
-        seqs.append(seq)
+    try:
+        _ = (level for level in levels)
+    except TypeError:
+        levels = [levels]
+    for level in levels:
+        for desc, predict in predicts_dict.items():
+            seq, clip = rollout_video_clip(predict, level, remove_cheese, mouse_inner_pos,
+                mouse_outer_pos)
+            clips.append(clip)
+            seqs.append(seq)
     clips_grid = [clips[x:x+num_cols] for x in range(0, len(clips), num_cols)]
     final_clip = clips_array(clips_grid)
     stacked_fn = 'stacked.mp4'

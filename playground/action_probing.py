@@ -147,21 +147,28 @@ else:
 
 # %%
 # Train a probe!
-# value_label = 'embedder.relufc_out'
-# inds_slice = slice(None)
+value_label = 'embedder.relufc_out'
+inds_slice = slice(None)
 
 value_label = 'embedder.flatten_out'
 inds_slice = slice(None) #slice(-10000, None)
 
 value = values_by_label[value_label]
 
-probe_result = cpr.linear_probe(value[inds_slice], next_action_cheese[inds_slice], 
-    model_type='classifier', C=0.01, class_weight='balanced', test_size=0.3, random_state=42)
+# probe_result = cpr.linear_probe(value[inds_slice], next_action_cheese[inds_slice], 
+#     model_type='classifier', C=0.01, class_weight='balanced', test_size=0.3, random_state=42)
 
-model = probe_result['model']
+# model = probe_result['model']
 
-print(probe_result['train_score'], probe_result['test_score'])
-print(probe_result['conf_matrix'])
+# print(probe_result['train_score'], probe_result['test_score'])
+# print(probe_result['conf_matrix'])
+
+# Load pre-saved probe and results
+results_fn = 'action_probing_res_20230306T230300.pkl'
+with open(results_fn, 'rb') as fl:
+    model, df, args = pickle.load(fl)
+
+df.mean()
 
 
 
@@ -191,13 +198,18 @@ logits_cheese_score = (next_action_logits == next_action_cheese).mean()
 logits_corner_score = (next_action_logits == next_action_corner).mean()
 print(logits_cheese_score, logits_corner_score)
 
-# What about confirming we can learn a probe to the actual logits??
+# %%
+# What about confirming we can learn a probe to the actual model actions?
 probe_result_logits = cpr.linear_probe(value, next_action_logits, model_type='classifier', 
-    C=1., test_size=0.3)
+    C=0.01, test_size=0.3)
 print(probe_result_logits['train_score'], probe_result_logits['test_score'])
-#print(probe_result_logits['conf_matrix'])
-model_logits = probe_result_logits['model']
 
+
+# %%
+# What about the actual model logits?
+probe_result_logits = cpr.linear_probe(value, logits, model_type='ridge', 
+    alpha=100., test_size=0.3)
+print(probe_result_logits['train_score'], probe_result_logits['test_score'])
 
 
 # %%
@@ -216,9 +228,9 @@ model_logits = probe_result_logits['model']
 # Level 5: new policy finds the cheese, old one doesn't, so that's interesting...
 # Level 12: stuck near the decision square, normal doesn't get cheese
 # Level 13: get's cheese, normal doesn't... 
-# Test this more systematically...
+# Test this more systematically in script
 
-levels = range(200)
+# levels = range(200)
 random_seed = 42
 rng = np.random.default_rng(random_seed)
 
@@ -243,32 +255,119 @@ def predict_cheese(obs, deterministic):
 
 predict_normal = rollout_utils.get_predict(policy)
 
+# results = []
+# for level in tqdm(levels):
+#     result = {'level': level}
+#     for desc, pred in {'normal': predict_normal, 'retrain': predict_cheese}.items():
+#         venv = maze.create_venv(1, start_level=level, num_levels=1)
+#         seq, _, _ = cro.run_rollout(pred, venv, max_episodes=1, max_steps=256, show_pbar=False)
+#         result[f'{desc}_found_cheese'] = seq.rewards.sum().item() > 0.
+#     results.append(result)
+# df = pd.DataFrame(results)
+# display(df)
+
+
+# %%
+# Pick a few levels to show side-by-side rollouts on
+# vid_levels = [level for level in 
+    # df[(df.normal_found_cheese==False) & (df.retrain_found_cheese==False)].iloc[:4].level]
+vid_levels = [17]
+
+vid, seqs = rollout_utils.side_by_side_rollout({
+    'normal': predict_normal, 'cheese-retrained': predict_cheese}, vid_levels)
+display(vid)
+
+
+# %%
+# What about a sparse probe?
+# Seems to work pretty well!  Can get almost the same prediction accuracy (89%) with 1000 activtions, only 1/8th total available
+#f_test, _ = cpr.f_classif_fixed(value, next_action_cheese)
+
+index_nums = np.array([10, 100, 300, 600, 1000])
+f_test, _ = cpr.f_classif_fixed(value, next_action_cheese)
+sort_inds = np.argsort(f_test)[::-1]
+scores_list = []
+for K in tqdm(index_nums):
+    results = cpr.linear_probe(value[:,sort_inds[:K]], next_action_cheese, C=0.01, 
+                               class_weight='balanced', random_state=42)
+    scores_list.append({'K': K, 'train_score': results['train_score'],
+                        'test_score': results['test_score']})
+scores_df = pd.DataFrame(scores_list)
+scores_df
+
+# %%
+# What about using sparse channels?
+# Okay this is pretty interesting!  Seems like 10-20 channels is enough to get pretty solid prediction performance on for
+# next cheese action!  And also enough to get next action selected by the logits at 96% accuracy with only 15 channels?
+chan_nums = np.array([10]) #np.array([5, 10, 15, 20])
+f_test_full = rearrange(f_test, '(c h w) -> c h w', h=8, w=8)
+value_full = rearrange(value, 'b (c h w) -> b c h w', c=128, h=8, w=8)
+f_test_sum_by_chan = f_test_full.sum(axis=-1).sum(axis=-1)
+chan_sort_inds = np.argsort(f_test_sum_by_chan)[::-1]
+scores_list = []
+for ch_num in tqdm(chan_nums):
+    results = cpr.linear_probe(value_full[:,chan_sort_inds[:ch_num],:,:], next_action_cheese, C=0.01, 
+                               class_weight='balanced', random_state=42)
+    scores_list.append({'ch_num': ch_num, 'train_score': results['train_score'],
+                        'test_score': results['test_score']})
+scores_df = pd.DataFrame(scores_list)
+display(scores_df)
+model_to_use = results['model']
+
+# %%
+# Try some rollouts with a model that uses sparse channel model
+levels = range(10)
+random_seed = 42
+rng = np.random.default_rng(random_seed)
+
+def predict_cheese_sparse(obs, deterministic):
+    obs = t.FloatTensor(obs)
+    with hook.store_specific_values([value_label]):
+        hook.network(obs)
+        value_sparse = rearrange(
+            rearrange(
+                hook.get_value_by_label(value_label),
+                'b (c h w) -> b c h w', c=128, h=8, w=8)[:,chan_sort_inds[:ch_num],:,:],
+            'b c h w -> b (c h w)')
+    probs = np.squeeze(model_to_use.predict_proba(value_sparse))
+    if deterministic:
+        act_sh_ind = probs.argmax()
+    else:
+        act_sh_ind = rng.choice(len(probs), 1, p=probs)
+    act_sh = model_to_use.classes_[act_sh_ind][0]
+    for act_name, inds in models.MAZE_ACTION_INDICES.items():
+        if act_name[0] == act_sh:
+            act = np.array([inds[0]])
+            break
+    return act, None
+
+predict_normal = rollout_utils.get_predict(policy)
+
 results = []
 for level in tqdm(levels):
     result = {'level': level}
-    for desc, pred in {'normal': predict_normal, 'retrain': predict_cheese}.items():
+    for desc, pred in {'normal': predict_normal, 'retrain': predict_cheese_sparse}.items():
         venv = maze.create_venv(1, start_level=level, num_levels=1)
-        seq, _, _ = cro.run_rollout(pred, venv, max_episodes=1, max_steps=256, show_pbar=False)
+        seq, _, _ = cro.run_rollout(pred, venv, max_episodes=1, max_steps=256, show_pbar=True)
         result[f'{desc}_found_cheese'] = seq.rewards.sum().item() > 0.
     results.append(result)
 df = pd.DataFrame(results)
 display(df)
 
-
 # %%
-# Pick a few levels to show side-by-side rollouts on
-vid_levels = [0]
+# Some specific levels with sparse retrained agent
+vid_levels = [9]
 
-for level in vid_levels:
-    vid, seqs = rollout_utils.side_by_side_rollout({
-        'normal': predict_normal, 'cheese-retrained': predict_cheese}, level)
-    display(vid)
+vid, seqs = rollout_utils.side_by_side_rollout({
+    'normal': predict_normal, 'cheese-retrained-sparse': predict_cheese_sparse}, vid_levels)
+display(vid)
+
 
 
 # %%
 # Try comparing vfields
 
-level = 2
+level = 17
 
 def forward(obs):
     obs = t.FloatTensor(obs)
@@ -323,6 +422,8 @@ logits_this_level = hook.get_value_by_label(logits_value_label)
 next_action_cheese_this_level_pred = model.predict(value_this_level)
 
 (next_action_cheese_this_level_pred == next_action_cheese_this_level).mean()
+
+
 
 # %%
 # Try fine-tuning a version of the actual model to be a bit more cheese-seeking
