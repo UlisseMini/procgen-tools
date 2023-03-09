@@ -38,12 +38,11 @@ def apply_all_cheese_patches(seed=IntSlider(min=0, max=100, step=1, value=0), va
     display(button)
 
 # %% Try synthetically modifying each channel individually
-
 @interact
 def interactive_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), value=FloatSlider(min=-30, max=30, step=0.1, value=5.6), row=IntSlider(min=0, max=15, step=1, value=5), col=IntSlider(min=0, max=15, step=1, value=5), channel=Dropdown(options=cheese_channels, value=42)):
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=channel, value=value, coord=(row, col), default=None) 
-    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=True, ax_size=AX_SIZE)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patches, hook, render_padding=False, ax_size=AX_SIZE)
     fig.suptitle(f'Synthetically patching {channel} (value={value})', fontsize=20)
 
     # Draw a red pixel at the location of the patch

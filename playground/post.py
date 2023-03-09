@@ -83,7 +83,7 @@ for idx, ax in enumerate(axs.flatten()):
     visualization.visualize_venv(venv, mode='human', idx=0, ax=ax, show_plot=False, render_padding=True, render_mouse=True)
     ax.set_title(f'Seed: {seed:,}')
     ax.axis('off')
-
+    
 # %% Visualize seed 3893 with and without padding
 
 fig, axs = plt.subplots(1, 2, figsize=(8, 4))
@@ -93,6 +93,19 @@ for idx, ax in enumerate(axs.flatten()):
     visualization.visualize_venv(venv, mode='human', idx=0, ax=ax, show_plot=False, render_padding=1-idx, render_mouse=True)
     ax.set_title('Padding shown' if bool(1-idx) else 'Padding hidden')
     ax.axis('off') 
+
+# %% Visualize two seeds, side-by-side
+
+fig, axs = plt.subplots(1, 2, figsize=(8, 4))
+for idx, ax in enumerate(axs.flatten()):
+    seed = [68871, 81681][idx]
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    # Plot the vf
+    vf = vfield.vector_field(venv, policy=hook.network)
+    vfield.plot_vf(vf, ax=ax, show_components=False, render_padding = False)
+    
+    ax.set_title(f'Seed: {seed:,}')
+    ax.axis('off')
 
 # %% Generate main GIF
 import xarray as xr
@@ -137,7 +150,7 @@ def get_grid_seq(seed : int, target_locations : List[Tuple[int, int]], timesteps
     return grid_seq.values # Return the numpy array
 
 # %%
-seed = 65
+seed = 0
 target_locations = [(5, 5), (5, 11), (4, 9), (4, 11), (8, 11), (8, 9), (4, 8), (5, 5)]
 timesteps = 50
 np_grids = get_grid_seq(seed=seed, target_locations=target_locations, timesteps=timesteps)
@@ -167,15 +180,36 @@ for idx, grid in enumerate(np_grids):
     img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     imgs.append(img)
 
-# Make a gif from the images
-import imageio
+# %% Save the images as an MP4
 SAVE_DIR = 'playground/visualizations'
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
-target = f'{gif_dir}/retargeting_rollout_{seed}.gif'
-imageio.mimsave(target, imgs, duration=0.08)
+target = f'{gif_dir}/retargeting_rollout_{seed}'
 
-# %%
-SAVE_DIR = 'playground/visualizations'
+start_step = 29 # Start the gif at this frame
+
+# Save as an mp4 using ffmpeg
+import cv2
+
+video_name = 'video.avi'
+
+frame = cv2.imread(os.path.join(image_folder, images[0]))
+height, width, layers = imgs[0].shape
+
+video = cv2.VideoWriter(video_name, 0, 1, (width,height))
+
+for image in imgs:
+    video.write(cv2.imread(os.path.join(image_folder, image)))
+
+cv2.destroyAllWindows()
+video.release()
+
+
+# %% Save the images as a GIF
+imgs[start_step].save(target + '.gif', format="GIF", save_all=True, append_images=imgs[start_step+1:], duration=100, loop=0)
+
+print(f'Gif saved to {target}')
+
+# %% Applying all cheese patches
 AX_SIZE = 6
 
 cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99] 

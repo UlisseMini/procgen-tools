@@ -45,17 +45,20 @@ except NameError:
   in_jupyter = False
 PATH_PREFIX = '../' if in_jupyter else ''
 
-# Load model
-use_small = False # Use small model with 1/4 as many conv layers
-model_name = 'maze_i' if use_small else f'maze_I/model_rand_region_{RAND_REGION}'
-model_stub = f'trained_models/{model_name}.pth'
-try:
-  model_path = PATH_PREFIX + model_stub
-  policy = models.load_policy(model_path, NUM_ACTIONS, t.device('cpu'))
-except FileNotFoundError:
-  policy = models.load_policy(model_stub, NUM_ACTIONS, t.device('cpu'))
-  
-hook = cmh.ModuleHook(policy)
+def load_model(rand_region : int = 5, num_actions : int = 15, use_small : bool = False):
+    """ Load a model from the trained_models folder. Returns the policy and the hook. """
+    model_name = 'maze_i' if use_small else f'maze_I/model_rand_region_{rand_region}'
+    model_stub = f'trained_models/{model_name}.pth'
+    try:
+      model_path = '../' + model_stub
+      policy = models.load_policy(model_path, num_actions, t.device('cpu'))
+    except FileNotFoundError:
+      policy = models.load_policy(model_stub, num_actions, t.device('cpu'))
+    
+    hook = cmh.ModuleHook(policy)
+    return policy, hook
+
+policy, hook = load_model(rand_region=1, num_actions=NUM_ACTIONS, use_small=False)
 
 # Useful general variables
 default_layer = 'embedder.block2.res1.resadd_out'
