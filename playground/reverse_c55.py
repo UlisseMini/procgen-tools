@@ -147,10 +147,9 @@ def resample_activations(seed : int, channels : List[int], different_location : 
         different_location (bool, optional): If True, then the resampling location is randomly sampled. Otherwise, it is the cheese location. Defaults to False.
     """
     render_padding = False
-    venv = patch_utils.get_cheese_venv_pair(seed=seed)
     padding = maze.get_padding(maze.get_inner_grid_from_seed(seed))
     
-    
+    venv = patch_utils.get_cheese_venv_pair(seed=seed)
     resampling_loc = (14, 14) if different_location else maze.get_cheese_pos_from_seed(seed, flip_y=False)  # NOTE assumes cheese loc isn't near (14, 14)
     patches = random_combined_px_patch(layer_name=default_layer, channels=channels, cheese_loc=resampling_loc)
 
@@ -166,7 +165,13 @@ def resample_activations(seed : int, channels : List[int], different_location : 
     display(button)
 
 # %% Resample activations interactively
-interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, [55]], value=cheese_channels), different_location=Checkbox(value=False))
+# Get a list of 11 random channels which aren't in cheese_channels 
+def get_alternate_channels(avoid_channels : List[int]) -> List[int]:
+    """ Get a list of 11 random channels which aren't in cheese_channels """
+    candidate_channels = [channel for channel in range(128) if channel not in avoid_channels]
+    return np.random.choice(candidate_channels, size=11, replace=False).tolist()
+
+interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, get_alternate_channels(cheese_channels), [55]], value=cheese_channels), different_location=Checkbox(value=False))
 # %% See how resampling works for a range of seeds
 for seed in range(0, 30):
     resample_activations(seed=seed, channels=cheese_channels)
@@ -179,4 +184,26 @@ for seed in seeds:
     resample_activations(seed=seed, channels=cheese_channels, different_location=True)
     plt.close('all')
 
+# %% Quantitively measure effects of random resampling
+def avg_vf_diff_magnitude(seeds : List[int], patches : dict):
+    """ Return average vf diff due to the given patches. Average is the average vector diff magnitude, averaged over grid locations. """
+    avg_diff = 0
+    for seed in seeds:
+        venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+        vf1 = vfield.vector_field(venv, policy)
+        with hook.use_patches(patches):
+            vf2 = vfield.vector_field(venv, hook.network)
+        vf_diff = vfield.get_vf_diff(vf1, vf2)
+        avg_diff += np.mean(np.linalg.norm(vf_diff, axis=-1))
+    return avg_diff / len(seeds)
+
+def avg_resampling(channels : List[int]):
+    """ Return the average vf diff for resampling the given channels. """
+    seeds = np.random.choice(range(10000), size=10, replace=False).tolist()
+    patches = random_combined_px_patch(layer_name=default_layer, channels=channels)
+    return avg_vf_diff_magnitude(seeds, patches)
+
+print(f'Avg resampling for cheese channels: {avg_resampling(cheese_channels)}')
+print(f'Avg resampling for effective channels: {avg_resampling(effective_channels)}') # TODO compare on same seeds, maybe give dict of patches to avg_vf_diff_magnitude?
+# TODO use component action vectors instead of net 
 # %%
