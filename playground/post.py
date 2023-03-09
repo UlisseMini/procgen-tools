@@ -163,7 +163,7 @@ import PIL
 
 imgs = []
 fig, ax = plt.subplots(1, 1, figsize=(AX_SIZE, AX_SIZE))
-
+"""  using PIL.quantize(), preferably with Quantize.LIBIMAGEQUANT down to a palette of 254 colours on the first frame as long as it has the mouse, the cyan dot and all the colours. Then quantize all the other images in the series to the same palette and in the save() at the end, pass in the palette. """
 
 for idx, grid in enumerate(np_grids):
     # Render the grid
@@ -172,40 +172,27 @@ for idx, grid in enumerate(np_grids):
     visualization.visualize_venv(venv, mode='human', ax=ax, idx=0, show_plot=False, render_padding=False, render_mouse=True)
     
     # Plot the dot for the current timestep
-    visualization.plot_dots(axes=[ax], coord=target_locations[idx // timesteps], hidden_padding=padding, color='cyan')
+    visualization.plot_dots(axes=[ax], coord=target_locations[idx // timesteps], hidden_padding=padding, color='red')
     
     # Get the axis as an image
     fig.tight_layout()
     fig.canvas.draw()
+    
     img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    if idx == 0: # Quantize the first frame and get the palette
+        img = img.quantize(colors=254, method=PIL.Image.Quantize.MAXCOVERAGE)
+    else: # Quantize all other frames to the same palette
+        img = img.quantize(colors=254, palette=imgs[0], method=PIL.Image.Quantize.MAXCOVERAGE)
     imgs.append(img)
 
-# %% Save the images as an MP4
+# %% Save the images as a GIF
 SAVE_DIR = 'playground/visualizations'
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
 target = f'{gif_dir}/retargeting_rollout_{seed}'
 
 start_step = 29 # Start the gif at this frame
 
-# Save as an mp4 using ffmpeg
-import cv2
-
-video_name = 'video.avi'
-
-frame = cv2.imread(os.path.join(image_folder, images[0]))
-height, width, layers = imgs[0].shape
-
-video = cv2.VideoWriter(video_name, 0, 1, (width,height))
-
-for image in imgs:
-    video.write(cv2.imread(os.path.join(image_folder, image)))
-
-cv2.destroyAllWindows()
-video.release()
-
-
-# %% Save the images as a GIF
-imgs[start_step].save(target + '.gif', format="GIF", save_all=True, append_images=imgs[start_step+1:], duration=100, loop=0)
+imgs[start_step].save(target + '.gif', format="GIF", save_all=True, append_images=imgs[start_step+1:], duration=50, loop=0)
 
 print(f'Gif saved to {target}')
 

@@ -58,7 +58,7 @@ def load_model(rand_region : int = 5, num_actions : int = 15, use_small : bool =
     hook = cmh.ModuleHook(policy)
     return policy, hook
 
-policy, hook = load_model(rand_region=1, num_actions=NUM_ACTIONS, use_small=False)
+policy, hook = load_model(rand_region=RAND_REGION, num_actions=NUM_ACTIONS, use_small=False)
 
 # Useful general variables
 default_layer = 'embedder.block2.res1.resadd_out'
