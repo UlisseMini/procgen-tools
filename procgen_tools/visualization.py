@@ -1,7 +1,19 @@
 from procgen_tools.imports import *
 from procgen_tools import maze, vfield, patch_utils
 from typing import Dict
+import PIL
 
+# Getting an image from figures
+def img_from_fig(fig : plt.Figure, palette : PIL.Image = None):
+    """ Get an image from a matplotlib figure. If palette is not None, then the image is quantized to the palette. """
+    # Prepare the fig
+    fig.tight_layout()
+    fig.canvas.draw()
+
+    # Get the image from the figure
+    img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    img = img.quantize(colors=254, method=PIL.Image.Quantize.MAXCOVERAGE, palette=palette)
+    return img 
 
 # LABEL HANDLING
 def format_label(label : str):

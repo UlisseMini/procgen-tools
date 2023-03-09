@@ -24,7 +24,8 @@ SAVE_DIR = 'playground/visualizations'
 AX_SIZE = 6
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
 
-def save_channel_patch_image(seed : int, value : float, row : int, col : int, channels : List[int], default : float = None):
+import PIL
+def save_channel_patch_image(seed : int, value : float, row : int, col : int, channels : List[int], default : float = None, palette : PIL.Image = None):
     """ Save an image of the maze with a pixel patch on the given channel at (row, col) in the block2.res1.resadd_out channel. """
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
     padding = maze.get_padding(maze.get_inner_grid_from_seed(seed))
@@ -38,15 +39,11 @@ def save_channel_patch_image(seed : int, value : float, row : int, col : int, ch
     fig.subplots_adjust(top=1)
 
     # Draw a red pixel at the location of the patch
-    visualization.plot_dots(axs, (row, col), color='cyan', hidden_padding = padding)
-    save_dir = f'{gif_dir}'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    fname = f'{save_dir}/seed{seed}_col{col}.png'
-    fig.savefig(fname)
-    plt.close(fig) # TODO just render image directly, don't save to file
+    visualization.plot_dots(axs, (row, col), color='red', hidden_padding = padding)
     
-    return fname 
+    # Make the image
+    img = visualization.img_from_fig(fig=fig, palette=palette)
+    return img
 
 # %%
 import imageio
@@ -89,10 +86,8 @@ def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] 
     images = []
     grid = maze.get_inner_grid_from_seed(seed)
     for row, col in coords:
-        fname = save_channel_patch_image(seed=seed, value=value, row=row, col=col, channels=channels, default=default)
-        images.append(imageio.imread(fname))
-        # Delete the file
-        os.remove(fname)
+        img = save_channel_patch_image(seed=seed, value=value, row=row, col=col, channels=channels, default=default, palette=images[0] if images else None) # Use the first image's palette for all images
+        images.append(img)
 
     channels_str = channels_str or f'c{str(channels)}'
     target = f'{gif_dir}/{channels_str}_seed{seed}_val{str(value).replace(".", "_")}_default{default}.gif'

@@ -98,7 +98,7 @@ for idx, ax in enumerate(axs.flatten()):
 
 fig, axs = plt.subplots(1, 2, figsize=(8, 4))
 for idx, ax in enumerate(axs.flatten()):
-    seed = [68871, 81681][idx]
+    seed = [59195, 1442][idx]
     venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
     # Plot the vf
     vf = vfield.vector_field(venv, policy=hook.network)
@@ -159,11 +159,8 @@ np_grids = get_grid_seq(seed=seed, target_locations=target_locations, timesteps=
 inner_grid = maze.get_inner_grid_from_seed(seed)
 padding = maze.get_padding(grid=inner_grid)
 
-import PIL
-
 imgs = []
 fig, ax = plt.subplots(1, 1, figsize=(AX_SIZE, AX_SIZE))
-"""  using PIL.quantize(), preferably with Quantize.LIBIMAGEQUANT down to a palette of 254 colours on the first frame as long as it has the mouse, the cyan dot and all the colours. Then quantize all the other images in the series to the same palette and in the save() at the end, pass in the palette. """
 
 for idx, grid in enumerate(np_grids):
     # Render the grid
@@ -175,14 +172,7 @@ for idx, grid in enumerate(np_grids):
     visualization.plot_dots(axes=[ax], coord=target_locations[idx // timesteps], hidden_padding=padding, color='red')
     
     # Get the axis as an image
-    fig.tight_layout()
-    fig.canvas.draw()
-    
-    img = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    if idx == 0: # Quantize the first frame and get the palette
-        img = img.quantize(colors=254, method=PIL.Image.Quantize.MAXCOVERAGE)
-    else: # Quantize all other frames to the same palette
-        img = img.quantize(colors=254, palette=imgs[0], method=PIL.Image.Quantize.MAXCOVERAGE)
+    img = visualization.img_from_fig(fig, palette=imgs[0] if idx > 0 else None)
     imgs.append(img)
 
 # %% Save the images as a GIF

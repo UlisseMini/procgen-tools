@@ -169,7 +169,7 @@ def resample_activations(seed : int, channels : List[int], different_location : 
 def get_alternate_channels(avoid_channels : List[int]) -> List[int]:
     """ Get a list of 11 random channels which aren't in cheese_channels """
     candidate_channels = [channel for channel in range(128) if channel not in avoid_channels]
-    return np.random.choice(candidate_channels, size=11, replace=False).tolist()
+    return np.random.choice(candidate_channels, size=len(avoid_channels), replace=False).tolist()
 
 interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, get_alternate_channels(cheese_channels), [55]], value=cheese_channels), different_location=Checkbox(value=False))
 # %% See how resampling works for a range of seeds
@@ -185,25 +185,41 @@ for seed in seeds:
     plt.close('all')
 
 # %% Quantitively measure effects of random resampling
-def avg_vf_diff_magnitude(seeds : List[int], patches : dict):
-    """ Return average vf diff due to the given patches. Average is the average vector diff magnitude, averaged over grid locations. """
+def avg_vf_diff_magnitude(seed : int, patches : dict):
+    """ Return average per-location probability change due to the given patches. """
     avg_diff = 0
-    for seed in seeds:
-        venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-        vf1 = vfield.vector_field(venv, policy)
-        with hook.use_patches(patches):
-            vf2 = vfield.vector_field(venv, hook.network)
-        vf_diff = vfield.get_vf_diff(vf1, vf2)
-        avg_diff += np.mean(np.linalg.norm(vf_diff, axis=-1))
-    return avg_diff / len(seeds)
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    vf1 = vfield.vector_field(venv, policy)
+    with hook.use_patches(patches):
+        vf2 = vfield.vector_field(venv, hook.network)
+    vf_diff = vfield.get_vf_diff(vf1, vf2)
 
-def avg_resampling(channels : List[int]):
-    """ Return the average vf diff for resampling the given channels. """
-    seeds = np.random.choice(range(10000), size=10, replace=False).tolist()
-    patches = random_combined_px_patch(layer_name=default_layer, channels=channels)
-    return avg_vf_diff_magnitude(seeds, patches)
+    # Average the vector diff magnitude over grid locations
+    avg_diff += np.linalg.norm(vf_diff['arrows']) / len(vf_diff['arrows'])
+    return avg_diff / 2 # Compute TV distance so divide by 2, otherwise double-counting probability shifts
 
-print(f'Avg resampling for cheese channels: {avg_resampling(cheese_channels)}')
-print(f'Avg resampling for effective channels: {avg_resampling(effective_channels)}') # TODO compare on same seeds, maybe give dict of patches to avg_vf_diff_magnitude?
-# TODO use component action vectors instead of net 
+def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10, different_location : bool = False):
+    """ For a list of channel lists, generate num_seeds random seeds and compute the effect of each channel random resampling on these seeds using avg_vf_diff_magnitude. If different_location is false, then  """
+    seeds = np.random.choice(range(10000), size=num_seeds, replace=False).tolist()
+    avg_diffs = defaultdict(int)
+
+    for channel_lst in channels_lsts:
+        patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if different_location else None) # NOTE assumes cheese loc isn't near (14, 14)
+        
+    avg_diffs = dict()
+
+    return avg_vf_diff_magnitude(seed = seed, patches = patches)
+
+n_seeds = 20
+
+# %% Check how much resampling from a random maze affects action probabilities
+print(f'Probability change for cheese channels, resampling from a random maze: {avg_resampling(cheese_channels, num_seeds = n_seeds, different_location=True)}') # about .02
+print(f'Probability change for cheese channels, resampling with same cheese location: {avg_resampling(cheese_channels, num_seeds = n_seeds)}')
+# %% Compare stats on action probability shifts
+for chan_list in [cheese_channels, effective_channels]:
+    for channels in [chan_list, get_alternate_channels(avoid_channels=chan_list)]:
+        for resample in [True, False]:
+            change = avg_resampling(channels, num_seeds = 40, different_location=resample)
+            print(f'Probability change for {channels}, resampling from {"a random" if resample else "same-cheese"} maze: {change}')
+    # NOTE we're resampling from a fixed maze for all target forward passes
 # %%
