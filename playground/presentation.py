@@ -43,6 +43,7 @@ def save_channel_patch_image(seed : int, value : float, row : int, col : int, ch
     
     # Make the image
     img = visualization.img_from_fig(fig=fig, palette=palette)
+    plt.close(fig)
     return img
 
 # %%
@@ -94,7 +95,7 @@ def save_sweep(channels : List[int], seed : int, coords : List[Tuple[int, int]] 
     # Overwrite if necessary
     if os.path.exists(target):
         os.remove(target)
-    imageio.mimsave(target, images, duration=0.5)
+    images[0].save(target, format='GIF', append_images=images[1:], save_all=True, duration=100, loop=0)
     print(f'Saved {target}.')
 
 # %%
@@ -107,7 +108,6 @@ for seed in (0, 20, 60):
     save_sweep(channels=cheese_channels, seed=seed, value=.9, channels_str='cheese_channels')
 
 # %%
-
 # Randomly generate 5 mazes and save a GIF for each
 for seed in np.random.randint(0, 100000, 5):
     seed = int(seed) # Convert from numpy int to python int

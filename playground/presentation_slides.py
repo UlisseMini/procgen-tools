@@ -22,7 +22,7 @@ for i, (seed, title) in enumerate(zip((9, 0), ('Training: Top right 5x5', 'Deplo
     ax[i].set_title(title)
     ax[i].set_xticks([]); ax[i].set_yticks([])
 
-plt.savefig(f'mazes-on-off.png', bbox_inches='tight', pad_inches=0, dpi=300)
+# plt.savefig(f'mazes-on-off.png', bbox_inches='tight', pad_inches=0, dpi=300)
 plt.show()
 
 
@@ -54,7 +54,9 @@ def plot_cheese_channels(hook):
         if k != 'M':
             activ = hook.get_value_by_label(default_layer)[0][CHEESE_CHANNELS[i]]
             axd[k].imshow(activ)
-            axd[k].set_title(f'Channel {CHEESE_CHANNELS[i]}')
+            # Use RdBu colormap for better contrast
+            axd[k].imshow(activ, cmap='RdBu', vmin=-1, vmax=1)
+            axd[k].set_title(f'Channel {CHEESE_CHANNELS[i]}', fontsize=18)
             i += 1
         else:
             axd[k].imshow(render_inner_grid(EnvState(venv.env.callmethod('get_state')[0]).inner_grid()))
@@ -87,8 +89,8 @@ with imageio.get_writer('maze.gif', mode="I", fps=1) as writer:
     for filename in filenames:
         image = imageio.imread(filename)
         writer.append_data(image)
-
-
+# Delete pngs
+os.system('rm maze-*.png')
 
 # %%
 # 

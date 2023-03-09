@@ -15,10 +15,8 @@ setup(dl_data=False) # create directory structure and download data
 # %%
 from procgen_tools.imports import *
 from procgen_tools import visualization, patch_utils, maze, vfield
-
-# %% Generate vfields for randomly generated seeds
 AX_SIZE = 4
-
+# %% Generate vfields for randomly generated seeds
 # Control show_components with a checkbox
 checkbox = widgets.Checkbox(value=False, description='Show action components')
 
@@ -151,9 +149,13 @@ def get_grid_seq(seed : int, target_locations : List[Tuple[int, int]], timesteps
 
 # %%
 seed = 0
+render_preview = True
 target_locations = [(5, 5), (5, 11), (4, 9), (4, 11), (8, 11), (8, 9), (4, 8), (5, 5)]
+preview_GIF_locations = [(8, 11), (8,9), (8, 11)]
+
+locations = preview_GIF_locations if render_preview else target_locations
 timesteps = 50
-np_grids = get_grid_seq(seed=seed, target_locations=target_locations, timesteps=timesteps)
+np_grids = get_grid_seq(seed=seed, target_locations=locations, timesteps=timesteps)
 
 #%% Make a gif from the grid sequence
 inner_grid = maze.get_inner_grid_from_seed(seed)
@@ -169,7 +171,7 @@ for idx, grid in enumerate(np_grids):
     visualization.visualize_venv(venv, mode='human', ax=ax, idx=0, show_plot=False, render_padding=False, render_mouse=True)
     
     # Plot the dot for the current timestep
-    visualization.plot_dots(axes=[ax], coord=target_locations[idx // timesteps], hidden_padding=padding, color='red')
+    visualization.plot_dots(axes=[ax], coord=locations[idx // timesteps], hidden_padding=padding, color='red')
     
     # Get the axis as an image
     img = visualization.img_from_fig(fig, palette=imgs[0] if idx > 0 else None)
@@ -178,11 +180,11 @@ for idx, grid in enumerate(np_grids):
 # %% Save the images as a GIF
 SAVE_DIR = 'playground/visualizations'
 gif_dir = f'{SAVE_DIR}/pixel_gifs'
-target = f'{gif_dir}/retargeting_rollout_{seed}'
+target = f'{gif_dir}/retargeting_rollout_{seed}_{"preview" if render_preview else "full"}'
 
 start_step = 29 # Start the gif at this frame
 
-imgs[start_step].save(target + '.gif', format="GIF", save_all=True, append_images=imgs[start_step+1:], duration=50, loop=0)
+imgs[start_step].save(target + '.gif', format="GIF", save_all=True, append_images=imgs[start_step+1:], duration=40 if render_preview else 50, loop=0)
 
 print(f'Gif saved to {target}')
 
