@@ -82,7 +82,7 @@ def find_cheese(seed=IntSlider(min=0, max=100, step=1, value=20), value=FloatSli
         chan_col += 2
 
     # patches = patch_utils.get_channel_pixel_patch(layer_name=default_layer, channel=55, coord=(chan_row, chan_col), value=value) 
-    combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(chan_row, chan_col), channels=cheese_channels)
+    combined_patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=(chan_row, chan_col), channels=cheese_channels, default=-.2)
 
     fig, axs, info = patch_utils.compare_patched_vfields(venv, combined_patch, hook, render_padding=True, ax_size=AX_SIZE)
     visualization.plot_dots(axs[1:], (chan_row, chan_col))
@@ -111,9 +111,11 @@ def c55_patch_transfer_across_channels(seed=IntSlider(min=0, max=100, step=1, va
     display(button)
 
 # %% Random patching channels
-channel_slider = IntSlider(min=-1, max=63, step=1, value=55)
-@interact
-def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_name=Dropdown(options=labels, value=default_layer), channel=channel_slider):
+seed_slider = IntSlider(min=0, max=100, step=1, value=0)
+layer_slider = Dropdown(options=labels, value=default_layer)
+channel_slider = IntSlider(min=-1, max=127, step=1, value=55)
+
+def random_channel_patch(seed : int, layer_name : str, channel : int):
     """ Replace the given channel's activations with values from a randomly sampled observation. This invokes patch_utils.get_random_patch from patch_utils. If channel=-1, then all channels are replaced. """
     channel_slider.max = patch_utils.num_channels(hook, layer_name) -1
     channel = channel_slider.value = min(channel_slider.value, channel_slider.max)
@@ -125,6 +127,8 @@ def random_channel_patch(seed=IntSlider(min=0, max=100, step=1, value=0), layer_
 
     button = visualization.create_save_button(prefix=f'{SAVE_DIR}/random_channel_patch', fig=fig, descriptors=defaultdict(seed=seed, layer_name=layer_name, channel=channel))
     display(button)
+
+interact(random_channel_patch, seed=seed_slider, layer_name=layer_slider, channel=channel_slider)
 
 # %% Causal scrub 55
 # We want to replace the channel 55 activations with the activations from a randomly generated maze with cheese at the same location
