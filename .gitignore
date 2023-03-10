@@ -178,3 +178,5 @@ figs/*.png
 *.png
 *.pkl
 *~
+
+!README_files/*
