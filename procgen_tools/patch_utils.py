@@ -87,14 +87,13 @@ def compose_patches(*patches : List[dict]):
     return patch
 
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
-    """ Get a patch function that patches the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). """
+    """ Get a patch function that adds to the activations at layer_name with coeff*(values[0, ...] - values[1, ...]). """
     cheese = values[0,...]
     no_cheese = values[1,...]
     assert np.any(cheese != no_cheese), "Cheese and no cheese values are the same"
 
     cheese_diff = cheese - no_cheese # Add this to activations during forward passes
-    return {layer_name: lambda outp: outp + coeff*cheese_diff} # can't pickle
-    # return {layer_name: cmh.PatchDef(value=coeff*cheese_diff, mask=np.array(True))} # can pickle
+    return {layer_name: lambda outp: outp + coeff*cheese_diff} 
 
 def get_zero_patch(layer_name: str, channel : int = -1):
     """ Get a patch function that patches the activations at layer_name with 0. """
@@ -192,7 +191,14 @@ def values_from_venv(layer_name: str, hook: cmh.ModuleHook, venv: ProcgenGym3Env
     hook.run_with_input(obs, func=forward_func_policy)
     return hook.get_value_by_label(layer_name)
 
-def cheese_diff_values(seed:int, layer_name:str, hook: cmh.ModuleHook): # TODO rename to cheese_ablation_values ?
+def patch_from_venv_pair(venv : ProcgenGym3Env, layer_name : str, hook : cmh.ModuleHook, coeff : float = 1.0):
+    """ Get a patch which creates an 'X-vector' from the given venv pair. """
+    assert venv.num_envs == 2, "Must have two environments in the venv."
+
+    values = values_from_venv(layer_name, hook, venv)
+    return get_values_diff_patch(values=values, layer_name=layer_name, coeff=coeff)
+
+def cheese_diff_values(seed : int, layer_name : str, hook: cmh.ModuleHook): # TODO rename to cheese_ablation_values ?
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)

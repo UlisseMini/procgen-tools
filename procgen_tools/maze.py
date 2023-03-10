@@ -642,7 +642,7 @@ def render_outer_grid(grid: np.ndarray):
     venv = venv_from_grid(grid)
     return venv.env.get_info()[0]['rgb']
 
-def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True):
+def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True, show_full : bool = False):
     from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
@@ -653,7 +653,7 @@ def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, 
     assert num_mice in (0,1), f'num_mice {num_mice}'
 
     # will maintain a pointer into grid
-    g = inner_grid(grid)
+    g = grid if show_full else inner_grid(grid)
     rows, cols = g.shape
     wgrid = GridspecLayout(rows, cols, width='min-content')
 
@@ -952,6 +952,20 @@ def copy_venvs(venv_all):
     env = create_venv(num=len(sb), start_level=0, num_levels=1)
     env.env.callmethod("set_state", sb)
     return env
+
+import pickle as pkl
+def load_venv(filename : str):
+    "Load a venv from a file."
+    state_bytes = pkl.load(open(filename, "rb"))
+    num_envs = len(state_bytes)
+    venv = create_venv(num=num_envs, start_level=0, num_levels=1)
+    venv.env.callmethod("set_state", [state_bytes])
+    return venv
+
+def save_venv(venv : ProcgenGym3Env, filename : str):
+    "Save all envs in venv to a file."
+    state_bytes = venv.env.callmethod("get_state")
+    pkl.dump(state_bytes, open(filename, "wb"))
 
 def remove_cheese_from_state(state):
     grid = state.full_grid()
