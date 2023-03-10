@@ -17,8 +17,8 @@ from procgen_tools import visualization, patch_utils, maze
 
 
 # %% Setup code for the rest of the notebook
-cheese_channels = [77, 113, 44, 88, 55, 42, 7, 8, 82, 99].sort() 
-effective_channels = [77, 113, 88, 55, 8, 82, 89].sort()
+cheese_channels = sorted([77, 113, 44, 88, 55, 42, 7, 8, 82, 99])
+effective_channels = sorted([77, 113, 88, 55, 8, 82, 89])
 
 SAVE_DIR = 'playground/visualizations'
 AX_SIZE = 6

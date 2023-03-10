@@ -136,7 +136,7 @@ def random_combined_px_patch(layer_name : str, channels : List[int], cheese_loc 
     """ Get a combined patch which randomly replaces channel activations with other activations from different levels. """
     patches = [patch_utils.get_random_patch(layer_name=layer_name, hook=hook, channel=channel, cheese_loc=cheese_loc) for channel in channels]
     combined_patch = patch_utils.compose_patches(*patches)
-    return combined_patch
+    return combined_patch # NOTE we're resampling from a fixed maze for all target forward passes
 
 def resample_activations(seed : int, channels : List[int], different_location : bool = False):
     """ Resample activations for default_layer with the given channels. 
@@ -169,7 +169,7 @@ def resample_activations(seed : int, channels : List[int], different_location : 
 def get_alternate_channels(avoid_channels : List[int]) -> List[int]:
     """ Get a list of 11 random channels which aren't in cheese_channels """
     candidate_channels = [channel for channel in range(128) if channel not in avoid_channels]
-    return np.random.choice(candidate_channels, size=len(avoid_channels), replace=False).tolist()
+    return sorted(np.random.choice(candidate_channels, size=len(avoid_channels), replace=False).tolist())
 
 interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, get_alternate_channels(cheese_channels), [55]], value=cheese_channels), different_location=Checkbox(value=False))
 # %% See how resampling works for a range of seeds
@@ -198,22 +198,33 @@ def avg_vf_diff_magnitude(seed : int, patches : dict):
     avg_diff += np.linalg.norm(vf_diff['arrows']) / len(vf_diff['arrows'])
     return avg_diff / 2 # Compute TV distance so divide by 2, otherwise double-counting probability shifts
 
-def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10, different_location : bool = False):
-    """ For a list of channel lists, generate num_seeds random seeds and compute the effect of each channel random resampling on these seeds using avg_vf_diff_magnitude. If different_location is false, then  """
+def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10):
+    """ For a list of channel lists, generate num_seeds random seeds and compute the effect of each channel random resampling on these seeds using avg_vf_diff_magnitude. """
     seeds = np.random.choice(range(10000), size=num_seeds, replace=False).tolist()
     avg_diffs = defaultdict(int)
 
     for seed in seeds:
-        for channel_lst in channels_lsts:
-            patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if different_location else None) # NOTE assumes cheese loc isn't near (14, 14)
-            avg_diffs[tuple(channel_lst)] += avg_vf_diff_magnitude(seed, patches) / num_seeds
+        for change_loc in [False, True]:
+            for channel_lst in channels_lsts:
+                patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if change_loc else None) # NOTE assumes cheese loc isn't near (14, 14)
+                avg_diffs[tuple(channel_lst), change_loc] += avg_vf_diff_magnitude(seed, patches) / num_seeds
     return avg_diffs
 
+lst = [1,3]
+# Sort the lst
+
+
 # %% Compare stats on action probability shifts
-for chan_list in [cheese_channels, effective_channels]:
-    for channels in [chan_list, get_alternate_channels(avoid_channels=chan_list)]:
-        for resample in [True, False]:
-            change = avg_resampling(channels, num_seeds = 40, different_location=resample)
-            print(f'Probability change for {channels}, resampling from {"a random" if resample else "same-cheese"} maze: {change}')
-    # NOTE we're resampling from a fixed maze for all target forward passes
+channels_lsts = [cheese_channels, get_alternate_channels(cheese_channels), effective_channels, get_alternate_channels(effective_channels), [55], get_alternate_channels(avoid_channels=[55])]
+avg_diffs = avg_resampling(channels_lsts, num_seeds=100)
+
+# %%
+# display avg_diffs in a table
+from prettytable import PrettyTable
+table = PrettyTable()
+table.field_names = ['Channels', 'Change Loc', 'Avg Diff']
+for (channels, change_loc), avg_diff in avg_diffs.items():
+    table.add_row([channels, change_loc, avg_diff])
+print(table)
+    
 # %%
