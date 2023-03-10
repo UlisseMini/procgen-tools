@@ -4,10 +4,11 @@ from typing import Dict
 import PIL
 
 # Getting an image from figures
-def img_from_fig(fig : plt.Figure, palette : PIL.Image = None):
+def img_from_fig(fig : plt.Figure, palette : PIL.Image = None, tight_layout : bool = True):
     """ Get an image from a matplotlib figure. If palette is not None, then the image is quantized to the palette. """
     # Prepare the fig
-    fig.tight_layout()
+    if tight_layout:
+        fig.tight_layout()
     fig.canvas.draw()
 
     # Get the image from the figure

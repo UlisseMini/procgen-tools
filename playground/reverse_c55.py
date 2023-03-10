@@ -203,18 +203,12 @@ def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10, differ
     seeds = np.random.choice(range(10000), size=num_seeds, replace=False).tolist()
     avg_diffs = defaultdict(int)
 
-    for channel_lst in channels_lsts:
-        patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if different_location else None) # NOTE assumes cheese loc isn't near (14, 14)
-        
-    avg_diffs = dict()
+    for seed in seeds:
+        for channel_lst in channels_lsts:
+            patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if different_location else None) # NOTE assumes cheese loc isn't near (14, 14)
+            avg_diffs[tuple(channel_lst)] += avg_vf_diff_magnitude(seed, patches) / num_seeds
+    return avg_diffs
 
-    return avg_vf_diff_magnitude(seed = seed, patches = patches)
-
-n_seeds = 20
-
-# %% Check how much resampling from a random maze affects action probabilities
-print(f'Probability change for cheese channels, resampling from a random maze: {avg_resampling(cheese_channels, num_seeds = n_seeds, different_location=True)}') # about .02
-print(f'Probability change for cheese channels, resampling with same cheese location: {avg_resampling(cheese_channels, num_seeds = n_seeds)}')
 # %% Compare stats on action probability shifts
 for chan_list in [cheese_channels, effective_channels]:
     for channels in [chan_list, get_alternate_channels(avoid_channels=chan_list)]:
