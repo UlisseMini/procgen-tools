@@ -50,11 +50,12 @@ import procgen_tools.vfield as vfield
 import procgen_tools.rollout_utils as rollout_utils
 from procgen import ProcgenGym3Env
 
+from action_probing_obsproc import load_value
+
 path_prefix = '../'
 
 # %%
-# Generate a large batch of observations, run through hooked network to get fc activations,
-# cache these as dataset along with "next cheese action" and "next corner action".
+# Load observations and related data
 
 num_obs_normal = 25000
 num_obs_dec = 5000
@@ -64,8 +65,8 @@ hook_batch_size = 100
 value_labels = ['embedder.flatten_out', 'embedder.relufc_out']
 logits_value_label = 'fc_policy_out'
 
-REDO_OBS = False
 cache_fn = 'action_probing_obs.pkl'
+value_cache_dr = 'action_probing_proc_20230309T074726'
 
 rand_region = 5
 policy = models.load_policy(path_prefix + 
@@ -73,121 +74,123 @@ policy = models.load_policy(path_prefix +
     15, t.device('cpu'))
 hook = cmh.ModuleHook(policy)
 
-def get_action(curr_pos, next_pos):
-    if next_pos[0] < curr_pos[0]: return 'D'
-    if next_pos[0] > curr_pos[0]: return 'U'
-    if next_pos[1] < curr_pos[1]: return 'L'
-    if next_pos[1] > curr_pos[1]: return 'R'
-    return 'N'
+# A hack because storing activations in middle layers took too much RAM with full dataset
+num_obs_to_ignore = 15000
 
-if not os.path.isfile(cache_fn) or REDO_OBS:
-    next_level_seed = 0
-    
-    # Get a bunch of obs not necessarily on dec square to get decent navigational basis
-    print(f'Get {num_obs_normal} normal observations...')
-    obs_list = []
-    obs_meta_normal_list = []
-    for batch_start_ind in tqdm(range(0, num_obs_normal, obs_batch_size)):
-        obs_normal, obs_meta_normal, next_level_seed = maze.get_random_obs_opts(
-            obs_batch_size, 
-            start_level=next_level_seed, return_metadata=True, random_seed=next_level_seed, 
-            deterministic_levels=True, show_pbar=True)
-        obs_list.append(obs_normal)
-        obs_meta_normal_list.extend(obs_meta_normal)
-    obs_normal = np.concatenate(obs_list, axis=0)
-    
-    # Also get a bunch on dec squares to show diversity between cheese/corner actions
-    print(f'Get {num_obs_dec} decision square observations...')
-    obs_list = []
-    obs_meta_dec_list = []
-    for batch_start_ind in tqdm(range(0, num_obs_dec, obs_batch_size)):
-        obs_dec, obs_meta_dec, next_level_seed = maze.get_random_obs_opts(
-            obs_batch_size, 
-            start_level=next_level_seed, return_metadata=True, random_seed=next_level_seed, 
-            deterministic_levels=True, show_pbar=True, must_be_dec_square=True)
-        obs_list.append(obs_dec)
-        obs_meta_dec_list.extend(obs_meta_dec)
-    obs_dec = np.concatenate(obs_list, axis=0)
+with open(cache_fn, 'rb') as fl:
+    obs, obs_meta, next_action_cheese, next_action_corner = pickle.load(fl)
+    obs = obs[num_obs_to_ignore:]
+    obs_meta = np.array(obs_meta[num_obs_to_ignore:])
+    next_action_cheese = next_action_cheese[num_obs_to_ignore:]
+    next_action_corner = next_action_corner[num_obs_to_ignore:]
 
-    # Merge into a single batch of observations
-    obs = np.concatenate([obs_normal, obs_dec], axis=0)
-    obs_meta = obs_meta_normal_list + obs_meta_dec_list
-
-    # Extract best action for cheese and corner paths
-    next_action_cheese = np.array([get_action(md['mouse_pos_outer'], 
-            md['next_pos_cheese_outer'])
-        for md in obs_meta])
-    next_action_corner = np.array([get_action(md['mouse_pos_outer'], 
-            md['next_pos_corner_outer'])
-        for md in obs_meta])
-
-    # Run observations through a hooked network, extract the fc layer activations
-    # and the flatten layer activations as potential training/test data.  
-    # Do it batches to avoid running out of RAM!
-    print('Run observations through hooked network, in batches...')
-    value_lists = {value_label: [] for value_label in value_labels}
-    logits_list = []
-    for batch_start_ind in tqdm(range(0, obs.shape[0], hook_batch_size)):
-        hook.run_with_input(obs[batch_start_ind:(batch_start_ind+hook_batch_size)], 
-            values_to_store=value_labels+[logits_value_label])
-        for value_label in value_labels:
-            value_lists[value_label].append(hook.get_value_by_label(value_label))
-        logits_list.append(hook.get_value_by_label(logits_value_label))
-    values_by_label = {value_label: np.concatenate(value_lists[value_label], axis=0) 
-                       for value_label in value_labels}
-    logits = np.concatenate(logits_list, axis=0)
-    
-    with open(cache_fn, 'wb') as fl:
-        pickle.dump((obs, values_by_label, logits, next_action_cheese, next_action_corner), fl)
-
-else:
-    with open(cache_fn, 'rb') as fl:
-        obs, values_by_label, logits, next_action_cheese, next_action_corner = pickle.load(fl)
 
 
 # %%
 # Train a probe!
-value_label = 'embedder.relufc_out'
-inds_slice = slice(None)
-
+#value_label = 'embedder.relufc_out'
 value_label = 'embedder.flatten_out'
-inds_slice = slice(None) #slice(-10000, None)
 
-value = values_by_label[value_label]
+value = load_value(value_label, value_cache_dr)
 
-# probe_result = cpr.linear_probe(value[inds_slice], next_action_cheese[inds_slice], 
-#     model_type='classifier', C=0.01, class_weight='balanced', test_size=0.3, random_state=42)
+probe_result = cpr.linear_probe(value, next_action_cheese, 
+    model_type='classifier', C=0.005, class_weight='balanced', test_size=0.3, random_state=42)
 
-# model = probe_result['model']
+model = probe_result['model']
 
-# print(probe_result['train_score'], probe_result['test_score'])
-# print(probe_result['conf_matrix'])
+print(probe_result['train_score'], probe_result['test_score'])
+print(probe_result['conf_matrix'])
 
-# Load pre-saved probe and results
-results_fn = 'action_probing_res_20230306T230300.pkl'
-with open(results_fn, 'rb') as fl:
-    model, df, args = pickle.load(fl)
+# # Load pre-saved probe and results
+# results_fn = 'action_probing_res_20230306T230300.pkl'
+# with open(results_fn, 'rb') as fl:
+#     model, df, args = pickle.load(fl)
+# df.mean()
 
-df.mean()
+
+# %%
+# Look for patterns in observations where the next cheese action is assigned particularly low prob
+
+# Get probabilities for all actions based on learned linear model
+next_action_proba = model.predict_proba(value)
+
+# Turn target into one-hot encoded version
+actions, next_action_cheese_ind = np.unique(next_action_cheese, return_inverse=True)
+assert (actions == model.classes_).all()
+#next_action_cheese_1hot = np.eye(len(actions))[next_action_cheese_ind]
+
+# Sort data points by prob of picking next cheese action, lowest being most interesting
+cheese_action_proba = next_action_proba[np.arange(len(next_action_cheese_ind)),next_action_cheese_ind]
+inds_worst_pred = np.argsort(cheese_action_proba)
+
+# %%
+# Take a look at a few of the worse obs!
+num_worst = 16
+
+worst_obs_da = xr.DataArray(rearrange(obs[inds_worst_pred[:num_worst],...], 'b c h w -> h w c b'),
+    dims=['h', 'w', 'rgb', 'obs_index'], 
+    #coords={'level': [md['level_seed'] for md in np.array(obs_meta)[inds_worst_pred[:num_worst]]]})
+    coords={'obs_index': inds_worst_pred[:num_worst]})
+fig = px.imshow(worst_obs_da, facet_col='obs_index',
+    facet_col_wrap=4, facet_col_spacing=0.01, facet_row_spacing=0.01)
+fig.update_layout(height=1200)
+fig.show()
+
+
+# %%
+# Play with some specific levels
+inds_to_check = [10441]
+
+# Get level seed for reference
+#level_seeds = obs_meta[index_to_check]['level_seed']
+
+# Look at specific channels that we expect to code for cheese, how do they look?
+value_label_to_check = 'embedder.block2.res1.resadd_out'
+channels_to_check = [55, 42]
+hook.run_with_input(obs[inds_to_check])
+value_to_check = hook.get_value_by_label(value_label_to_check)
+
+
+# %%
+# Compare distributions of max values of cheese coding channels when the agent does pick the 
+# cheese actions, vs when it doesn't.
+value_label_to_check = 'embedder.block2.res1.resadd_out'
+channels_to_check = [55, 42]
+
+pred_action = model.predict(value)
+
+value_to_check = load_value(value_label_to_check, value_cache_dr)
+value_to_check_max = value_to_check.max(axis=-1).max(axis=-1)
+
+chans_list = []
+for ch in channels_to_check:
+    chans_list.append(pd.DataFrame({'max_value': value_to_check_max[:,ch], 
+        'did_pick_cheese_action': pred_action==next_action_cheese, 
+        'channel': np.full(next_action_cheese.shape, ch),
+        #'level_seed': np.concatenate([level_seeds, level_seeds]),
+        }))
+chans_df = pd.concat(chans_list, axis='index')
+px.histogram(chans_df, title=f'{value_label} max values at "did pick cheese action" true/false',
+    x='max_value', color='did_pick_cheese_action', opacity=0.5, 
+    barmode='overlay', facet_col='channel', facet_col_wrap=2,
+    histnorm='probability', marginal='box', 
+    hover_data=list(chans_df.columns)).show()
 
 
 
 # %%
 # What about a more complex probe?
-from sklearn.ensemble import RandomForestClassifier
+# from sklearn.ensemble import RandomForestClassifier
 
-X_train, X_test, y_train, y_test = train_test_split(
-    value[inds_slice], next_action_cheese[inds_slice], 
-    test_size=0.3, random_state=42)
+# X_train, X_test, y_train, y_test = train_test_split(
+#     value[inds_slice], next_action_cheese[inds_slice], 
+#     test_size=0.3, random_state=42)
 
-mdl = RandomForestClassifier(n_estimators=5, max_features='sqrt',
-    class_weight='balanced', random_state=1)
-mdl.fit(X_train, y_train)
-y_pred = mdl.predict(X_test)
-print(mdl.score(X_train, y_train), mdl.score(X_test, y_test))
-
-
-
+# mdl = RandomForestClassifier(n_estimators=5, max_features='sqrt',
+#     class_weight='balanced', random_state=1)
+# mdl.fit(X_train, y_train)
+# y_pred = mdl.predict(X_test)
+# print(mdl.score(X_train, y_train), mdl.score(X_test, y_test))
 
 
 # %%
@@ -197,6 +200,7 @@ next_action_logits = models.MAZE_ACTIONS_BY_INDEX[logits_argmax].astype('<U1')
 logits_cheese_score = (next_action_logits == next_action_cheese).mean()
 logits_corner_score = (next_action_logits == next_action_corner).mean()
 print(logits_cheese_score, logits_corner_score)
+
 
 # %%
 # What about confirming we can learn a probe to the actual model actions?

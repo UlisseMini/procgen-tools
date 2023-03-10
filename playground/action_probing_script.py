@@ -71,7 +71,6 @@ if __name__ == "__main__":
     value_labels = ['embedder.flatten_out', 'embedder.relufc_out']
     logits_value_label = 'fc_policy_out'
 
-    REDO_OBS = False
     cache_fn = args.obs_fn
 
     policy = models.load_policy(path_prefix + 
@@ -86,69 +85,11 @@ if __name__ == "__main__":
         if next_pos[1] > curr_pos[1]: return 'R'
         return 'N'
 
-    if not os.path.isfile(cache_fn) or REDO_OBS:
-        next_level_seed = 0
-        
-        # Get a bunch of obs not necessarily on dec square to get decent navigational basis
-        print(f'Get {num_obs_normal} normal observations...')
-        obs_list = []
-        obs_meta_normal_list = []
-        for batch_start_ind in tqdm(range(0, num_obs_normal, obs_batch_size)):
-            obs_normal, obs_meta_normal, next_level_seed = maze.get_random_obs_opts(
-                obs_batch_size, 
-                start_level=next_level_seed, return_metadata=True, random_seed=next_level_seed, 
-                deterministic_levels=True, show_pbar=True)
-            obs_list.append(obs_normal)
-            obs_meta_normal_list.extend(obs_meta_normal)
-        obs_normal = np.concatenate(obs_list, axis=0)
-        
-        # Also get a bunch on dec squares to show diversity between cheese/corner actions
-        print(f'Get {num_obs_dec} decision square observations...')
-        obs_list = []
-        obs_meta_dec_list = []
-        for batch_start_ind in tqdm(range(0, num_obs_dec, obs_batch_size)):
-            obs_dec, obs_meta_dec, next_level_seed = maze.get_random_obs_opts(
-                obs_batch_size, 
-                start_level=next_level_seed, return_metadata=True, random_seed=next_level_seed, 
-                deterministic_levels=True, show_pbar=True, must_be_dec_square=True)
-            obs_list.append(obs_dec)
-            obs_meta_dec_list.extend(obs_meta_dec)
-        obs_dec = np.concatenate(obs_list, axis=0)
-
-        # Merge into a single batch of observations
-        obs = np.concatenate([obs_normal, obs_dec], axis=0)
-        obs_meta = obs_meta_normal_list + obs_meta_dec_list
-
-        # Extract best action for cheese and corner paths
-        next_action_cheese = np.array([get_action(md['mouse_pos_outer'], 
-                md['next_pos_cheese_outer'])
-            for md in obs_meta])
-        next_action_corner = np.array([get_action(md['mouse_pos_outer'], 
-                md['next_pos_corner_outer'])
-            for md in obs_meta])
-
-        # Run observations through a hooked network, extract the fc layer activations
-        # and the flatten layer activations as potential training/test data.  
-        # Do it batches to avoid running out of RAM!
-        print('Run observations through hooked network, in batches...')
-        value_lists = {value_label: [] for value_label in value_labels}
-        logits_list = []
-        for batch_start_ind in tqdm(range(0, obs.shape[0], hook_batch_size)):
-            hook.run_with_input(obs[batch_start_ind:(batch_start_ind+hook_batch_size)], 
-                values_to_store=value_labels+[logits_value_label])
-            for value_label in value_labels:
-                value_lists[value_label].append(hook.get_value_by_label(value_label))
-            logits_list.append(hook.get_value_by_label(logits_value_label))
-        values_by_label = {value_label: np.concatenate(value_lists[value_label], axis=0) 
-                        for value_label in value_labels}
-        logits = np.concatenate(logits_list, axis=0)
-        
-        with open(cache_fn, 'wb') as fl:
-            pickle.dump((obs, values_by_label, logits, next_action_cheese, next_action_corner), fl)
-
-    else:
-        with open(cache_fn, 'rb') as fl:
+    with open(cache_fn, 'rb') as fl:
+        try:
             obs, values_by_label, logits, next_action_cheese, next_action_corner = pickle.load(fl)
+        except:
+            obs, obs_meta, next_action_cheese, next_action_corner = pickle.load(fl)
 
     # Train a probe!
     value_label = args.src_value
