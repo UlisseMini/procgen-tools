@@ -206,6 +206,22 @@ def get_vf_diff(vf1 : dict, vf2 : dict):
 
     return {'arrows': arrow_diffs, 'legal_mouse_positions': vf2['legal_mouse_positions'], 'grid': vf2['grid']}
 
+def vf_diff_magnitude(vf_diff : dict) -> float:
+    """ Compute the average magnitude of the vector field difference. """
+    return np.linalg.norm(vf_diff['arrows']) / len(vf_diff['arrows'])
+
+def vf_diff_magnitude_from_seed(seed : int, patches : dict):
+    """ Return average per-location probability change due to the given patches. """
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    vf1 = vfield.vector_field(venv, policy)
+    with hook.use_patches(patches):
+        vf2 = vfield.vector_field(venv, hook.network)
+    vf_diff = vfield.get_vf_diff(vf1, vf2)
+
+    # Average the vector diff magnitude over grid locations
+    avg_diff = vf_diff_magnitude(vf_diff)
+    return avg_diff / 2 # Compute TV distance so divide by 2, otherwise double-counting probability shifts
+
 def plot_vf_diff(vf1 : dict, vf2 : dict, ax : plt.Axes = None, human_render : bool = True, render_padding : bool = False, show_components : bool = False): 
     """ Render the difference "vf1 - vf2" between two vector fields, plotting only the difference. """
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same 

@@ -161,17 +161,20 @@ def resample_activations(seed : int, channels : List[int], different_location : 
     visualization.plot_dots(axs[1:], resampling_loc, is_grid=True, flip_y=False, hidden_padding = 0 if render_padding else padding)
     plt.show()
 
-    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/c55_causal_scrub', fig=fig, descriptors=defaultdict(seed=seed, different_location=different_location))
+    # Display the average vector field difference magnitude
+    avg_prob_diff = vfield.vf_diff_magnitude(info['diff_vfield']) / 2
+    print(f'Action probability distributions changed by {avg_prob_diff * 100 :2.1f}% on average')
+
+    button = visualization.create_save_button(prefix=f'{SAVE_DIR}/causal_scrub', fig=fig, descriptors=defaultdict(seed=seed, different_location=different_location))
     display(button)
 
 # %% Resample activations interactively
-# Get a list of 11 random channels which aren't in cheese_channels 
 def get_alternate_channels(avoid_channels : List[int]) -> List[int]:
-    """ Get a list of 11 random channels which aren't in cheese_channels """
+    """ Get a list of random channels which aren't in avoid_channels. """
     candidate_channels = [channel for channel in range(128) if channel not in avoid_channels]
     return sorted(np.random.choice(candidate_channels, size=len(avoid_channels), replace=False).tolist())
 
-interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, effective_channels, get_alternate_channels(cheese_channels), [55]], value=cheese_channels), different_location=Checkbox(value=False))
+interactive(resample_activations, seed=IntSlider(min=0, max=100, step=1, value=60), channels=Dropdown(options=[cheese_channels, [42, 55, 77, 88], get_alternate_channels(cheese_channels), [55]], value=cheese_channels), different_location=Checkbox(value=False))
 # %% See how resampling works for a range of seeds
 for seed in range(0, 30):
     resample_activations(seed=seed, channels=cheese_channels)
@@ -185,21 +188,8 @@ for seed in seeds:
     plt.close('all')
 
 # %% Quantitively measure effects of random resampling
-def avg_vf_diff_magnitude(seed : int, patches : dict):
-    """ Return average per-location probability change due to the given patches. """
-    avg_diff = 0
-    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-    vf1 = vfield.vector_field(venv, policy)
-    with hook.use_patches(patches):
-        vf2 = vfield.vector_field(venv, hook.network)
-    vf_diff = vfield.get_vf_diff(vf1, vf2)
-
-    # Average the vector diff magnitude over grid locations
-    avg_diff += np.linalg.norm(vf_diff['arrows']) / len(vf_diff['arrows'])
-    return avg_diff / 2 # Compute TV distance so divide by 2, otherwise double-counting probability shifts
-
 def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10):
-    """ For a list of channel lists, generate num_seeds random seeds and compute the effect of each channel random resampling on these seeds using avg_vf_diff_magnitude. """
+    """ For a list of channel lists, generate num_seeds random seeds and compute the effect of each channel random resampling on these seeds using vfield.vf_diff_magnitude_from_seed. This takes a while! """
     seeds = np.random.choice(range(10000), size=num_seeds, replace=False).tolist()
     avg_diffs = defaultdict(int)
 
@@ -207,24 +197,27 @@ def avg_resampling(channels_lsts : List[List[int]], num_seeds : int = 10):
         for change_loc in [False, True]:
             for channel_lst in channels_lsts:
                 patches = random_combined_px_patch(layer_name=default_layer, channels=channel_lst, cheese_loc=(14, 14) if change_loc else None) # NOTE assumes cheese loc isn't near (14, 14)
-                avg_diffs[tuple(channel_lst), change_loc] += avg_vf_diff_magnitude(seed, patches) / num_seeds
+                avg_diffs[tuple(channel_lst), change_loc] += vfield.vf_diff_magnitude_from_seed(seed, patches) / num_seeds
     return avg_diffs
-
-lst = [1,3]
-# Sort the lst
-
 
 # %% Compare stats on action probability shifts
 channels_lsts = [cheese_channels, get_alternate_channels(cheese_channels), effective_channels, get_alternate_channels(effective_channels), [55], get_alternate_channels(avoid_channels=[55])]
-avg_diffs = avg_resampling(channels_lsts, num_seeds=100)
+avg_diffs = avg_resampling(channels_lsts, num_seeds=30)
 
-# %%
-# display avg_diffs in a table
-from prettytable import PrettyTable
-table = PrettyTable()
-table.field_names = ['Channels', 'Change Loc', 'Avg Diff']
-for (channels, change_loc), avg_diff in avg_diffs.items():
-    table.add_row([channels, change_loc, avg_diff])
-print(table)
-    
+# %% Show the avg_diffs data in plotly
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+
+fig = make_subplots(rows=1, cols=2, subplot_titles=['Same Location', 'Different Location']) # TODO is this switched?
+for change_loc in [False, True]:
+    fig.add_trace(go.Bar(x=[str(channels) for channels in channels_lsts], y=[avg_diffs[tuple(channels), change_loc] for channels in channels_lsts]), row=1, col=2 if change_loc else 1)
+fig.update_layout(title_text='Average Probability Shifts for Random Resampling')
+# Set same y axes to be max of both
+fig.update_yaxes(range=[0, max([max([avg_diffs[tuple(channels), change_loc] for channels in channels_lsts]) for change_loc in [False, True]])])
+
+# Set legend
+fig.update_layout(showlegend=False)
+
+fig.show()
 # %%
