@@ -959,7 +959,7 @@ def load_venv(filename : str):
     state_bytes = pkl.load(open(filename, "rb"))
     num_envs = len(state_bytes)
     venv = create_venv(num=num_envs, start_level=0, num_levels=1)
-    venv.env.callmethod("set_state", [state_bytes])
+    venv.env.callmethod("set_state", state_bytes)
     return venv
 
 def save_venv(venv : ProcgenGym3Env, filename : str):

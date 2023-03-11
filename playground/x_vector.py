@@ -17,10 +17,10 @@ from procgen_tools.imports import *
 from procgen_tools import visualization, patch_utils, maze, vfield
 AX_SIZE = 4 
 
-load_venv = False
+load_venv = True
 pwd = 'playground'
-venv_folder = 'venv'
-venv_fname = f'{pwd}/{venv_folder}/top_right_venv.pkl'
+mazes_folder = 'mazes'
+venv_fname = f'{pwd}/{mazes_folder}/top_right_venv.pkl'
 
 # %% Try generating a top-right vector; prediction of .3 that my first idea works
 if load_venv:
@@ -39,4 +39,4 @@ def examine_patch(target_seed=IntSlider(min=0,max=100,step=1,value=0), coeff=Flo
     target_venv = maze.create_venv(num=1, start_level=target_seed, num_levels=1)
     fig, axs, info = patch_utils.compare_patched_vfields(target_venv, top_right_patch, hook, render_padding=False, ax_size=AX_SIZE)
     plt.show(fig)
-# %%
+# %% 
