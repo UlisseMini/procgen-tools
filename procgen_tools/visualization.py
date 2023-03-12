@@ -260,7 +260,7 @@ def visualize_venv(venv : ProcgenGym3Env, idx : int = 0, mode : str="human", ax 
         plt.show() 
     return img
 
-def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = None, callback : Callable = None, show_vfield : bool = True, show_components : bool = False):
+def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int = 0, ax_size : int = None, callback : Callable = None, show_vfield : bool = True, show_components : bool = False, show_full : bool = False):
     """ Given a policy and a maze seed, create a maze editor and a vector field plot. Update the vector field whenever the maze is edited. Returns a VBox containing the maze editor and the vector field plot. 
     
     Args:
@@ -271,6 +271,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         callback: A callback to call whenever the maze is edited.
         show_vfield: Whether to show the vector field plot.
         show_components: Whether to show the vectors for each action.
+        show_full: Whether to edit the full level with padding included.
     """
     output = Output()
     if venv is None: 
@@ -278,8 +279,9 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
 
     # Dynamically compute ax_size if not provided
     if ax_size is None:
-        inner_grid_size = maze.state_from_venv(venv, idx=0).inner_grid().shape[0]
-        ax_size = 4 * inner_grid_size / 16
+        grid = maze.state_from_venv(venv, idx=0).full_grid() if show_full else maze.state_from_venv(venv, idx=0).inner_grid()
+        grid_size = grid.shape[0]
+        ax_size = 4 * grid_size / 16
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close('all')
 
@@ -293,7 +295,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
                 vf = vfield.vector_field(venv, policy)    
                 vfield.plot_vf(vf, ax=ax, show_components=show_components)
             else: 
-                visualize_venv(venv, ax=ax, ax_size=ax_size, show_plot=False, render_padding=False)
+                visualize_venv(venv, ax=ax, ax_size=ax_size, show_plot=False, render_padding=show_full)
 
             # Update the existing figure in place 
             clear_output(wait=True)
@@ -307,7 +309,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb) # NOTE can't block off initial mouse position? 
+    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb, show_full=show_full) # NOTE can't block off initial mouse position? 
     # Set the editors so that they don't space out when the window is resized
     for editor in editors:
         editor.layout.height = "100%"

@@ -17,20 +17,20 @@ from procgen_tools.imports import *
 from procgen_tools import visualization, patch_utils, maze, vfield
 AX_SIZE = 4 
 
-load_venv = True
 pwd = 'playground'
 mazes_folder = 'mazes'
 venv_fname = f'{pwd}/{mazes_folder}/top_right_venv.pkl'
 
-# %% Try generating a top-right vector; prediction of .3 that my first idea works
+# %% Try generating a top-right vector; prediction of .3 that my first idea works (EDIT: It did!)
+load_venv = False
 if load_venv:
     venv = maze.load_venv(venv_fname)
 else:
-    venv = maze.create_venv(num=2, start_level=0, num_levels=1)
+    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
     maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
     display(maze_editors)
 # %%
-if not load_venv: maze.save_venv(venv=venv, filename=venv_fname) # TODO check these functions work
+if not load_venv: maze.save_venv(venv=venv, filename=venv_fname) 
 # %% Get a value patch from this pair of envs
 # Compare vector fields for this patch
 @interact
@@ -39,4 +39,7 @@ def examine_patch(target_seed=IntSlider(min=0,max=100,step=1,value=0), coeff=Flo
     target_venv = maze.create_venv(num=1, start_level=target_seed, num_levels=1)
     fig, axs, info = patch_utils.compare_patched_vfields(target_venv, top_right_patch, hook, render_padding=False, ax_size=AX_SIZE)
     plt.show(fig)
-# %% 
+# %% Show vfield for full maze 
+single_venv = maze.copy_venv(venv, idx=0) # Modified maze is at index 0
+vf_box = visualization.custom_vfield(policy=hook.network, venv=single_venv, show_full=True)
+# %%

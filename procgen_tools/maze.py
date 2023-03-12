@@ -426,15 +426,15 @@ def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     Get the inside of the maze, ie. the stuff within the outermost walls.
     inner_grid(inner_grid(x)) = inner_grid(x) for all x.
     """
-    # uses the fact that the mouse always starts in the bottom left.
-    bl = next(i for i in range(len(grid)) if grid[i][i] != BLOCKED)
-    if bl == 0: # edgecase! the whole grid is the inner grid.
-        return grid
-
-    inner = grid[bl:-bl, bl:-bl]
-    if assert_:
-        assert (outer_grid(inner, grid.shape[0], assert_=False) == grid).all()
-    return inner
+    # Find the amount of padding on the maze, where padding is BLOCKED
+    # Use numpy to test if each square is BLOCKED
+    # If it is, then it's part of the padding
+    bl = 0 
+    # Check if the top, bottom, left, and right are all blocked
+    while (grid[bl, :] == BLOCKED).all() and (grid[-bl-1, :] == BLOCKED).all() and (grid[:, bl] == BLOCKED).all() and (grid[:, -bl-1] == BLOCKED).all():
+        bl += 1 
+    
+    return grid[bl:-bl, bl:-bl] if bl > 0 else grid # if bl == 0, then we don't need to do anything
 
 
 def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
