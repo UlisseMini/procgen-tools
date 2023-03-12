@@ -592,13 +592,18 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
     return True
 
 
-def venv_from_grid(grid: np.ndarray):
+def venv_from_grid(grid: np.ndarray) -> ProcgenGym3Env: #
     "Get a venv with the given inner grid"
     n_mice = (grid==MOUSE).sum()
     if n_mice == 0:
         grid = grid.copy()
-        assert grid[0,0] == EMPTY, 'grid[0,0] is not empty'
-        grid[0,0] = MOUSE
+
+        blocked_idx = 0 # Assumes mouse should be placed on diagonal
+        while grid[blocked_idx, blocked_idx] == BLOCKED:
+            blocked_idx += 1
+        assert grid[blocked_idx, blocked_idx] == EMPTY, f'grid[{blocked_idx},{blocked_idx}] is not empty'
+
+        grid[blocked_idx, blocked_idx] = MOUSE
     assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
 
     venv = create_venv(num=1, num_levels=1, start_level=0)

@@ -282,6 +282,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         grid = maze.state_from_venv(venv, idx=0).full_grid() if show_full else maze.state_from_venv(venv, idx=0).inner_grid()
         grid_size = grid.shape[0]
         ax_size = 4 * grid_size / 16
+
     fig, ax = plt.subplots(1,1, figsize=(ax_size, ax_size))
     plt.close('all')
 

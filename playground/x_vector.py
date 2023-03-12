@@ -40,6 +40,7 @@ def examine_patch(target_seed=IntSlider(min=0,max=100,step=1,value=0), coeff=Flo
     fig, axs, info = patch_utils.compare_patched_vfields(target_venv, top_right_patch, hook, render_padding=False, ax_size=AX_SIZE)
     plt.show(fig)
 # %% Show vfield for full maze 
-single_venv = maze.copy_venv(venv, idx=0) # Modified maze is at index 0
-vf_box = visualization.custom_vfield(policy=hook.network, venv=single_venv, show_full=True)
+venv_test = maze.create_venv(num=1, start_level=0, num_levels=1)
+single_venv = maze.copy_venv(venv_test, idx=0) # Modified maze is at index 0
+vf_box = visualization.custom_vfield(policy=hook.network, venv=single_venv, show_full=True) # NOTE broken for non-traditional padding venvs 
 # %%
