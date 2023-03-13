@@ -165,3 +165,8 @@ def euc_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
 def taxi_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
     "Shortest Taxicab (L1) distance between decision-square and a square in the top-right 5*5 region"
     return dist_cheese_nxn(grid, get_dsq(grid), n=5, p=1, **kwargs)
+
+@metric
+def cheese_coord_norm(grid: np.ndarray, **kwargs) -> float:
+    "Norm of the outer grid coordinates of cheese."
+    return np.linalg.norm(maze.outer_grid_coords(len(grid), maze.get_cheese_pos(grid)))
