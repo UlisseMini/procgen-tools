@@ -65,8 +65,8 @@ hook_batch_size = 100
 value_labels = ['embedder.flatten_out', 'embedder.relufc_out']
 logits_value_label = 'fc_policy_out'
 
-cache_fn = 'action_probing_obs.pkl'
-value_cache_dr = 'action_probing_proc_20230309T074726'
+cache_fn = '../episode_data/action_probing_current/action_probing_obs.pkl'
+value_cache_dr = '../episode_data/action_probing_current'
 
 rand_region = 5
 policy = models.load_policy(path_prefix + 
@@ -303,7 +303,7 @@ scores_df
 # What about using sparse channels?
 # Okay this is pretty interesting!  Seems like 10-20 channels is enough to get pretty solid prediction performance on for
 # next cheese action!  And also enough to get next action selected by the logits at 96% accuracy with only 15 channels?
-chan_nums = np.array([10]) #np.array([5, 10, 15, 20])
+chan_nums = np.array([5, 10, 15, 20])
 f_test_full = rearrange(f_test, '(c h w) -> c h w', h=8, w=8)
 value_full = rearrange(value, 'b (c h w) -> b c h w', c=128, h=8, w=8)
 f_test_sum_by_chan = f_test_full.sum(axis=-1).sum(axis=-1)
