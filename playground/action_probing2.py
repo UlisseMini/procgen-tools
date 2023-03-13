@@ -24,6 +24,7 @@ import numpy as np
 import numpy.linalg
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA, NMF
 import xarray as xr
 import torch as t
 import torch.nn as nn
@@ -33,7 +34,7 @@ import plotly.express as px
 import plotly as py
 import plotly.graph_objects as go
 from tqdm.auto import tqdm
-from einops import rearrange
+from einops import rearrange, repeat
 from IPython.display import Video, display, clear_output
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, clips_array, vfx
 import matplotlib.pyplot as plt 
@@ -54,13 +55,16 @@ from procgen import ProcgenGym3Env
 
 from action_probing_obsproc import load_value
 
+# Hack to make sure cwd is the script folder
+os.chdir(globals()['_dh'][0])
+
 path_prefix = '../'
 
 # %%
 # Load data and hook module
 
 obs_cache_fn = 'action_probing_obs.pkl'
-value_cache_dr = 'action_probing_proc_20230308T070658'
+value_cache_dr = 'action_probing_proc_20230309T074726'
 
 logits_label = 'fc_policy_out'
 
@@ -68,9 +72,9 @@ logits_label = 'fc_policy_out'
 num_obs_to_ignore = 15000
 
 with open(obs_cache_fn, 'rb') as fl:
-    obs, values_by_label, logits, next_action_cheese, next_action_corner = pickle.load(fl)
-    del values_by_label, logits
+    obs, obs_meta, next_action_cheese, next_action_corner = pickle.load(fl)
     obs = obs[num_obs_to_ignore:]
+    obs_meta = np.array(obs_meta[num_obs_to_ignore:])
     next_action_cheese = next_action_cheese[num_obs_to_ignore:]
     next_action_corner = next_action_corner[num_obs_to_ignore:]
 
@@ -80,7 +84,6 @@ with open(obs_cache_fn, 'rb') as fl:
 #     15, t.device('cpu'))
 # hook = cmh.ModuleHook(policy)
 
-# TODO: sort this properly, just coincidence that is sorts lexicographically into module order!
 value_labels = [
     'embedder.block1.conv_in0',
     # Block 1 activations are really big?
@@ -93,7 +96,7 @@ value_labels = [
     #'embedder.relufc_out',
 ]
 
-logits = load_value(logits_label)
+logits = load_value(logits_label, value_cache_dr)
 
 logits_argmax = logits.argmax(axis=1)
 next_action_logits = models.MAZE_ACTIONS_BY_INDEX[logits_argmax].astype('<U1')
@@ -143,4 +146,51 @@ for value_label in tqdm(value_labels):
 scores_df = pd.DataFrame(scores_list)
 scores_df
 
+# %%
+# What about PCA/NMF as an interp tool to autoencode conv channels into a smaller set of channel features?
+value_label = 'embedder.block1.res2.resadd_out'
+value = load_value(value_label, value_cache_dr)
 
+# Turn value into reasonably-sized data set by flattening a random sample of the value batch inds
+num_batch_samples = 100
+random_seed = 42
+rng = np.random.default_rng(random_seed)
+batch_inds = rng.integers(0, value.shape[0], num_batch_samples)
+X = rearrange(value[batch_inds,...], 
+    'b c h w -> (b h w) c')
+
+# Try a decomposition or two
+pca = PCA(n_components=20)
+pca.fit(X)
+print(pca.explained_variance_ratio_)
+
+nmf_p = NMF(n_components=20, random_state=random_seed)
+nmf_p.fit(np.maximum(X,0.))
+print(nmf_p.reconstruction_err_/X.size)
+
+nmf_n = NMF(n_components=20, random_state=random_seed)
+nmf_n.fit(np.maximum(-X,0.))
+print(nmf_n.reconstruction_err_/X.size)
+
+
+# %%
+# Show results on an example data point
+def show_rdu_res(obs, value, components, bi, title):
+    obs_mono = np.zeros_like(obs[bi])
+    obs_mono[1,...] = obs[bi].mean(axis=0)
+    exp_factor = obs.shape[-1]//value.shape[-1]
+    value_rdu_exp = repeat(np.einsum('chw,pc->hwp', value[bi,...], components),
+        'h w p -> (h h2) (w w2) p', h2=exp_factor, w2=exp_factor)
+    value_rdu_exp = (value_rdu_exp - value_rdu_exp.min())/(value_rdu_exp.max()-value_rdu_exp.min())
+    obs_value_rdu = repeat(obs_mono, 'c h w -> c h w p', p=components.shape[0])
+    obs_value_rdu[0,...] = value_rdu_exp
+    obs_value_rdu = rearrange(obs_value_rdu, 'c h w p -> h w c p')
+    # #px.imshow(rearrange(obs[bi], 'c h w -> h w c')).show()
+    fig = px.imshow(obs_value_rdu, facet_col=3, facet_col_wrap=5, title=title)
+    fig.update_layout(height=1000)
+    fig.show()
+    #return obs_value_rdu
+
+show_rdu_res(obs, value, pca.components_, batch_inds[0], 'PCA')
+show_rdu_res(obs, value, nmf_p.components_, batch_inds[0], 'NMF(p)')
+show_rdu_res(obs, value, nmf_n.components_, batch_inds[0], 'NMF(n)')
