@@ -310,7 +310,7 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
         update_plot()
 
     # Then make a callback which updates the render in-place when the maze is edited
-    editors = maze.venv_editors(venv, check_on_dist=False, env_nums=range(1), callback=cb, show_full=show_full) # NOTE can't block off initial mouse position? 
+    editors = maze.venv_editors(venv, check_on_dist=False, callback=cb, show_full=show_full) # NOTE can't block off initial mouse position? 
     # Set the editors so that they don't space out when the window is resized
     for editor in editors:
         editor.layout.height = "100%"
@@ -318,6 +318,11 @@ def custom_vfield(policy : t.nn.Module, venv : ProcgenGym3Env = None, seed : int
     widget_vbox = Box(children=editors + [output], layout=Layout(display='flex', flex_flow='row', align_items='stretch', width='100%'))
 
     return widget_vbox
+
+def custom_vfields(policy : t.nn.Module, venv : ProcgenGym3Env, **kwargs):
+    """ Create a vector field plot for each maze in the environment, using policy to generate the vfields. """
+    venvs = [maze.copy_venv(venv, idx=i) for i in range(venv.num_envs)]
+    return VBox([custom_vfield(venv=venv, policy=policy, **kwargs) for venv in venvs])
 
 ### activation management
 def get_activations(obs : np.ndarray, hook: cmh.ModuleHook, layer_name: str):

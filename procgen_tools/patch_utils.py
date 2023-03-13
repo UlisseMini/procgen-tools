@@ -18,17 +18,6 @@ def get_custom_venv_pair(seed: int, num_envs=2):
     display(HBox(maze.venv_editor(venv, check_on_dist=False)))
     return venv
 
-def load_venv_pair(path: str):
-    """ Load a venv pair from a file. """
-    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
-    with open(path_prefix + path, 'rb') as f:
-        state_bytes = pkl.load(f) 
-    venv.env.callmethod('set_state', state_bytes)
-    def _step(*_, **__):
-        raise NotImplementedError('This venv is only used as a template for copy_env')
-    venv.step = _step
-    return venv
-
 # %%
 # Load model
 
@@ -198,7 +187,7 @@ def patch_from_venv_pair(venv : ProcgenGym3Env, layer_name : str, hook : cmh.Mod
     values = values_from_venv(layer_name, hook, venv)
     return get_values_diff_patch(values=values, layer_name=layer_name, coeff=coeff)
 
-def cheese_diff_values(seed : int, layer_name : str, hook: cmh.ModuleHook): # TODO rename to cheese_ablation_values ?
+def cheese_diff_values(seed : int, layer_name : str, hook: cmh.ModuleHook): 
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
     venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
