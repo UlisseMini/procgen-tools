@@ -1110,6 +1110,8 @@ def get_random_obs_opts(
                     cheese_pos_outer = cheese_pos_outer_this,
                     next_pos_cheese_outer = next_pos_cheese_outer,
                     next_pos_corner_outer = next_pos_corner_outer,
+                    path_to_cheese = path_to_cheese,
+                    path_to_corner = path_to_corner,
                     maze_dim = maze_dim_this,
                 ))
 
