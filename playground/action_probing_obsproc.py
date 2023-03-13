@@ -156,10 +156,7 @@ if __name__ == "__main__":
 
     else:
         with open(cache_fn, 'rb') as fl:
-            try:
-                obs, values_by_label, logits, next_action_cheese, next_action_corner = pickle.load(fl)
-            except:
-                obs, obs_meta, next_action_cheese, next_action_corner = pickle.load(fl)
+            obs, obs_meta, next_action_cheese, next_action_corner = pickle.load(fl)
 
     # Run observations through a hooked network, extract different activations.
     # Do it batches to avoid running out of RAM!
