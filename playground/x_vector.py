@@ -19,18 +19,51 @@ AX_SIZE = 4
 
 pwd = 'playground'
 mazes_folder = 'mazes'
-basenames = {'top right': 'top_right_path', 'cheese top right': 'cheese_top_right'}
-venv_fname = f'{pwd}/{mazes_folder}/{basenames["top right"]}.pkl'
+basenames = {'top right': 'top_right_path', 'cheese top right': 'cheese_top_right', 'translate': 'translate'}
+venv_fname = f'{pwd}/{mazes_folder}/{basenames["translate"]}.pkl'
 
 # %% Try generating a top-right vector; prediction of .3 that my first idea works (EDIT: It did!)
+@interact
+def generate_x_vector(basename=Dropdown(options=basenames.keys(), value='top right')):
+    # Make a field for making new basenames
+    new_basename = widgets.Text(
+        value='',
+        placeholder='Type something',
+        description='New basename:',
+        disabled=False
+    )
+    
+    # Make a load button 
+    load_button = widgets.Button(description='Load')
+
+    def load_cb():
+        venv = maze.load_venv(f'{pwd}/{mazes_folder}/{basenames[new_basename.value]}.pkl')
+        maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
+        display(maze_editors)
+    load_button.on_click(lambda x: load_cb())
+    display(HBox([new_basename, load_button]))
+    
+    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
+    maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
+    display(maze_editors)
+
+    def save_cb():
+        maze.save_venv(venv=venv, filename=f'{pwd}/{mazes_folder}/{basenames[basename]}.pkl')
+    
+    # Make a save button
+    save_button = widgets.Button(description='Save')
+    save_button.on_click(lambda x: save_cb())
+    display(save_button)
 load_venv = False
 if load_venv:
     venv = maze.load_venv(venv_fname)
 else:
-    venv = maze.create_venv(num=2, start_level=0, num_levels=1)
+    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
     maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
     display(maze_editors)
 # %%
+# Prompt user before saving TODO also get top_right_path.pkl
+# TODO fix rename of function in gatherdata/metrics?
 if not load_venv: maze.save_venv(venv=venv, filename=venv_fname) 
 # %% Get a value patch from this pair of envs
 # Compare vector fields for this patch
@@ -38,7 +71,7 @@ if not load_venv: maze.save_venv(venv=venv, filename=venv_fname)
 def examine_patch(target_seed=IntSlider(min=0,max=100,step=1,value=0), coeff=FloatSlider(min=-5,max=5,step=.1,value=1)): 
     patch = patch_utils.patch_from_venv_pair(venv, layer_name=default_layer, hook=hook, coeff=coeff)
     target_venv = maze.create_venv(num=1, start_level=target_seed, num_levels=1)
-    fig, axs, info = patch_utils.compare_patched_vfields(target_venv, patch, hook, render_padding=False, ax_size=AX_SIZE)
+    fig, axs, info = patch_utils.compare_patched_vfields(venv, patch, hook, render_padding=False, ax_size=AX_SIZE, show_components=True)
     plt.show(fig)
 
 # %% Test patch composition with cheese vector patch (credence: 75% this works) EDIT: It did

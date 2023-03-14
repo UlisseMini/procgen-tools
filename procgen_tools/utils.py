@@ -48,6 +48,16 @@ def _fetch(url, filepath: str = None, force: bool = False):
     # extract file (if needed)
     if filepath.endswith('.tgz') or filepath.endswith('.tar.gz'):
         _extract_tgz(filepath)
+
+def cd_into_procgen_tools():
+    """ Go up until we're in the procgen-tools directory. Assumes we're in a subdirectory of procgen-tools. """
+    original_path = Path.cwd()
+    # Assert procgen-tools is a parent directory
+    while Path.cwd().name != 'procgen-tools':
+        if Path.cwd().parent == Path.cwd(): # we're at the root
+            os.chdir(original_path)
+            raise Exception('Could not find procgen-tools directory')
+        os.chdir('..')
         
 
 # %%
@@ -56,10 +66,9 @@ def setup_dir():
     """
     Get into the procgen-tools directory, create it if it doesn't exist.
     """
-    if Path.cwd().name in ('experiments', 'playground'):
-        os.chdir('..')
-
-    if Path.cwd().name != 'procgen-tools':
+    try:
+        cd_into_procgen_tools()
+    except Exception:
         Path('procgen-tools').mkdir(parents=True, exist_ok=True)
         os.chdir('procgen-tools')
 
