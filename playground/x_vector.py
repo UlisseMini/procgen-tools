@@ -23,44 +23,51 @@ basenames = {'top right': 'top_right_path', 'cheese top right': 'cheese_top_righ
 venv_fname = f'{pwd}/{mazes_folder}/{basenames["translate"]}.pkl'
 
 # %% Try generating a top-right vector; prediction of .3 that my first idea works (EDIT: It did!)
-@interact
-def generate_x_vector(basename=Dropdown(options=basenames.keys(), value='top right')):
-    # Make a field for making new basenames
-    new_basename = widgets.Text(
-        value='',
-        placeholder='Type something',
-        description='New basename:',
-        disabled=False
-    )
-    
-    # Make a load button 
-    load_button = widgets.Button(description='Load')
+# venv = maze.create_venv(num=2, start_level=1, num_levels=1)
+venv = maze.load_venv(f'{pwd}/{mazes_folder}/translate.pkl')
+maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
+output = Output()
+# with output: TODO get this working
+#    display(maze_editors)
+display(maze_editors)
 
-    def load_cb():
-        venv = maze.load_venv(f'{pwd}/{mazes_folder}/{basenames[new_basename.value]}.pkl')
-        maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
+# %% Interactively save and load mazes
+# Make a load button 
+load_button = widgets.Button(description='Load')
+
+# Get a dropdown of basenames from the mazes folder
+basenames_from_folder = os.listdir(mazes_folder)
+basenames_from_folder = [os.path.splitext(basename)[0] for basename in basenames_from_folder]
+load_dropdown = widgets.Dropdown(
+    options=basenames_from_folder,
+    value='top right',
+    description='Basename:',
+    disabled=False,
+)
+
+def load_cb():
+    venv = maze.load_venv(f'{pwd}/{mazes_folder}/{basenames[load_dropdown.value]}.pkl')
+    maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False) # TODO update with callable?
+    output.clear_output()
+    with output:
         display(maze_editors)
-    load_button.on_click(lambda x: load_cb())
-    display(HBox([new_basename, load_button]))
-    
-    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
-    maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
-    display(maze_editors)
 
-    def save_cb():
-        maze.save_venv(venv=venv, filename=f'{pwd}/{mazes_folder}/{basenames[basename]}.pkl')
-    
-    # Make a save button
-    save_button = widgets.Button(description='Save')
-    save_button.on_click(lambda x: save_cb())
-    display(save_button)
-load_venv = False
-if load_venv:
-    venv = maze.load_venv(venv_fname)
-else:
-    venv = maze.create_venv(num=2, start_level=1, num_levels=1)
-    maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
-    display(maze_editors)
+load_button.on_click(lambda x: load_cb())
+display(HBox([load_dropdown, load_button]))
+
+# Make a save button         
+def save_cb():
+    maze.save_venv(venv=venv, filename=f'{pwd}/{mazes_folder}/{basenames[new_basename.value]}.pkl')
+new_basename = widgets.Text(
+    value='',
+    placeholder='Type something',
+    description='New basename:',
+    disabled=False
+)
+save_button = widgets.Button(description='Save')
+save_button.on_click(lambda x: save_cb())
+display(save_button)
+
 # %%
 # Prompt user before saving TODO also get top_right_path.pkl
 # TODO fix rename of function in gatherdata/metrics?
@@ -108,4 +115,17 @@ display(vf_box)
 stats_venv = maze.create_venv(num=2, start_level=0, num_levels=1)
 vf_boxes = visualization.custom_vfields(venv=stats_venv, policy=hook.network, show_full=True, ax_size=AX_SIZE)
 display(vf_boxes)
+
+# %% Try modifying channels which encode mouse pos
+mouse_channels = [68, 69, 76, 83, 93, 96, 97, 111, 121, 126] # NOTE only half of mouse channels # 20% that this works reasonably well
+@interact
+def modify_mouse_channels(seed=IntSlider(min=0,max=100,step=1,value=0), use_default = Checkbox(value=True), value=FloatSlider(min=-5,max=5,step=.1,value=1)):
+    mouse_pos = maze.get_mouse_pos_from_seed(seed)
+    grid_pos = visualization.get_channel_from_grid_pos(mouse_pos, layer=default_layer)
+    patch = patch_utils.combined_pixel_patch(layer_name=default_layer, value=value, coord=grid_pos, channels=mouse_channels, default=use_default)
+    
+    target_venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    fig, axs, info = patch_utils.compare_patched_vfields(target_venv, patch, hook, render_padding=False, ax_size=AX_SIZE)
+    plt.show(fig)
+
 # %%

@@ -414,11 +414,13 @@ def remove_all_cheese(venv):
     venv.env.callmethod("set_state", state_bytes_list)
     return venv
 
-def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
+def get_mouse_pos(grid: np.ndarray, flip_y : bool = False) -> typing.Tuple[int, int]:
     "Get (x, y) position of the mouse in the grid"
     num_mouses = (grid == MOUSE).sum()
     assert num_mouses == 1, f'{num_mouses} mice, should be 1'
-    return tuple(ix[0] for ix in np.where(grid == MOUSE))
+    row, col = np.where(grid == MOUSE)
+    row, col = row[0], col[0]
+    return ((WORLD_DIM - 1) - row if flip_y else row), col 
 
 
 def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
@@ -594,21 +596,20 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
 
 def venv_from_grid(grid: np.ndarray) -> ProcgenGym3Env: #
     "Get a venv with the given inner grid"
-    n_mice = (grid==MOUSE).sum()
+    grid_copy = grid.copy()
+    n_mice = (grid_copy==MOUSE).sum()
     if n_mice == 0:
-        grid = grid.copy()
-
         blocked_idx = 0 # Assumes mouse should be placed on diagonal
-        while grid[blocked_idx, blocked_idx] == BLOCKED:
+        while grid_copy[blocked_idx, blocked_idx] == BLOCKED:
             blocked_idx += 1
-        assert grid[blocked_idx, blocked_idx] == EMPTY, f'grid[{blocked_idx},{blocked_idx}] is not empty'
+        assert grid_copy[blocked_idx, blocked_idx] == EMPTY, f'grid[{blocked_idx},{blocked_idx}] is not empty'
 
-        grid[blocked_idx, blocked_idx] = MOUSE
-    assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
+        grid_copy[blocked_idx, blocked_idx] = MOUSE
+    assert (grid_copy==MOUSE).sum() == 1, 'grid has {} mice'.format((grid_copy==MOUSE).sum())
 
     venv = create_venv(num=1, num_levels=1, start_level=0)
     state = state_from_venv(venv, idx=0)
-    state.set_grid(grid, pad=True)
+    state.set_grid(grid_copy, pad=True)
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
@@ -620,7 +621,7 @@ def get_filled_venv(fill_type : int = EMPTY) -> ProcgenGym3Env:
     for block_type in (BLOCKED, CHEESE, EMPTY):
         grid[grid == block_type] = fill_type
     grid[mouse_pos] = MOUSE # Don't overwrite the mouse
-    return venv_from_grid(grid=grid)
+    return venv_from_grid(grid_copy=grid)
 
 def get_padding(grid: np.ndarray) -> int:
     """ Return the padding of the (inner) grid, i.e. the number of walls around the maze. """
@@ -874,7 +875,12 @@ def get_cheese_pos_from_seed(seed : int, flip_y : bool = False):
     grid = get_full_grid_from_seed(seed)
     return get_cheese_pos(grid, flip_y=flip_y)
 
-def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
+def get_mouse_pos_from_seed(seed : int, flip_y : bool = False):
+    """ Get the mouse position from a maze seed. """
+    grid = get_full_grid_from_seed(seed)
+    return get_mouse_pos(grid, flip_y=flip_y)
+
+def get_mazes_with_mouse_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
     """ Generate a list of maze seeds with cheese at the specified location. """
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
     assert (0 <= coord < WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."

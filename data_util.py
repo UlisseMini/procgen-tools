@@ -75,7 +75,7 @@ class Episode():
     @property
     @cache
     def state_vals(self):
-        return maze.parse_maze_state_bytes(self.initial_state_bytes)
+        return maze._parse_maze_state_bytes(self.initial_state_bytes)
 
     @cache
     def outer_grid(self):
