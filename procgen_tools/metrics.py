@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Optional, Tuple, Dict, Callable
-from . import maze
+from procgen_tools import maze
 
 # Helpers
 
@@ -169,4 +169,5 @@ def taxi_dist_decision_square_5x5(grid: np.ndarray, **kwargs) -> float:
 @metric
 def cheese_coord_norm(grid: np.ndarray, **kwargs) -> float:
     "Norm of the outer grid coordinates of cheese."
-    return np.linalg.norm(maze.outer_grid_coords(len(grid), maze.get_cheese_pos(grid)))
+    outer_grid = maze.outer_grid(grid)
+    return np.linalg.norm( maze.get_cheese_pos(outer_grid))

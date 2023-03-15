@@ -34,7 +34,6 @@ display(maze_editors)
 # %% Interactively save and load mazes
 # Make a load button 
 load_button = widgets.Button(description='Load')
-
 # Get a dropdown of basenames from the mazes folder
 basenames_from_folder = os.listdir(mazes_folder)
 basenames_from_folder = [os.path.splitext(basename)[0] for basename in basenames_from_folder]

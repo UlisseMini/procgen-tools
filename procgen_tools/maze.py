@@ -295,8 +295,19 @@ def _serialize_maze_state(state_vals: StateValues, assert_=DEBUG) -> bytes:
         assert _parse_maze_state_bytes(state_bytes, assert_=False) == state_vals, 'deserialize(serialize(state_vals)) != state_vals'
     return state_bytes
 
+# Backwards compatability with data_utils
+def get_grid(state_vals: StateValues):
+    "Get the grid from state_vals"
+    world_dim = state_vals['world_dim'].val
+    grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
+    return grid_vals
 
+def get_mouse_pos_sv(state_vals : StateValues) -> Square:
+    """ Get the mouse position from state_vals """
+    ents = state_vals['ents'][0]
+    return int(ents['y'].val), int(ents['x'].val)
 
+# EnvState functions
 class EnvState():
     def __init__(self, state_bytes: bytes):
         self.state_bytes = state_bytes
@@ -346,7 +357,7 @@ class EnvState():
         Set the grid of the maze.
         """
         if pad:
-            grid = outer_grid(grid, self.world_dim, assert_=False)
+            grid = outer_grid(grid, assert_=False)
         assert grid.shape == (self.world_dim, self.world_dim)
 
         state_vals = self.state_vals
@@ -439,11 +450,11 @@ def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     return grid[bl:-bl, bl:-bl] if bl > 0 else grid # if bl == 0, then we don't need to do anything
 
 
-def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
+def outer_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     """
     The inverse of inner_grid(). Could also be called "pad_grid".
     """
-    bl = (world_dim - len(grid)) // 2
+    bl = (WORLD_DIM - len(grid)) // 2
     outer = np.pad(grid, bl, 'constant', constant_values=BLOCKED)
     if assert_:
         assert (inner_grid(outer, assert_=False) == grid).all()

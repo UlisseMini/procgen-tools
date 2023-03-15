@@ -1,5 +1,5 @@
 import warnings
-import procgen_tools.maze as maze
+from procgen_tools import maze
 from typing import List, Tuple
 from functools import cache
 import numpy as np
@@ -10,6 +10,7 @@ class Episode():
     """
     A recorded episode. Contains the following:
     - state_vals: dict of state vals on first timestep
+
     Has helpers to access: grid, inner_grid
     """
     __slots__ = (
@@ -34,6 +35,7 @@ class Episode():
         self.__setstate__(kwargs)
 
     def assert_valid(self):
+        # copilot wrote most of this <3
         assert isinstance(self.initial_state_bytes, bytes)
         assert isinstance(self.mouse_positions_outer, list)
         assert isinstance(self.rewards, list)
@@ -75,12 +77,11 @@ class Episode():
     @property
     @cache
     def state_vals(self):
-        return maze.parse_maze_state_bytes(self.initial_state_bytes)
+        return maze._parse_maze_state_bytes(self.initial_state_bytes)
 
     @cache
     def outer_grid(self):
-        state = maze.EnvState(self.state_vals)
-        return state.full_grid()
+        return maze.get_grid(self.state_vals)
 
     @property
     def steps(self) -> int:

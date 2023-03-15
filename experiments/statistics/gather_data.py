@@ -1,13 +1,13 @@
 from procgen import ProcgenGym3Env
 import torch
-import envs.maze as maze
-from models import load_policy
+from procgen_tools import maze
+from procgen_tools.models import load_policy
 from tqdm import tqdm
 import numpy as np
 import pickle
 from argparse import ArgumentParser
 import random
-from data_util import Episode
+from procgen_tools.data_utils import Episode
 
 def create_venv(num_levels = 1, start_level = 0):
     venv = ProcgenGym3Env(
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_file', type=str, default='./trained_models/maze_I/model_rand_region_5.pth')
     parser.add_argument('--num_timesteps', type=int, default=256, help='maximum timesteps per episode')
-    parser.add_argument('--num_episodes', type=int, default=10000, help='number of episodes to collect (agent finishes or times out)')
+    parser.add_argument('--num_episodes', type=int, default=1, help='number of episodes to collect (agent finishes or times out)')
     parser.add_argument('--argmax', action='store_true', help='argmax logits instead of sampling. often gets stuck, but when successful has less jittering')
 
     args = parser.parse_args()
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
         # grab initial_state_bytes and initial info for episode object
         states_bytes = venv.env.callmethod('get_state')[0]
-        states_vals = maze.parse_maze_state_bytes(states_bytes)
+        states_vals = maze._parse_maze_state_bytes(states_bytes)
         info = venv.env.get_info()
 
         # init episode object
@@ -68,7 +68,7 @@ if __name__ == '__main__':
                 break
 
             states_bytes = venv.env.callmethod('get_state')[0]
-            states_vals = maze.parse_maze_state_bytes(states_bytes)
+            states_vals = maze._parse_maze_state_bytes(states_bytes)
 
             rewards.append(float(rew[0]))
             actions.append(int(act[0]))
@@ -76,5 +76,6 @@ if __name__ == '__main__':
 
 
         # get basename of model file
-        with open(f'data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
+        present_dir = 'experiments/statistics'
+        with open(f'{present_dir}/data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
             pickle.dump(episode, f, protocol=pickle.HIGHEST_PROTOCOL)

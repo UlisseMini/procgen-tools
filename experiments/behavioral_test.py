@@ -24,6 +24,7 @@ from procgen_tools import maze
 from procgen_tools.models import load_policy
 from procgen_tools.metrics import metrics, decision_square 
 from procgen_tools.data_utils import load_episode
+from data_util import load_episode
 
 from IPython import display
 from glob import glob
@@ -78,6 +79,8 @@ for run in tqdm(runs):
 runs = recorded_runs; del recorded_runs
 got_cheese = np.array(got_cheese)
 len(got_cheese)
+
+# TODO only examine the filtered runs 
 
 # %%
 # We want to turn the metrics into a dataframe, so we have to convert them to numpy arrays
