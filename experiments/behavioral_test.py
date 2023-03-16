@@ -300,7 +300,7 @@ for x in range(n_runs):
 
 # Print the coefficient for each attribute, printing the label next to each coefficient (for the last run)
 display_coeff_table(clf, attributes)
-print("The average score is ", score_av/n_runs) # NOTE is this avg accuracy?
+print("The average score is ", total_score/n_runs) # NOTE is this avg accuracy?
 
 regression_coeff_signs = { key: (clf.coef_[0][i] > 0) for i, key in enumerate(claimed_attributes) }
 
@@ -359,3 +359,5 @@ for attrs in [claimed_attributes, filtered_rm.keys()]:
     print(vif)
 
 
+
+# %%
