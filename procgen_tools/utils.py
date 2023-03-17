@@ -11,7 +11,7 @@ from tqdm import tqdm
 def _extract_tgz(path):
     "Extracts a .tar.gz or .tgz file."
     assert path.endswith('.tgz') or path.endswith('.tar.gz')
-    with tarfile.open(path, 'r:gz') as tar:
+    with tarfile.open(path, 'r') as tar:
         members = tar.getmembers()
         t = tqdm(members)
         t.set_description(f'Extracting {path}')
@@ -73,7 +73,7 @@ def setup_dir():
         os.chdir('procgen-tools')
 
 
-def setup(force: bool = False, dl_data : bool = False, dl_episode_data : bool = False, dl_patch_data : bool = False):
+def setup(force: bool = False, dl_data : bool = False, dl_episode_data : bool = False, dl_patch_data : bool = False, dl_stats : bool = False):
     """
     cd into the procgen-tools directory then download and extract data files.
     """
@@ -93,6 +93,8 @@ def setup(force: bool = False, dl_data : bool = False, dl_episode_data : bool = 
         _fetch('https://nerdsniper.net/mats/patch_data.tgz', force=force)
     if dl_data:
         _fetch('https://nerdsniper.net/mats/data.tgz', force=force or force_redownload_vfields)
+    if dl_stats:
+         _fetch('https://nerdsniper.net/mats/episode_stats_data.tgz', force=True, filepath='experiments/statistics/episode_stats_data.tgz')
 
     _fetch('https://nerdsniper.net/mats/model_rand_region_5.pth', 'trained_models/maze_I/model_rand_region_5.pth', force=force)
 
