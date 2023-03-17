@@ -1,13 +1,14 @@
 from procgen import ProcgenGym3Env
 import torch
-import envs.maze as maze
-from models import load_policy
+from procgen_tools import maze
+from procgen_tools.models import load_policy
 from tqdm import tqdm
 import numpy as np
 import pickle
 from argparse import ArgumentParser
 import random
-from data_util import Episode
+from procgen_tools.data_utils import Episode
+
 
 def create_venv(num_levels = 1, start_level = 0):
     venv = ProcgenGym3Env(
@@ -31,15 +32,18 @@ if __name__ == '__main__':
     model_name = args.model_file.split('/')[-1][:-4]
 
     # determinism
-    random.seed(42)
+    max_seed = 1000000
+    rng = np.random.default_rng()
+    seeds = rng.choice(max_seed, size=args.num_episodes, replace=False)
 
-    for ep in tqdm(range(args.num_episodes)):
-        venv = create_venv(start_level=random.randint(0, 100000))
+    for seed in tqdm(seeds):
+        seed = int(seed)
+        venv = create_venv(start_level=seed)
         assert venv.num_envs == 1, 'Only one env supported (for now)'
 
         # grab initial_state_bytes and initial info for episode object
         states_bytes = venv.env.callmethod('get_state')[0]
-        states_vals = maze.parse_maze_state_bytes(states_bytes)
+        states_vals = maze._parse_maze_state_bytes(states_bytes)
         info = venv.env.get_info()
 
         # init episode object
@@ -50,7 +54,7 @@ if __name__ == '__main__':
             initial_state_bytes=states_bytes,
             mouse_positions_outer=mouse_positions_outer,
             actions=actions, rewards=rewards, sampler=sampler,
-            level_seed=int(info[0]["level_seed"]),
+            level_seed=seed,
         )
 
         policy.eval()
@@ -68,7 +72,7 @@ if __name__ == '__main__':
                 break
 
             states_bytes = venv.env.callmethod('get_state')[0]
-            states_vals = maze.parse_maze_state_bytes(states_bytes)
+            states_vals = maze._parse_maze_state_bytes(states_bytes)
 
             rewards.append(float(rew[0]))
             actions.append(int(act[0]))
@@ -76,5 +80,6 @@ if __name__ == '__main__':
 
 
         # get basename of model file
-        with open(f'data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
+        present_dir = 'experiments/statistics'
+        with open(f'{present_dir}/data/{model_name}-seed{seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
             pickle.dump(episode, f, protocol=pickle.HIGHEST_PROTOCOL)

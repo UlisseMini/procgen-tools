@@ -28,6 +28,7 @@ import circrl.module_hook as cmh
 import circrl.rollouts as cro
 
 import procgen_tools.models as models
+import procgen_tools.utils as utils
 from procgen import ProcgenGym3Env
 
 import os, sys
@@ -43,18 +44,16 @@ try:
   in_jupyter = True
 except NameError:
   in_jupyter = False
-PATH_PREFIX = '../' if in_jupyter else ''
+# PATH_PREFIX = '../' if in_jupyter else ''
 
 def load_model(rand_region : int = 5, num_actions : int = 15, use_small : bool = False):
     """ Load a model from the trained_models folder. Returns the policy and the hook. """
     model_name = 'maze_i' if use_small else f'maze_I/model_rand_region_{rand_region}'
     model_stub = f'trained_models/{model_name}.pth'
-    try:
-      model_path = '../' + model_stub
-      policy = models.load_policy(model_path, num_actions, t.device('cpu'))
-    except FileNotFoundError:
-      policy = models.load_policy(model_stub, num_actions, t.device('cpu'))
     
+    utils.cd_into_procgen_tools()
+
+    policy = models.load_policy(model_stub, num_actions, t.device('cpu'))
     hook = cmh.ModuleHook(policy)
     return policy, hook
 

@@ -176,7 +176,8 @@ figs/*.png
 *.json
 *.mp4
 *.png
-*.pkl
+*/*.pkl
+!playground/mazes/*.pkl # Don't ignore the maze files, they're useful for patching
 *~
 
 !README_files/*

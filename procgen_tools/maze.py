@@ -295,8 +295,19 @@ def _serialize_maze_state(state_vals: StateValues, assert_=DEBUG) -> bytes:
         assert _parse_maze_state_bytes(state_bytes, assert_=False) == state_vals, 'deserialize(serialize(state_vals)) != state_vals'
     return state_bytes
 
+# Backwards compatability with data_utils
+def get_grid(state_vals: StateValues):
+    "Get the grid from state_vals"
+    world_dim = state_vals['world_dim'].val
+    grid_vals = np.array([dd['i'].val for dd in state_vals['data']]).reshape(world_dim, world_dim)
+    return grid_vals
 
+def get_mouse_pos_sv(state_vals : StateValues) -> Square:
+    """ Get the mouse position from state_vals """
+    ents = state_vals['ents'][0]
+    return int(ents['y'].val), int(ents['x'].val)
 
+# EnvState functions
 class EnvState():
     def __init__(self, state_bytes: bytes):
         self.state_bytes = state_bytes
@@ -346,7 +357,7 @@ class EnvState():
         Set the grid of the maze.
         """
         if pad:
-            grid = outer_grid(grid, self.world_dim, assert_=False)
+            grid = outer_grid(grid, assert_=False)
         assert grid.shape == (self.world_dim, self.world_dim)
 
         state_vals = self.state_vals
@@ -414,11 +425,13 @@ def remove_all_cheese(venv):
     venv.env.callmethod("set_state", state_bytes_list)
     return venv
 
-def get_mouse_pos(grid: np.ndarray) -> typing.Tuple[int, int]:
+def get_mouse_pos(grid: np.ndarray, flip_y : bool = False) -> typing.Tuple[int, int]:
     "Get (x, y) position of the mouse in the grid"
     num_mouses = (grid == MOUSE).sum()
     assert num_mouses == 1, f'{num_mouses} mice, should be 1'
-    return tuple(ix[0] for ix in np.where(grid == MOUSE))
+    row, col = np.where(grid == MOUSE)
+    row, col = row[0], col[0]
+    return ((WORLD_DIM - 1) - row if flip_y else row), col 
 
 
 def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
@@ -426,22 +439,22 @@ def inner_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     Get the inside of the maze, ie. the stuff within the outermost walls.
     inner_grid(inner_grid(x)) = inner_grid(x) for all x.
     """
-    # uses the fact that the mouse always starts in the bottom left.
-    bl = next(i for i in range(len(grid)) if grid[i][i] != BLOCKED)
-    if bl == 0: # edgecase! the whole grid is the inner grid.
-        return grid
+    # Find the amount of padding on the maze, where padding is BLOCKED
+    # Use numpy to test if each square is BLOCKED
+    # If it is, then it's part of the padding
+    bl = 0 
+    # Check if the top, bottom, left, and right are all blocked
+    while (grid[bl, :] == BLOCKED).all() and (grid[-bl-1, :] == BLOCKED).all() and (grid[:, bl] == BLOCKED).all() and (grid[:, -bl-1] == BLOCKED).all():
+        bl += 1 
+    
+    return grid[bl:-bl, bl:-bl] if bl > 0 else grid # if bl == 0, then we don't need to do anything
 
-    inner = grid[bl:-bl, bl:-bl]
-    if assert_:
-        assert (outer_grid(inner, grid.shape[0], assert_=False) == grid).all()
-    return inner
 
-
-def outer_grid(grid: np.ndarray, world_dim: int, assert_=True) -> np.ndarray:
+def outer_grid(grid: np.ndarray, assert_=True) -> np.ndarray:
     """
     The inverse of inner_grid(). Could also be called "pad_grid".
     """
-    bl = (world_dim - len(grid)) // 2
+    bl = (WORLD_DIM - len(grid)) // 2
     outer = np.pad(grid, bl, 'constant', constant_values=BLOCKED)
     if assert_:
         assert (inner_grid(outer, assert_=False) == grid).all()
@@ -592,18 +605,22 @@ def on_distribution(grid: np.ndarray, p: Callable = print, full: bool = False) -
     return True
 
 
-def venv_from_grid(grid: np.ndarray):
+def venv_from_grid(grid: np.ndarray) -> ProcgenGym3Env: #
     "Get a venv with the given inner grid"
-    n_mice = (grid==MOUSE).sum()
+    grid_copy = grid.copy()
+    n_mice = (grid_copy==MOUSE).sum()
     if n_mice == 0:
-        grid = grid.copy()
-        assert grid[0,0] == EMPTY, 'grid[0,0] is not empty'
-        grid[0,0] = MOUSE
-    assert (grid==MOUSE).sum() == 1, 'grid has {} mice'.format((grid==MOUSE).sum())
+        blocked_idx = 0 # Assumes mouse should be placed on diagonal
+        while grid_copy[blocked_idx, blocked_idx] == BLOCKED:
+            blocked_idx += 1
+        assert grid_copy[blocked_idx, blocked_idx] == EMPTY, f'grid[{blocked_idx},{blocked_idx}] is not empty'
+
+        grid_copy[blocked_idx, blocked_idx] = MOUSE
+    assert (grid_copy==MOUSE).sum() == 1, 'grid has {} mice'.format((grid_copy==MOUSE).sum())
 
     venv = create_venv(num=1, num_levels=1, start_level=0)
     state = state_from_venv(venv, idx=0)
-    state.set_grid(grid, pad=True)
+    state.set_grid(grid_copy, pad=True)
     venv.env.callmethod("set_state", [state.state_bytes])
     return venv
 
@@ -615,7 +632,7 @@ def get_filled_venv(fill_type : int = EMPTY) -> ProcgenGym3Env:
     for block_type in (BLOCKED, CHEESE, EMPTY):
         grid[grid == block_type] = fill_type
     grid[mouse_pos] = MOUSE # Don't overwrite the mouse
-    return venv_from_grid(grid=grid)
+    return venv_from_grid(grid_copy=grid)
 
 def get_padding(grid: np.ndarray) -> int:
     """ Return the padding of the (inner) grid, i.e. the number of walls around the maze. """
@@ -869,7 +886,12 @@ def get_cheese_pos_from_seed(seed : int, flip_y : bool = False):
     grid = get_full_grid_from_seed(seed)
     return get_cheese_pos(grid, flip_y=flip_y)
 
-def get_mazes_with_cheese_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
+def get_mouse_pos_from_seed(seed : int, flip_y : bool = False):
+    """ Get the mouse position from a maze seed. """
+    grid = get_full_grid_from_seed(seed)
+    return get_mouse_pos(grid, flip_y=flip_y)
+
+def get_mazes_with_mouse_at_location(cheese_location : Tuple[int, int], num_mazes : int = 5, skip_seed : int = -1):
     """ Generate a list of maze seeds with cheese at the specified location. """
     assert len(cheese_location) == 2, "Cheese location must be a tuple of length 2."
     assert (0 <= coord < WORLD_DIM for coord in cheese_location), "Cheese location must be within the maze."
@@ -959,7 +981,7 @@ def load_venv(filename : str):
     state_bytes = pkl.load(open(filename, "rb"))
     num_envs = len(state_bytes)
     venv = create_venv(num=num_envs, start_level=0, num_levels=1)
-    venv.env.callmethod("set_state", [state_bytes])
+    venv.env.callmethod("set_state", state_bytes)
     return venv
 
 def save_venv(venv : ProcgenGym3Env, filename : str):
