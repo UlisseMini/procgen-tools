@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 import random
 from procgen_tools.data_utils import Episode
 
+
 def create_venv(num_levels = 1, start_level = 0):
     venv = ProcgenGym3Env(
         num=1,
@@ -22,7 +23,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_file', type=str, default='./trained_models/maze_I/model_rand_region_5.pth')
     parser.add_argument('--num_timesteps', type=int, default=256, help='maximum timesteps per episode')
-    parser.add_argument('--num_episodes', type=int, default=1, help='number of episodes to collect (agent finishes or times out)')
+    parser.add_argument('--num_episodes', type=int, default=10000, help='number of episodes to collect (agent finishes or times out)')
     parser.add_argument('--argmax', action='store_true', help='argmax logits instead of sampling. often gets stuck, but when successful has less jittering')
 
     args = parser.parse_args()
@@ -31,10 +32,13 @@ if __name__ == '__main__':
     model_name = args.model_file.split('/')[-1][:-4]
 
     # determinism
-    random.seed(42)
+    max_seed = 1000000
+    rng = np.random.default_rng()
+    seeds = rng.choice(max_seed, size=args.num_episodes, replace=False)
 
-    for ep in tqdm(range(args.num_episodes)):
-        venv = create_venv(start_level=random.randint(0, 100000))
+    for seed in tqdm(seeds):
+        seed = int(seed)
+        venv = create_venv(start_level=seed)
         assert venv.num_envs == 1, 'Only one env supported (for now)'
 
         # grab initial_state_bytes and initial info for episode object
@@ -50,7 +54,7 @@ if __name__ == '__main__':
             initial_state_bytes=states_bytes,
             mouse_positions_outer=mouse_positions_outer,
             actions=actions, rewards=rewards, sampler=sampler,
-            level_seed=int(info[0]["level_seed"]),
+            level_seed=seed,
         )
 
         policy.eval()
@@ -77,5 +81,5 @@ if __name__ == '__main__':
 
         # get basename of model file
         present_dir = 'experiments/statistics'
-        with open(f'{present_dir}/data/{model_name}-ep{ep}-seed{episode.level_seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
+        with open(f'{present_dir}/data/{model_name}-seed{seed}-{sampler}-{episode.steps}steps.pkl', 'wb') as f: # TODO: Compression, batch trajectories
             pickle.dump(episode, f, protocol=pickle.HIGHEST_PROTOCOL)
