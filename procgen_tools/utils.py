@@ -103,7 +103,7 @@ def setup(
             force=force or force_redownload_vfields,
         )
     if dl_stats:
-        _fetch("https://nerdsniper.net/mats/episode_stats_data.tgz", force=True)
+        _fetch("https://nerdsniper.net/mats/episode_stats_data.tgz", force=force)
 
     _fetch(
         "https://nerdsniper.net/mats/model_rand_region_5.pth",
