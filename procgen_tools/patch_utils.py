@@ -3,7 +3,7 @@ import procgen_tools.maze as maze
 import procgen_tools.visualization as viz
 
 # IMPORTANT: Files still import these from patch_utils, so for backwards compatibility, we need to import them here.
-from procgen_tools.models import get_cheese_venv_pair, get_custom_venv_pair
+from procgen_tools.maze import get_cheese_venv_pair, get_custom_venv_pair
 
 # %%
 
