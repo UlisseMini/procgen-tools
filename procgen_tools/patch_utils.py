@@ -2,6 +2,8 @@ from procgen_tools.imports import *
 import procgen_tools.maze as maze
 import procgen_tools.visualization as viz
 
+# IMPORTANT: Files still import these from patch_utils, so for backwards compatibility, we need to import them here.
+from procgen_tools.models import get_cheese_venv_pair, get_custom_venv_pair
 
 # %%
 
@@ -170,7 +172,7 @@ def patch_from_venv_pair(venv : ProcgenGym3Env, layer_name : str, hook : cmh.Mod
 
 def cheese_diff_values(seed : int, layer_name : str, hook: cmh.ModuleHook): 
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
-    venv = maze.get_cheese_venv_pair(seed) 
+    venv = get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
 
 def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True, show_original : bool = True, show_components : bool = False):
@@ -212,7 +214,7 @@ def plot_patched_vfields(seed: int, coeff: float, layer_name: str, hook: cmh.Mod
     """ Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, layer_name, hook) if values is None else values
     patches = get_values_diff_patch(values, coeff, layer_name) 
-    venv = maze.copy_venv(maze.get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
+    venv = maze.copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size, show_components=show_components)
     obj.update({
