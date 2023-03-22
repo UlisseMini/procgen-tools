@@ -1,22 +1,11 @@
 from procgen_tools.imports import * 
 import procgen_tools.maze as maze
-import procgen_tools.vfield as vfield
+import procgen_tools.visualization as viz
 
-def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
-    "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
-    venv = maze.create_venv(num=2, start_level=seed, num_levels=1)
 
-    for idx in range(2):
-        if has_cheese_tup[idx]: continue # Skip if we want cheese in this environment
-        maze.remove_cheese(venv, idx=idx)
+# %%
 
-    return venv
-
-def get_custom_venv_pair(seed: int, num_envs=2):
-    """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
-    venv = maze.create_venv(num=num_envs, start_level=seed, num_levels=1)
-    display(HBox(maze.venv_editor(venv, check_on_dist=False)))
-    return venv
+NUM_CHANNEL_DICT = dict([(layer_name, models.num_channels(hook, layer_name)) for layer_name in labels if layer_name != '_out']) # NOTE assumes existence of "labels" and "hook" variables
 
 # %%
 # Load model
@@ -37,14 +26,6 @@ def logits_to_action_plot(logits, title=''):
     prob_dict = models.human_readable_actions(t.distributions.categorical.Categorical(probs=prob))
     prob_dist = t.stack(list(prob_dict.values()))
     px.imshow(prob_dist, y=[k.title() for k in prob_dict.keys()],title=title).show()
-
-def num_channels(hook : cmh.ModuleHook, layer_name : str):
-    """ Get the number of channels in the given layer. """
-    # Ensure hook has been run on dummy input
-    assert hook.get_value_by_label(layer_name) is not None, "Hook has not been run on any input"
-    return hook.get_value_by_label(layer_name).shape[1]
-
-NUM_CHANNEL_DICT = dict([(layer_name, num_channels(hook, layer_name)) for layer_name in labels if layer_name != '_out']) # NOTE assumes existence of "labels" and "hook" variables
 
 # PATCHES
 def channel_patch_or_broadcast(layer_name : str,  patch_fn : Callable[[np.ndarray], np.ndarray], channel : int = -1):
@@ -189,7 +170,7 @@ def patch_from_venv_pair(venv : ProcgenGym3Env, layer_name : str, hook : cmh.Mod
 
 def cheese_diff_values(seed : int, layer_name : str, hook: cmh.ModuleHook): 
     """ Get the cheese/no-cheese activations at the layer for the given seed. """
-    venv = get_cheese_venv_pair(seed) 
+    venv = maze.get_cheese_venv_pair(seed) 
     return values_from_venv(layer_name, hook, venv)
 
 def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.ModuleHook, render_padding: bool = False, ax_size : int = 4, reuse_first : bool = True, show_diff : bool = True, show_original : bool = True, show_components : bool = False):
@@ -211,11 +192,11 @@ def compare_patched_vfields(venv : ProcgenGym3Env, patches : dict, hook: cmh.Mod
     assert 1 <= venv.num_envs <= 2, "Needs one or environments to compare the vector fields"
     venv1, venv2 = maze.copy_venv(venv, 0), maze.copy_venv(venv, 0 if venv.num_envs == 1 or reuse_first else 1)
 
-    original_vfield = vfield.vector_field(venv1, hook.network)
+    original_vfield = viz.vector_field(venv1, hook.network)
     with hook.use_patches(patches):
-        patched_vfield = vfield.vector_field(venv2, hook.network)
+        patched_vfield = viz.vector_field(venv2, hook.network)
 
-    fig, axs, vf_diff = vfield.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff, show_original=show_original, show_components=show_components)
+    fig, axs, vf_diff = viz.plot_vfs(original_vfield, patched_vfield, render_padding=render_padding, ax_size=ax_size, show_diff=show_diff, show_original=show_original, show_components=show_components)
 
     obj = {
         'patches': patches,
@@ -231,7 +212,7 @@ def plot_patched_vfields(seed: int, coeff: float, layer_name: str, hook: cmh.Mod
     """ Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff. """
     values = cheese_diff_values(seed, layer_name, hook) if values is None else values
     patches = get_values_diff_patch(values, coeff, layer_name) 
-    venv = maze.copy_venv(get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
+    venv = maze.copy_venv(maze.get_cheese_venv_pair(seed) if venv is None else venv, 0) # Get env with cheese present / first env in the pair
 
     fig, axs, obj = compare_patched_vfields(venv, patches, hook, render_padding=render_padding, ax_size=ax_size, show_components=show_components)
     obj.update({

@@ -20,6 +20,8 @@ import networkx as nx
 import copy
 from warnings import warn
 from tqdm.auto import tqdm
+from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
+from IPython.display import display
 
 from procgen import ProcgenGym3Env
 
@@ -660,7 +662,6 @@ def render_outer_grid(grid: np.ndarray):
     return venv.env.get_info()[0]['rgb']
 
 def grid_editor(grid: np.ndarray, node_radius='8px', delay=0.01, callback=None, check_on_dist=True, show_full : bool = False):
-    from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
     import time
 
     CELL_TO_COLOR = {EMPTY: '#D9D9D6', BLOCKED: '#A47449', CHEESE: '#EAAA00', MOUSE: '#393D47'}
@@ -999,6 +1000,24 @@ def move_cheese_in_state(state, new_cheese_pos):
     grid[grid == CHEESE] = EMPTY
     grid[new_cheese_pos] = CHEESE
     state.set_grid(grid)
+
+
+def get_custom_venv_pair(seed: int, num_envs=2):
+    """ Allow the user to edit num_envs levels from a seed. Return a venv containing both environments. """
+    venv = create_venv(num=num_envs, start_level=seed, num_levels=1)
+    display(HBox(venv_editor(venv, check_on_dist=False)))
+    return venv
+
+def get_cheese_venv_pair(seed: int, has_cheese_tup : Tuple[bool, bool] = (True, False)):
+    "Return a venv of 2 environments from a seed, with cheese in the first environment if has_cheese_tup[0] and in the second environment if has_cheese_tup[1]."
+    venv = create_venv(num=2, start_level=seed, num_levels=1)
+
+    for idx in range(2):
+        if has_cheese_tup[idx]: continue # Skip if we want cheese in this environment
+        remove_cheese(venv, idx=idx)
+
+    return venv
+
 
 def get_random_obs_opts(
         num_obs : int = 1, 
