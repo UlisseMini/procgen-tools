@@ -18,6 +18,9 @@ plotly>=5.13.0
 networkx>=3.0
 
 
+# Idk, random fancy stuff
+statsmodels
+prettytable
 
 # Build procgenAISC, not needed for now
 

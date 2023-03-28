@@ -242,3 +242,10 @@ def load_policy(model_file: str, action_size: int, device = None) -> Categorical
     policy.load_state_dict(checkpoint['model_state_dict'])
     return policy
 
+
+def num_channels(hook, layer_name: str):
+    """ Get the number of channels in the given layer. """
+    # Ensure hook has been run on dummy input
+    assert hook.get_value_by_label(layer_name) is not None, "Hook has not been run on any input"
+    return hook.get_value_by_label(layer_name).shape[1]
+
