@@ -115,9 +115,10 @@ seed_slider = IntSlider(min=0, max=100, step=1, value=0)
 layer_slider = Dropdown(options=labels, value=default_layer)
 channel_slider = IntSlider(min=-1, max=127, step=1, value=55)
 
+from procgen_tools import models
 def random_channel_patch(seed : int, layer_name : str, channel : int):
     """ Replace the given channel's activations with values from a randomly sampled observation. This invokes patch_utils.get_random_patch from patch_utils. If channel=-1, then all channels are replaced. """
-    channel_slider.max = patch_utils.num_channels(hook, layer_name) -1
+    channel_slider.max = models.num_channels(hook, layer_name) -1
     channel = channel_slider.value = min(channel_slider.value, channel_slider.max)
 
     venv = patch_utils.get_cheese_venv_pair(seed=seed)
