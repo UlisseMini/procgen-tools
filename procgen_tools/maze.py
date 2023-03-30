@@ -1558,9 +1558,7 @@ def venv_with_all_mouse_positions(venv):
         state_bytes_list.append(env_state.state_bytes)
         env_state.state_bytes = sb_back
 
-    threads = (
-        1 if len(legal_mouse_positions) < 100 else os.cpu_count()
-    )  # bullshit
+    threads = 1 if len(legal_mouse_positions) < 100 else os.cpu_count()
     venv_all = create_venv(
         num=len(legal_mouse_positions),
         num_threads=threads,
