@@ -1051,6 +1051,24 @@ def get_inner_grid_from_seed(seed: int):
     return state.inner_grid()
 
 
+def rand_seed_with_size(min_size: int = 3, max_size: int = WORLD_DIM) -> int:
+    """Generate a random seed with a maze of size between min_size and
+    max_size. Rejection sampling is used to ensure that the maze size is
+    in the desired range."""
+    assert (
+        3 <= min_size <= max_size <= WORLD_DIM
+    ), f"Invalid size range. Must be 3 <= min_size <= max_size <= {WORLD_DIM}."
+
+    max_seed = 100000
+    while True:
+        seed = np.random.randint(0, max_seed)
+        if (
+            get_inner_grid_from_seed(seed=seed).shape[0] <= max_size
+            and get_inner_grid_from_seed(seed=seed).shape[0] >= min_size
+        ):
+            return seed
+
+
 def get_cheese_pos_from_seed(seed: int, flip_y: bool = False):
     """Get the cheese position from a maze seed."""
     grid = get_full_grid_from_seed(seed)

@@ -24,7 +24,7 @@ venv_fname = f'{pwd}/{mazes_folder}/{basenames["translate"]}.pkl'
 
 # %% Try generating a top-right vector; prediction of .3 that my first
 # idea works (EDIT: It did!)
-venv = maze.get_top_right_venv_pair(seed=0)
+venv = maze.get_top_right_venv_pair(seed=1)
 # venv = maze.create_venv(num=2, start_level=1, num_levels=1)
 # venv = maze.load_venv(f'{pwd}/{mazes_folder}/translate.pkl')
 maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
@@ -73,6 +73,7 @@ display(save_button)
 # Prompt user before saving TODO also get top_right_path.pkl
 # TODO fix rename of function in gatherdata/metrics?
 if not load_venv: maze.save_venv(venv=venv, filename=venv_fname) 
+
 # %% Get a value patch from this pair of envs
 # Compare vector fields for this patch
 @interact
