@@ -22,9 +22,11 @@ mazes_folder = 'mazes'
 basenames = {'top right': 'top_right_path', 'cheese top right': 'cheese_top_right', 'translate': 'translate'}
 venv_fname = f'{pwd}/{mazes_folder}/{basenames["translate"]}.pkl'
 
-# %% Try generating a top-right vector; prediction of .3 that my first idea works (EDIT: It did!)
+# %% Try generating a top-right vector; prediction of .3 that my first
+# idea works (EDIT: It did!)
+venv = maze.get_top_right_venv_pair(seed=0)
 # venv = maze.create_venv(num=2, start_level=1, num_levels=1)
-venv = maze.load_venv(f'{pwd}/{mazes_folder}/translate.pkl')
+# venv = maze.load_venv(f'{pwd}/{mazes_folder}/translate.pkl')
 maze_editors = maze.venv_editor(venv, show_full=True, check_on_dist=False)
 output = Output()
 # with output: TODO get this working
