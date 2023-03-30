@@ -40,9 +40,7 @@ def generate_plots(max_size : int = 18, min_size : int = 3, cols : int = 2, rows
 
     fig, axs = plt.subplots(rows, cols, figsize=(AX_SIZE*cols, AX_SIZE*rows))
     for idx, ax in enumerate(axs.flatten()): 
-        seed = np.random.randint(0, 100000)
-        while maze.get_inner_grid_from_seed(seed=seed).shape[0] > max_size or maze.get_inner_grid_from_seed(seed=seed).shape[0] < min_size:
-            seed = np.random.randint(0, 100000)
+        seed = maze.rand_seed_with_size(min_size=min_size, max_size=max_size) 
         venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
         if show_vfield:
             vf = vfield.vector_field(venv, policy=hook.network)
@@ -69,3 +67,4 @@ button.on_click(lambda _: generate_plots(max_size = slider.value))
 display(HBox([button, checkbox]))
 
 generate_plots(max_size = slider.value)
+# %%
