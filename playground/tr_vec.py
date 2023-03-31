@@ -57,10 +57,12 @@ def top_right_maze_pairs(seed=IntSlider(value=0, min=0, max=100)):
 
 
 # %%
+
+
 @interact
 def top_right_vf_pairs(seed=IntSlider(value=0, min=0, max=100)):
     venv = maze.get_top_right_venv_pair(seed=seed)
-    fig, axs = plt.subplots(1, 2, figsize=(AX_SIZE, AX_SIZE * 2))
+    fig, axs = plt.subplots(1, 2, figsize=(10, 10 * 2))
     for idx in (0, 1):
         vfield = visualization.vector_field(venv, policy, idx=idx)
         visualization.plot_vf(vfield, ax=axs[idx], render_padding=True)
