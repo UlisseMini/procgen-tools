@@ -17,7 +17,23 @@ Data dependencies (cached episode data, etc.) will be downloaded automatically w
 
 ### Code Associated with Publications
 
-TODO: refer to specific files associated with the LessWrong post (and others in the future)
+Check out the following `ipynb` notebooks in `experiments/`:
+- `cheese_vector` and `top_right_vector` demonstrate the algebraic value
+  editing technique whereby simply-computed activation-vectors are subtracted
+  during the forward passes used to navigate the maze. For example, subtracting the "cheese vector" roughly
+  makes the agent ignore the cheese in many levels.
+- `behavioral_demos` allows interactive generation of mazes, and
+  displays what decisions the trained policy makes in each maze.
+- The `statistics/behavioral_stats` notebook runs a comprehensive suite
+  of behavioral statistics to test what maze features tend to affect
+  whether the agent approaches the cheese, or not.
+- `cheese_scrubbing` applies Redwood Research's "[causal scrubbing](https://www.alignmentforum.org/posts/JvZhhzycHu2Yd57RN/causal-scrubbing-a-method-for-rigorously-testing)"
+  technique in order to gain evidence on what behavior-relevant information is
+  used by certain residual addition
+  channels partway through the network. 
+- `visualize_activations` is a (presently incomplete) notebook with a
+  tool that allows editing a maze, and seeing how edits affect policy
+  behavior and internal activations. 
 
 
 ### Key Features
