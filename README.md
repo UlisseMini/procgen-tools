@@ -1,6 +1,12 @@
 ## procgen-tools
 
-Code for a series of experiments and associated tools for interpreting agents trained on _procgen_, specifically the `maze` environment as used in [Goal Misgeneralization in Deep Reinforcement Learning](https://arxiv.org/abs/2105.14111) by Longosco et al.
+Code for a series of experiments and associated tools for interpreting
+agents trained on _procgen_, specifically the `maze` environment as used
+in [Goal Misgeneralization in Deep Reinforcement
+Learning](https://arxiv.org/abs/2105.14111) by Longosco et al. The
+pretrained models are available in [this Google Drive
+folder](https://drive.google.com/drive/folders/1Ig7bzRlieyYFcdKL_PM-guSWR8WryDOL?usp=sharing)
+(we analyzed the `maze_I/*.pth` models).
 
 This repository was initially created by the shard theory team during the SERI MATS 3.0 research fellowship program.
 
@@ -13,7 +19,8 @@ The repository is organized as follows:
 
 Required dependencies should be installed using `pip install -r requirements.txt`.  
 
-Data dependencies (cached episode data, etc.) will be downloaded automatically when needed.
+Data dependencies (cached episode data, etc.) will be downloaded
+automatically when needed. 
 
 ### Code Associated with Publications
 
