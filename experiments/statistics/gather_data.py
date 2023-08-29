@@ -64,7 +64,7 @@ if __name__ == "__main__":
     save_dir = os.path.join("experiments/statistics/data", model_name)
     os.makedirs(
         save_dir, exist_ok=True
-    )  # This creates the directory if it doesn't already exist
+    )  # This creates the directory if it doesn't already exist TODO assumes being run from repo base
 
     # determinism
     max_seed = 1000000
