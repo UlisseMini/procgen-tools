@@ -10,7 +10,17 @@ folder](https://drive.google.com/drive/folders/1Ig7bzRlieyYFcdKL_PM-guSWR8WryDOL
 
 This repository was initially created by the shard theory team during the SERI MATS 3.0 research fellowship program.
 
-**Disclaimer:** *this repository is a work-in-progress research codebase built to produce results quickly. It lacks tests and proper documentation, and will likely undergo interface-breaking refectorings several times as this research continues. We hope it's a helpful resource nonetheless! If this code is useful or you'd like to contribute to this work, we'd love to hear from you!*
+**Disclaimers:** *this repository is a work-in-progress research codebase
+built to produce results quickly. It lacks tests and proper
+documentation, and will likely undergo interface-breaking refectorings
+several times as this research continues. We hope it's a helpful
+resource nonetheless! If this code is useful or you'd like to contribute
+to this work, we'd love to hear from you! 
+
+Furthermore, we sometimes edit activations during forward passes. The
+repository sometimes erroneously calls this "patching" (which are sets
+of [_resampled_ activations](https://www.alignmentforum.org/posts/xh85KbTFhbCz7taD4/how-to-think-about-activation-patching)), even though we aren't always editing
+activations by resampling activations.*
 
 The repository is organized as follows:
 - `experiments` contains research materials considered interesting or significant enough to (eventually) be documented and shared.
@@ -97,7 +107,7 @@ plt.show()
 
 #### Interpretable, Parameter-Compatible Implementations of IMPALA Models
 
-We use the `circrl` library to automatically apply forward hooks to pre-trained models, provide access to internal activations at all hidden layers, and apply patches and ablations of various kinds.  This library uses the pytorch `named_modules()` function to label and hook hidden layers.  The pretrained IMPALA models from the Goal Misgeneralization paper were implemented in such a way that certain important parameter-free modules (e.g. `ReLU()`s) were newly created at each forward call, making it difficult to apply hooks to extract the activations of these layers.  We implemented modified versions of these [models](procgen_tools/models.py) that create and name all modules during construction to facilitate later interpretability work.  The resulting model classes are parameter-compatible with the original pretrained models so `state_dict`s can be loaded unchanged.
+We use the `circrl` library to automatically apply forward hooks to pre-trained models, provide access to internal activations at all hidden layers, and apply activation edits and ablations of various kinds.  This library uses the pytorch `named_modules()` function to label and hook hidden layers.  The pretrained IMPALA models from the Goal Misgeneralization paper were implemented in such a way that certain important parameter-free modules (e.g. `ReLU()`s) were newly created at each forward call, making it difficult to apply hooks to extract the activations of these layers.  We implemented modified versions of these [models](procgen_tools/models.py) that create and name all modules during construction to facilitate later interpretability work.  The resulting model classes are parameter-compatible with the original pretrained models so `state_dict`s can be loaded unchanged.
 
 #### Vector Field Visualizations
 
@@ -124,17 +134,17 @@ plt.show()
 
 From this visualization we can clearly see that at the "decision square" (the square at which the paths to the cheese and the top-right corner diverge, an important square when studying these goal-misgeneralizating agents), this agent will choose with fairly high probability to go towards the top-right corner.
 
-Support is also provided for "vector field diff" visualizations, a tool for visualizing the effect of some kind of model intervention (patch, etc) on behavior within a given maze.  As an example, we'll add some random noise to a hidden layer in the model, and observe the effect on action probabilities:
+Support is also provided for "vector field diff" visualizations, a tool for visualizing the effect of some kind of model intervention  on behavior within a given maze.  As an example, we'll add some random noise to a hidden layer in the model, and observe the effect on action probabilities:
 
 
 ```python
 import circrl.module_hook as cmh
 hook = cmh.ModuleHook(policy)
-patches = {'embedder.block2.res1.resadd_out': lambda outp: outp + 0.2*t.randn_like(outp)}
+hooks = {'embedder.block2.res1.resadd_out': lambda outp: outp + 0.2*t.randn_like(outp)}
 venv = maze.create_venv(1, start_level=0, num_levels=1)
-with hook.use_patches(patches):
-    vf_patched = vfield.vector_field(venv, hook.network)
-vfield.plot_vfs(vf_original, vf_patched)
+with hook.use_patches(hooks):
+    vf_modified = vfield.vector_field(venv, hook.network)
+vfield.plot_vfs(vf_original, vf_modified)
 plt.show()
 ```
 
