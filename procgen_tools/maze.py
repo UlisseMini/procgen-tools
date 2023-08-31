@@ -448,6 +448,25 @@ def remove_cheese(venv, idx: int = 0):
     return venv
 
 
+def move_cheese(venv, new_pos: Tuple[int, int], idx: int = 0):
+    """
+    Move the cheese to the given position, modifying venv in-place.
+    """
+    assert (
+        0 <= new_pos[0] < WORLD_DIM and 0 <= new_pos[1] < WORLD_DIM
+    ), f"new_pos={new_pos} out of bounds"
+    state_bytes_list = venv.env.callmethod("get_state")
+    state = state_from_venv(venv, idx)
+
+    grid = state.full_grid()
+    grid[grid == CHEESE] = EMPTY
+    grid[new_pos] = CHEESE
+    state.set_grid(grid)
+    state_bytes_list[idx] = state.state_bytes
+    venv.env.callmethod("set_state", state_bytes_list)
+    return venv
+
+
 def remove_all_cheese(venv):
     """
     Remove the cheese from each env in venv, inplace.
@@ -548,9 +567,9 @@ def shortest_path(
     - default heuristic is euclidian distance to cheese
     """
     # assert (grid==MOUSE).sum() == 1, f'grid has {(grid==MOUSE).sum()} mice' # relaxed by start param
-    assert (
-        grid == CHEESE
-    ).sum() == 1, f"grid has {(grid==CHEESE).sum()} cheeses"
+    # assert (
+    #     grid == CHEESE
+    # ).sum() == 1, f"grid has {(grid==CHEESE).sum()} cheeses"
 
     grid = inner_grid(grid).copy()
 

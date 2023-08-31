@@ -1,6 +1,7 @@
 from procgen_tools.imports import *
 from procgen_tools import maze
 from typing import Dict
+from matplotlib.colors import LinearSegmentedColormap
 import PIL
 from warnings import warn
 from torch import nn
@@ -347,7 +348,7 @@ def pixel_slices_from_grid(
             math.floor(coord + 1) for coord in (col_lb, col_ub)
         )  # FIXME e.g. seed 19 still has a few pixels off
     else:
-        row_lb, row_ub = int(row_lb) + 1, int(row_ub) + 1
+        row_lb, row_ub = int(row_lb) + 2, int(row_ub) + 2
         col_lb, col_ub = int(col_lb) + 1, int(col_ub) + 1
     return slice(row_lb, row_ub), slice(col_lb, col_ub)
 
@@ -450,9 +451,26 @@ def visualize_venv(
 
 
 def show_grid_heatmap(
-    venv: ProcgenGym3Env, heatmap: np.ndarray, ax_size: float = 3
+    venv: ProcgenGym3Env,
+    heatmap: np.ndarray,
+    ax_size: float = 3,
+    mode: str = "numpy",
+    alpha: float = 0.7,
+    size: float = 1.0,
 ) -> None:
-    """TODO fill in docstring"""
+    """Show a heatmap over the maze using matplotlib.
+    Args:
+        venv: Vectorized environment
+        heatmap: 2D array of floats
+        ax_size: Size of the figure
+        mode: "human" or "numpy"
+        alpha: Transparency of the heatmap
+        size: Size of the heatmap squares
+    """
+    assert mode in ("human", "numpy")
+    assert 0 <= alpha <= 1
+    assert 0 <= size <= 1
+
     env_state = maze.state_from_venv(venv, idx=0)
     inner_grid = env_state.inner_grid()
     assert inner_grid.shape == heatmap.shape
@@ -465,18 +483,62 @@ def show_grid_heatmap(
     ax.set_yticks([])
 
     # Display the underlying maze
-    _ = visualize_venv(
-        venv, ax=ax, ax_size=ax_size, show_plot=False, render_padding=False
+    img = visualize_venv(
+        venv,
+        ax=ax,
+        ax_size=ax_size,
+        mode=mode,
+        show_plot=False,
+        render_padding=False,
     )
 
     # Plot the heatmap transparently over the maze
-    from matplotlib.colors import LinearSegmentedColormap
-
-    # Create a custom colormap from gray to red
-    colors = [(1, 0, 0, 0), (1, 0, 0, 1)]  # Gray to red
+    # First, create a custom colormap from gray to red
+    colors = [
+        (1, 0, 0, 0),
+        (1, 0, 0, alpha),
+    ]  # Transparent to non-transparent red
     cmap_name = "custom_div_cmap"
     cm = LinearSegmentedColormap.from_list(cmap_name, colors, N=100)
-    ax.imshow(heatmap[::-1], alpha=0.1, vmin=0, vmax=1, cmap=cm)
+    if mode == "human":
+        heatmap_overlay: np.ndarray = np.zeros(
+            (img.shape[0], img.shape[1], 4), dtype=np.float32
+        )  # RGBA
+        reachable: List[Tuple[int, int]] = maze.get_legal_mouse_positions(
+            inner_grid
+        )
+        padding: int = (maze.WORLD_DIM - inner_grid.shape[0]) / 2
+        for coord in reachable + [maze.get_cheese_pos(inner_grid)]:
+            pixel_slices: Tuple[slice, slice] = pixel_slices_from_grid(
+                row=coord[0] + padding,  # Translate to full grid coordinates
+                col=coord[1] + padding,
+                img=img,
+                removed_padding=padding,
+                extra_adjustment=False,
+            )
+
+            # Get the center square of size size in the pixel slices
+            # center = (
+            #     (pixel_slices[0].stop - pixel_slices[0].start) // 2,
+            #     (pixel_slices[1].stop - pixel_slices[1].start) // 2,
+            # )
+            # pixel_slices = (
+            #     slice(
+            #         center[0] - int(size * center[0]),
+            #         center[0] + int(size * center[0]),
+            #     ),
+            #     slice(
+            #         center[1] - int(size * center[1]),
+            #         center[1] + int(size * center[1]),
+            #     ),
+            # )
+
+            heatmap_overlay[pixel_slices[0], pixel_slices[1]] = cm(
+                heatmap[coord]
+            )  # Flip because the rows are upside-down by default
+        im = ax.imshow(heatmap_overlay)
+    else:
+        im = ax.imshow(heatmap[::-1], vmin=0, vmax=1, cmap=cm)
 
 
 def custom_vfield(
