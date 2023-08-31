@@ -24,6 +24,7 @@ from ipywidgets import GridspecLayout, Button, Layout, HBox, Output
 from IPython.display import display
 
 from procgen import ProcgenGym3Env
+from procgen_tools import models
 
 # Constants in numeric maze representation
 CHEESE = 2
@@ -929,6 +930,49 @@ def pathfind(grid: np.ndarray, start, end):
         grid, start, stop_condition=lambda _, sq: sq == end
     )
     return reconstruct_path(came_from, extra["last_square"])
+
+
+def geometric_probability_path(
+    start: Tuple[int, int], end: Tuple[int, int], vf: Dict
+) -> float:
+    """Returns the geometric mean of `vf`'s probability of the path from
+    `start` to `end` in the maze."""
+    for coord in (start, end):
+        assert (coord[i] >= 0 and coord[i] < MAZE_SIZE for i in (0, 1))
+    assert start != end
+
+    path = pathfind(vf["grid"], start, end)
+    zipped_list = zip(vf["legal_mouse_positions"], vf["probs"])
+    prob_dict: Dict[Tuple[int, int], float] = dict(zipped_list)
+
+    sum_log_prob: float = 0.0
+    for idx, coord in enumerate(path[:-1]):
+        action: str = None
+
+        # Get the action by looking at the next coord
+        for key, delta in models.MAZE_ACTION_DELTAS.items():
+            if (
+                coord[0] + delta[0] == path[idx + 1][0]
+                and coord[1] + delta[1] == path[idx + 1][1]
+            ):
+                action = key
+                print(action)
+                break
+
+        if action is None:
+            raise ValueError(
+                "Invalid path; cannot find action which leads to next"
+                " coordinate"
+            )
+
+        # Get the probability of the action
+        action_index: int = list(models.MAZE_ACTION_INDICES.keys()).index(
+            action
+        )
+        sum_log_prob += np.log(prob_dict[coord][action_index])
+    sum_log_prob /= len(path)
+    geom_mean_prob: float = np.exp(sum_log_prob)
+    return geom_mean_prob
 
 
 def deltas_from(grid: np.ndarray, sq):
