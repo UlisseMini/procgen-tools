@@ -38,7 +38,7 @@ AGENT_PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
 
 HUMAN_PX_WIDTH = 512  # Not actually divisible by WORLD_DIM, so I infer there's padding on the sides
 HUMAN_PX_PADDING = 6  # Just my guess for what the padding is
-REAL_PX_WIDTH = HUMAN_PX_WIDTH - 2 * HUMAN_PX_PADDING
+REAL_PX_WIDTH = HUMAN_PX_WIDTH  # - 2 * HUMAN_PX_PADDING
 HUMAN_PX_PER_TILE = REAL_PX_WIDTH / WORLD_DIM
 
 DEBUG = (
@@ -940,7 +940,8 @@ def geometric_probability_path(
     cheese is ignored in the mean."""
     for coord in (start, end):
         assert (coord[i] >= 0 and coord[i] < MAZE_SIZE for i in (0, 1))
-    assert start != end
+    if start == end:
+        return vf["probs"][start][4]  # The no-op probability
 
     path = pathfind(vf["grid"], start, end)
     cheese_loc: Tuple[int, int] = get_cheese_pos(vf["grid"])

@@ -287,20 +287,27 @@ def get_channel_from_grid_pos(
     return (int(chan_row), int(chan_col))
 
 
-def pixels_at_grid(
+def pixel_slices_from_grid(
     row: int,
     col: int,
     img: np.ndarray,
     removed_padding: int = 0,
+    extra_adjustment: bool = True,
     flip_y: bool = True,
-):
-    """Get the pixels in the image corresponding to the given grid position.
+) -> Tuple[slice, slice]:
+    """Get the pixel slices in the image corresponding to the given
+    grid position.
 
     Args:
         row: The row of the grid position.
         col: The column of the grid position.
-        img: The image to get the pixels from, assumed to be rendered from the human view.
-        removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
+        img: The image to get the pixels from, assumed to be rendered
+        from the human view.
+        extra_adjustment: Whether to account for the padding in the
+        human view.
+        removed_padding: The number of tiles which are not shown in the
+        human view, presumably due to render_padding being False in some
+        external call.
     """
     assert (
         0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM
@@ -328,15 +335,43 @@ def pixels_at_grid(
     )
 
     # add 12 to the bounds to account for the 6 pixel border, and cast as ints
-    # FIXME 512x512 is only for full level; smaller levels are different (?!) Thus subtracting 12 can lead to row_ub being too large for img, leading to a ValueError from shape mismatch in parent.
-    row_lb, row_ub = (
-        int(coord + maze.HUMAN_PX_PADDING * 2) for coord in (row_lb, row_ub)
-    )
-    col_lb, col_ub = (
-        math.floor(coord + 1) for coord in (col_lb, col_ub)
-    )  # FIXME e.g. seed 19 still has a few pixels off
+    # FIXME 512x512 is only for full level; smaller levels are different
+    # (?!) Thus subtracting 12 can lead to row_ub being too large for
+    # img, leading to a ValueError from shape mismatch in parent.
+    if extra_adjustment:
+        row_lb, row_ub = (
+            int(coord + maze.HUMAN_PX_PADDING * 2)
+            for coord in (row_lb, row_ub)
+        )
+        col_lb, col_ub = (
+            math.floor(coord + 1) for coord in (col_lb, col_ub)
+        )  # FIXME e.g. seed 19 still has a few pixels off
+    else:
+        row_lb, row_ub = int(row_lb) + 1, int(row_ub) + 1
+        col_lb, col_ub = int(col_lb) + 1, int(col_ub) + 1
+    return slice(row_lb, row_ub), slice(col_lb, col_ub)
 
-    return img[row_lb:row_ub, col_lb:col_ub, :]
+
+def pixels_at_grid(
+    row: int,
+    col: int,
+    img: np.ndarray,
+    removed_padding: int = 0,
+    flip_y: bool = True,
+):
+    """Get the pixels in the image corresponding to the given grid position.
+
+    Args:
+        row: The row of the grid position.
+        col: The column of the grid position.
+        img: The image to get the pixels from, assumed to be rendered from the human view.
+        removed_padding: The number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
+    """
+    slices = pixel_slices_from_grid(
+        row, col, img, removed_padding=removed_padding, flip_y=flip_y
+    )
+
+    return img[slices[0], slices[1], :]
 
 
 def visualize_venv(
