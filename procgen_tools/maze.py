@@ -936,17 +936,22 @@ def geometric_probability_path(
     start: Tuple[int, int], end: Tuple[int, int], vf: Dict
 ) -> float:
     """Returns the geometric mean of `vf`'s probability of the path from
-    `start` to `end` in the maze."""
+    `start` to `end` in the maze. If the path contains the cheese, the
+    cheese is ignored in the mean."""
     for coord in (start, end):
         assert (coord[i] >= 0 and coord[i] < MAZE_SIZE for i in (0, 1))
     assert start != end
 
     path = pathfind(vf["grid"], start, end)
+    cheese_loc: Tuple[int, int] = get_cheese_pos(vf["grid"])
+
     zipped_list = zip(vf["legal_mouse_positions"], vf["probs"])
     prob_dict: Dict[Tuple[int, int], float] = dict(zipped_list)
 
     sum_log_prob: float = 0.0
     for idx, coord in enumerate(path[:-1]):
+        if coord == cheese_loc:
+            continue
         action: str = None
 
         # Get the action by looking at the next coord
@@ -956,7 +961,6 @@ def geometric_probability_path(
                 and coord[1] + delta[1] == path[idx + 1][1]
             ):
                 action = key
-                print(action)
                 break
 
         if action is None:
@@ -970,8 +974,9 @@ def geometric_probability_path(
             action
         )
         sum_log_prob += np.log(prob_dict[coord][action_index])
-    sum_log_prob /= len(path)
-    geom_mean_prob: float = np.exp(sum_log_prob)
+
+    divisor: int = len(path) - (2 if cheese_loc in path[:-1] else 1)
+    geom_mean_prob: float = np.exp(sum_log_prob / divisor)
     return geom_mean_prob
 
 

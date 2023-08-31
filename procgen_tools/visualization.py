@@ -6,12 +6,12 @@ from warnings import warn
 from torch import nn
 import torch
 
+
 # Getting an image from figures
 def img_from_fig(
     fig: plt.Figure, palette: PIL.Image = None, tight_layout: bool = True
 ):
-    """Get an image from a matplotlib figure. If palette is not None, then the image is quantized to the palette.
-    """
+    """Get an image from a matplotlib figure. If palette is not None, then the image is quantized to the palette."""
     # Prepare the fig
     if tight_layout:
         fig.tight_layout()
@@ -68,8 +68,7 @@ def get_residual_num(label: str):
 
 # Plotting
 def is_internal_activation(label: str):
-    """Return True if the label is an internal activation, i.e. not an input or output.
-    """
+    """Return True if the label is an internal activation, i.e. not an input or output."""
     # Check if 'in' is in the label
     if "in" in label:
         return False
@@ -82,8 +81,7 @@ def is_internal_activation(label: str):
 def plot_layer_stats(
     hook: cmh.ModuleHook, mode: str = "activations", fig: go.Figure = None
 ):
-    """Create and show a plotly bar chart of the number of activations per layer of policy. The default mode is "activations", which plots the number of activations per layer. If mode is "parameters", then the number of parameters per layer is plotted.
-    """
+    """Create and show a plotly bar chart of the number of activations per layer of policy. The default mode is "activations", which plots the number of activations per layer. If mode is "parameters", then the number of parameters per layer is plotted."""
     if mode not in ("activations", "parameters"):
         raise ValueError(
             f"mode must be either 'activations' or 'parameters', got {mode}."
@@ -147,9 +145,9 @@ def plot_layer_stats(
             "xanchor": "center",
             "yanchor": "top",
         },
-        xaxis_title=mode.title()
-        if mode == "parameters"
-        else "Activation count",
+        xaxis_title=(
+            mode.title() if mode == "parameters" else "Activation count"
+        ),
         yaxis_title="Layer" if mode == "parameters" else "Activations",
     )
 
@@ -171,8 +169,7 @@ def plot_layer_stats(
 
 # Navigating the feature maps
 def get_stride(label: str):
-    """Get the stride of the layer referred to by label. How many pixels required to translate a single entry in the feature maps of label.
-    """
+    """Get the stride of the layer referred to by label. How many pixels required to translate a single entry in the feature maps of label."""
     if not label.startswith("embedder.block"):
         raise ValueError(f"Not in the Impala blocks.")
 
@@ -190,8 +187,7 @@ PIXEL_SIZE = human_view.shape[0]  # width of the human view input image
 
 
 def get_pixel_loc(val: int, channel_size: int = 16):
-    """Given a single channel position value, find the pixel location that corresponds to that channel.
-    """
+    """Given a single channel position value, find the pixel location that corresponds to that channel."""
     assert (
         val < channel_size
     ), f"channel_pos {val} must be less than channel_size {channel_size}"
@@ -204,8 +200,7 @@ def get_pixel_loc(val: int, channel_size: int = 16):
 def get_pixel_coords(
     channel_pos: Tuple[int, int], channel_size: int = 16, flip_y: bool = True
 ):
-    """Given a channel position, find the pixel location that corresponds to that channel. If flip_y is True, the y-axis will be flipped from the underlying numpy coords to the conventional human rendering format.
-    """
+    """Given a channel position, find the pixel location that corresponds to that channel. If flip_y is True, the y-axis will be flipped from the underlying numpy coords to the conventional human rendering format."""
     row, col = channel_pos
     assert 0 <= row < channel_size and 0 <= col < channel_size, (
         f"channel_pos {channel_pos} must be within the channel_size"
@@ -226,8 +221,7 @@ def plot_pixel_dot(
     size: int = 50,
     hidden_padding: int = 0,
 ):
-    """Plot a dot on the pixel grid at the given row and column of the block2.res1.resadd_out channel. hidden_padding is the number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call.
-    """
+    """Plot a dot on the pixel grid at the given row and column of the block2.res1.resadd_out channel. hidden_padding is the number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call."""
     px_row, px_col = get_pixel_coords((row, col))
     padding_offset = (PIXEL_SIZE / maze.WORLD_DIM) * hidden_padding
     dot_rescale_from_padding = maze.WORLD_DIM / (
@@ -272,8 +266,7 @@ def plot_dots(
 def get_channel_from_grid_pos(
     pos: Tuple[int, int], layer: str = default_layer
 ):
-    """Given a grid position, find the channel location that corresponds to that position.
-    """
+    """Given a grid position, find the channel location that corresponds to that position."""
     # Ensure cheese_pos is valid
     row, col = pos
     assert (
@@ -351,7 +344,7 @@ def visualize_venv(
     idx: int = 0,
     mode: str = "human",
     ax: plt.Axes = None,
-    ax_size: int = 3,
+    ax_size: float = 3,
     show_plot: bool = False,
     flip_numpy: bool = True,
     render_padding: bool = True,
@@ -419,6 +412,36 @@ def visualize_venv(
     if show_plot:
         plt.show()
     return img
+
+
+def show_grid_heatmap(
+    venv: ProcgenGym3Env, heatmap: np.ndarray, ax_size: float = 3
+) -> None:
+    """TODO fill in docstring"""
+    env_state = maze.state_from_venv(venv, idx=0)
+    inner_grid = env_state.inner_grid()
+    assert inner_grid.shape == heatmap.shape
+
+    # Create a figure
+    _, ax = plt.subplots(1, 1, figsize=(ax_size, ax_size))
+
+    # Remove x and y ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    # Display the underlying maze
+    _ = visualize_venv(
+        venv, ax=ax, ax_size=ax_size, show_plot=False, render_padding=False
+    )
+
+    # Plot the heatmap transparently over the maze
+    from matplotlib.colors import LinearSegmentedColormap
+
+    # Create a custom colormap from gray to red
+    colors = [(1, 0, 0, 0), (1, 0, 0, 1)]  # Gray to red
+    cmap_name = "custom_div_cmap"
+    cm = LinearSegmentedColormap.from_list(cmap_name, colors, N=100)
+    ax.imshow(heatmap[::-1], alpha=0.1, vmin=0, vmax=1, cmap=cm)
 
 
 def custom_vfield(
@@ -510,8 +533,7 @@ def custom_vfield(
 
 
 def custom_vfields(policy: t.nn.Module, venv: ProcgenGym3Env, **kwargs):
-    """Create a vector field plot for each maze in the environment, using policy to generate the vfields.
-    """
+    """Create a vector field plot for each maze in the environment, using policy to generate the vfields."""
     venvs = [maze.copy_venv(venv, idx=i) for i in range(venv.num_envs)]
     return VBox(
         [custom_vfield(venv=venv, policy=policy, **kwargs) for venv in venvs]
@@ -606,8 +628,7 @@ def plot_patch(
     bounds: Tuple[int, int] = None,
     px_dims: Tuple[int, int] = None,
 ):
-    """Plot the activations of a single patch, at the given layer and channel. Returns a figure.
-    """
+    """Plot the activations of a single patch, at the given layer and channel. Returns a figure."""
     assert layer in patch, f"Layer {layer} not in patch {patch}"
 
     if fig is None:
@@ -751,8 +772,7 @@ class ActivationsPlotter:
         self.update_plotter()
 
     def display(self):
-        """Display the elements; this function separates functionality from display.
-        """
+        """Display the elements; this function separates functionality from display."""
         display(self.fig)
         display(
             VBox(self.widgets[1:-1])
@@ -920,6 +940,7 @@ def forward_func_policy(network: nn.Module, inp: torch.Tensor):
 
 # %%
 # Get vector field
+
 
 # FIXME really stupid way to do this tbh, should use numpy somehow
 def _tmul(tup: tuple, scalar: float):
@@ -1091,9 +1112,11 @@ def plot_vf(
 ):
     "Plot the vector field given by vf. If human_render is true, plot the human view instead of the raw grid np.ndarray."
     render_arrows(
-        map_vf_to_human(vf, account_for_padding=render_padding)
-        if human_render
-        else vf,
+        (
+            map_vf_to_human(vf, account_for_padding=render_padding)
+            if human_render
+            else vf
+        ),
         ax=ax,
         human_render=human_render,
         render_padding=render_padding,
@@ -1168,8 +1191,7 @@ def vf_diff_magnitude(vf_diff: dict) -> float:
 
 
 def vf_diff_magnitude_from_seed(seed: int, patches: dict):
-    """Return average per-location probability change due to the given patches.
-    """
+    """Return average per-location probability change due to the given patches."""
     venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
     vf1 = vector_field(venv, policy)
     with hook.use_patches(patches):
@@ -1191,15 +1213,16 @@ def plot_vf_diff(
     render_padding: bool = False,
     show_components: bool = False,
 ):
-    """Render the difference "vf1 - vf2" between two vector fields, plotting only the difference.
-    """
+    """Render the difference "vf1 - vf2" between two vector fields, plotting only the difference."""
     # Remove cheese from the legal mouse positions and arrows, if levels are otherwise the same
     vf_diff = get_vf_diff(vf1, vf2)
 
     render_arrows(
-        map_vf_to_human(vf_diff, account_for_padding=render_padding)
-        if human_render
-        else vf_diff,
+        (
+            map_vf_to_human(vf_diff, account_for_padding=render_padding)
+            if human_render
+            else vf_diff
+        ),
         ax=ax,
         human_render=human_render,
         render_padding=render_padding,
@@ -1220,8 +1243,7 @@ def plot_vfs(
     show_original: bool = True,
     show_components: bool = False,
 ):
-    """Plot two vector fields and, if show_diff is True, their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field. If show_original is False, don't plot the original vector field.
-    """
+    """Plot two vector fields and, if show_diff is True, their difference vf2 - vf1. Plots three axes in total. Returns the figure, axes, and the difference vector field. If show_original is False, don't plot the original vector field."""
     num_cols = 1 + show_diff + show_original
     fontsize = 16
     fig, axs = plt.subplots(1, num_cols, figsize=(ax_size * num_cols, ax_size))
