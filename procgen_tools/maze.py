@@ -426,7 +426,8 @@ def state_from_venv(venv, idx: int = 0) -> EnvState:
 def get_cheese_pos(grid: np.ndarray, flip_y: bool = False) -> Square:
     "Get (row, col) position of the cheese in the grid. Note that the numpy grid is flipped along the y-axis, relative to rendered images."
     num_cheeses = (grid == CHEESE).sum()
-    assert num_cheeses == 1, f"num_cheeses={num_cheeses} should be 1"
+    if num_cheeses == 0:
+        return None
     row, col = np.where(grid == CHEESE)
     row, col = row[0], col[0]
     return ((WORLD_DIM - 1) - row if flip_y else row), col
@@ -960,7 +961,8 @@ def geometric_probability_path(
     for coord in (start, end):
         assert (coord[i] >= 0 and coord[i] < MAZE_SIZE for i in (0, 1))
     if start == end:
-        return vf["probs"][start][4]  # The no-op probability
+        idx: int = vf["legal_mouse_positions"].index(start)
+        return vf["probs"][idx][4]  # The no-op probability
 
     path = pathfind(vf["grid"], start, end)
     cheese_loc: Tuple[int, int] = get_cheese_pos(vf["grid"])

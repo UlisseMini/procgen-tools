@@ -508,7 +508,12 @@ def show_grid_heatmap(
             inner_grid
         )
         padding: int = (maze.WORLD_DIM - inner_grid.shape[0]) / 2
-        for coord in reachable + [maze.get_cheese_pos(inner_grid)]:
+
+        cheese_pos = maze.get_cheese_pos(inner_grid)
+        to_visualize = reachable + (
+            [cheese_pos] if cheese_pos is not None else []
+        )
+        for coord in to_visualize:
             pixel_slices: Tuple[slice, slice] = pixel_slices_from_grid(
                 row=coord[0] + padding,  # Translate to full grid coordinates
                 col=coord[1] + padding,
