@@ -38,7 +38,7 @@ AGENT_PX_PER_TILE = AGENT_PX_WIDTH / WORLD_DIM
 
 HUMAN_PX_WIDTH = 512  # Not actually divisible by WORLD_DIM, so I infer there's padding on the sides
 HUMAN_PX_PADDING = 6  # Just my guess for what the padding is
-REAL_PX_WIDTH = HUMAN_PX_WIDTH  # - 2 * HUMAN_PX_PADDING
+REAL_PX_WIDTH = HUMAN_PX_WIDTH - 2 * HUMAN_PX_PADDING
 HUMAN_PX_PER_TILE = REAL_PX_WIDTH / WORLD_DIM
 
 DEBUG = (

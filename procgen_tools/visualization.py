@@ -326,13 +326,18 @@ def pixel_slices_from_grid(
         row = (maze.WORLD_DIM - 1) - row
     row, col = row - removed_padding, col - removed_padding
 
+    tile_px = (
+        maze.HUMAN_PX_PER_TILE
+        if extra_adjustment
+        else maze.HUMAN_PX_PER_TILE / maze.WORLD_DIM
+    )
     row_lb, row_ub = (
-        row * maze.HUMAN_PX_PER_TILE,
-        (row + 1) * maze.HUMAN_PX_PER_TILE,
+        row * tile_px,
+        (row + 1) * tile_px,
     )
     col_lb, col_ub = (
-        col * maze.HUMAN_PX_PER_TILE,
-        (col + 1) * maze.HUMAN_PX_PER_TILE,
+        col * tile_px,
+        (col + 1) * tile_px,
     )
 
     # add 12 to the bounds to account for the 6 pixel border, and cast as ints
