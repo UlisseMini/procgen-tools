@@ -146,9 +146,9 @@ def plotly_fig_gen() -> go.Figure:
         rows=1,
         cols=3,
         subplot_titles=[
-            "P(cheese | decision-square)",
-            "P(top-right | decision-square)",
-            "P(other | decision-square)",
+            "P(cheese)",
+            "P(top-right)",
+            "P(other)",
         ],
         shared_yaxes=True,
     )
