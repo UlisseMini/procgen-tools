@@ -50,6 +50,10 @@ if __name__ == "__main__":
     hook = cmh.ModuleHook(policy)
 
     for seed, coeff in tqdm(list(itertools.product(seeds, coeffs))):
+        name = f"seed-{seed}_coeff-{coeff}_rr-{rand_region}_label-{label}"
+        filepath = f"{path_prefix}data/vfields/{args.vector_type}/{name}.pkl"
+        if os.path.exists(filepath):
+            continue
         values = None
         if args.vector_type == "top_right":
             venv_pair = maze.get_top_right_venv_pair(seed=seed)
@@ -60,14 +64,11 @@ if __name__ == "__main__":
         fig, _, obj = plot_patched_vfields(
             seed, coeff, label, hook, values=values
         )
-        name = f"seed-{seed}_coeff-{coeff}_rr-{rand_region}_label-{label}"
-        with open(
-            f"{path_prefix}data/vfields/{args.vector_type}/{name}.pkl", "wb"
-        ) as fp:
+        with open(filepath, "wb") as fp:
             del obj["patches"]  # can't pickle lambda
             pickle.dump(obj, fp)
 
         if args.save_figures:
-            fig.savefig(f"figures/{name}_{args.vector_type}.png")
+            fig.savefig(f"figures/{args.vector_type}_vfs/{name}.png")
         plt.clf()
         plt.close()

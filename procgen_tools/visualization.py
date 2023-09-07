@@ -309,6 +309,7 @@ def pixel_slices_from_grid(
         removed_padding: The number of tiles which are not shown in the
         human view, presumably due to render_padding being False in some
         external call.
+
     """
     assert (
         0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM
