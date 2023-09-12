@@ -330,7 +330,7 @@ def pixel_slices_from_grid(
     tile_px = (
         maze.HUMAN_PX_PER_TILE
         if extra_adjustment
-        else maze.HUMAN_PX_PER_TILE / maze.WORLD_DIM
+        else maze.HUMAN_PX_WIDTH / maze.WORLD_DIM
     )
     row_lb, row_ub = (
         row * tile_px,
@@ -513,7 +513,7 @@ def show_grid_heatmap(
         reachable: List[Tuple[int, int]] = maze.get_legal_mouse_positions(
             inner_grid
         )
-        padding: int = (maze.WORLD_DIM - inner_grid.shape[0]) / 2
+        padding: int = (maze.WORLD_DIM - inner_grid.shape[0]) // 2
 
         cheese_pos = maze.get_cheese_pos(inner_grid)
         to_visualize = reachable + (
