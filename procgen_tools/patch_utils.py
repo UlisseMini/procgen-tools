@@ -47,8 +47,7 @@ def channel_patch_or_broadcast(
     patch_fn: Callable[[np.ndarray], np.ndarray],
     channel: int = -1,
 ):
-    """Apply the patching function to the given channel at the given layer. If channel is -1, apply the patching function to all channels.
-    """
+    """Apply the patching function to the given channel at the given layer. If channel is -1, apply the patching function to all channels."""
     patch_single_channel = channel >= 0
 
     def patch_fn_new(outp: np.ndarray):
@@ -65,8 +64,7 @@ def channel_patch_or_broadcast(
 
 
 def compose_patches(*patches: List[dict]):
-    """Compose a list of patches into a single patch. The order of the patches is the order in which they are applied. Note that the new patch only applies for the layers which are shared by all patches.
-    """
+    """Compose a list of patches into a single patch. The order of the patches is the order in which they are applied. Note that the new patch only applies for the layers which are shared by all patches."""
     # Find all shared keys
     shared_keys = set.intersection(*[set(patch.keys()) for patch in patches])
 
@@ -80,8 +78,7 @@ def compose_patches(*patches: List[dict]):
 
 
 def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
-    """Get a patch function that adds to the activations at layer_name with coeff*(values[0, ...] - values[1, ...]).
-    """
+    """Get a patch function that adds to the activations at layer_name with coeff*(values[0, ...] - values[1, ...])."""
     vals_diff = (
         values[0, ...] - values[1, ...]
     )  # Add this to activations during forward passes
@@ -89,8 +86,7 @@ def get_values_diff_patch(values: np.ndarray, coeff: float, layer_name: str):
 
 
 def get_zero_patch(layer_name: str, channel: int = -1):
-    """Get a patch function that patches the activations at layer_name with 0.
-    """
+    """Get a patch function that patches the activations at layer_name with 0."""
     return channel_patch_or_broadcast(
         layer_name=layer_name,
         channel=channel,
@@ -104,8 +100,7 @@ def get_mean_patch(
     channel: int = -1,
     num_samples: int = 50,
 ):
-    """Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. If values is not specified, sample num_samples random observations and use the activations at layer_name.
-    """
+    """Get a patch that replaces the activations at layer_name with the mean of values, taken across the batch (first) dimension. If channel is specified (>= 0), take the mean across the channel dimension. If values is not specified, sample num_samples random observations and use the activations at layer_name."""
     patch_single_channel = channel >= 0
 
     if values is None:
@@ -132,8 +127,7 @@ def get_random_patch(
     cheese_loc: Tuple[int, int] = None,
     num_obs: int = 1,
 ):
-    """Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. If cheese_loc is specified, sample random observations with cheese at that location. Cycle through num_obs random observations, randomly generating the index of the observation to use at every invocation of the random patch.
-    """
+    """Get a patch that replaces the activations at layer_name with a random sample from the activations at that layer. If channel is specified (>= 0), only patch that channel, leaving the rest of the layer's activations unchanged. If cheese_loc is specified, sample random observations with cheese at that location. Cycle through num_obs random observations, randomly generating the index of the observation to use at every invocation of the random patch."""
     assert num_obs > 0, "Must sample at least one observation"
     assert cheese_loc is None or (
         0 <= cheese_loc[0] < maze.WORLD_DIM
@@ -180,7 +174,7 @@ def get_channel_pixel_patch(
         layer_name: name of the layer to patch
         channel: channel to patch
         value: value to set the pixel at coord
-        coord: coordinate of the pixel to set
+        coord: coordinate of the filter to set
         default: value to set all other pixels to. If None, set to the value of the pixel at coord in the original activations.
     """
     assert channel >= 0
@@ -241,8 +235,7 @@ def get_multiply_patch(
     pos_multiplier: float = None,
     neg_multiplier: float = None,
 ):
-    """Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. If pos_multiplier is specified, multiply only positive activations by that value. If neg_multiplier is specified, multiply only negative activations by that value.
-    """
+    """Get a patch that multiplies the activations at layer_name by multiplier. If channel is specified (>= 0), only multiply the given channel. If pos_multiplier is specified, multiply only positive activations by that value. If neg_multiplier is specified, multiply only negative activations by that value."""
 
     def multiply_outp(outp: t.Tensor):
         new_vals = outp
@@ -359,8 +352,7 @@ def plot_patched_vfields(
     ax_size: int = 5,
     show_components: bool = False,
 ):
-    """Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff.
-    """
+    """Plot the original and patched vector fields for the given seed, coeff, and layer_name. If values is provided, use those values for the patching. Otherwise, generate them via a cheese/no-cheese activation diff."""
     values = (
         cheese_diff_values(seed, layer_name, hook)
         if values is None
