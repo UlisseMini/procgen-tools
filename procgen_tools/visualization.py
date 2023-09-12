@@ -221,9 +221,17 @@ def plot_pixel_dot(
     color: str = "r",
     size: int = 50,
     hidden_padding: int = 0,
+    input_grid_coords: bool = True,
 ):
     """Plot a dot on the pixel grid at the given row and column of the block2.res1.resadd_out channel. hidden_padding is the number of tiles which are not shown in the human view, presumably due to render_padding being False in some external call."""
-    px_row, px_col = get_pixel_coords((row, col))
+    px_row, px_col = (
+        get_pixel_coords((row, col))
+        if input_grid_coords
+        else (
+            row,
+            col,
+        )
+    )
     padding_offset = (PIXEL_SIZE / maze.WORLD_DIM) * hidden_padding
     dot_rescale_from_padding = maze.WORLD_DIM / (
         maze.WORLD_DIM - hidden_padding
@@ -265,7 +273,7 @@ def plot_dots(
 
 
 def get_channel_from_grid_pos(
-    pos: Tuple[int, int], layer: str = default_layer
+    pos: Tuple[int, int], layer: str = default_layer, flip_y: bool = False
 ):
     """Given a grid position, find the channel location that corresponds to that position."""
     # Ensure cheese_pos is valid
@@ -273,6 +281,9 @@ def get_channel_from_grid_pos(
     assert (
         0 <= row < maze.WORLD_DIM and 0 <= col < maze.WORLD_DIM
     ), f"Invalid position: {pos}"
+
+    if flip_y:
+        row = (maze.WORLD_DIM - 1) - row
 
     # Convert to pixel location
     px_row, px_col = (
