@@ -6,6 +6,7 @@ import PIL
 from warnings import warn
 from torch import nn
 import torch
+from tqdm import tqdm
 
 
 # Getting an image from figures
@@ -465,6 +466,90 @@ def visualize_venv(
     if show_plot:
         plt.show()
     return img
+
+
+def vf_heatmap(
+    venv,
+    hook,
+) -> np.ndarray:
+    """Returns a heatmap of the geometric probabilities from the origin
+    to each square in the maze."""
+    vf: Dict = vector_field(venv, hook.network)
+    state: maze.EnvState = maze.state_from_venv(venv)
+    grid: np.ndarray = state.inner_grid()
+    heatmap: np.ndarray = np.zeros_like(grid, dtype=np.float32)
+    for coord in maze.get_legal_mouse_positions(grid) + [
+        maze.get_cheese_pos(grid)
+    ]:
+        heatmap[coord] = maze.geometric_probability_path((0, 0), coord, vf)
+    return heatmap
+
+
+def retarget_heatmap(
+    venv,
+    hook,
+    retargeting_fn: Callable,
+    compute_normal: bool = False,
+    **retargeting_fn_kwargs,
+) -> pd.DataFrame:
+    """Returns a DataFrame of retargeted probabilities for all squares in
+    the maze, where each row contains a geometric average of the
+    probabilities under retargeting the given channels to that square
+    using the given magnitude."""
+    if compute_normal:
+        with hook.use_patches({}):  # Remove all patches
+            vf: Dict = vector_field(venv, hook.network)
+
+    inner_grid: np.ndarray = maze.state_from_venv(venv).inner_grid()
+    padding: int = maze.get_padding(inner_grid)
+    reachable: List[Tuple[int, int]] = maze.get_legal_mouse_positions(
+        inner_grid
+    ) + [
+        (0, 0)
+    ]  # Add the starting mouse position
+
+    # Get the probabilities for each square
+    data: Dict[str, List[float]] = defaultdict(list)
+    retargeting_cache: Dict[Tuple[int, int], float] = defaultdict(float)
+    for coord in tqdm(reachable):
+        # Add padding to the coordinate
+        padded_coord: Tuple[int, int] = (
+            coord[0] + padding,
+            coord[1] + padding,
+        )
+        # This locates the channel position to modify
+        filter_coord: Tuple[int, int] = get_channel_from_grid_pos(
+            padded_coord, layer=default_layer, flip_y=True
+        )
+        if filter_coord in retargeting_cache:
+            channel_val = retargeting_cache[filter_coord]
+        else:
+            channel_val = retargeting_fn(
+                venv,
+                hook,
+                coord=filter_coord,
+                inner_coord=coord,
+                **retargeting_fn_kwargs,
+            )
+        new_data = {
+            "row": coord[0],
+            "col": coord[1],
+            "filter_coord": filter_coord,
+            "retarget_prob": channel_val,
+            "maze_size": inner_grid.shape[0],
+            "d_to_coord": len(
+                maze.pathfind(grid=inner_grid, start=(0, 0), end=coord)
+            ),
+            "start": (0, 0),
+        }
+        if compute_normal:
+            new_data["normal_prob"] = maze.geometric_probability_path(
+                (0, 0), coord, vf
+            )
+        for k, v in new_data.items():
+            data[k].append(v)
+
+    return pd.DataFrame(data)
 
 
 def show_grid_heatmap(
