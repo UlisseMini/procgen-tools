@@ -16,7 +16,10 @@ from procgen_tools import maze, visualization, models, patch_utils
 from typing import Tuple, Dict, List, Optional, Union
 from ipywidgets import interact, interactive, fixed, interact_manual
 import ipywidgets as widgets
+import itertools, pickle
+import argparse
 import tqdm
+import multiprocessing
 
 import circrl.module_hook as cmh
 
@@ -87,14 +90,51 @@ def cheese_at_square(
     return maze.geometric_probability_path((0, 0), inner_coord, vf)
 
 
+# Define the main processing routine for a single seed in a function
+def process_seed(seed, args, SAVE_DIR, effective_channels, magnitude):
+    filepath = os.path.join(SAVE_DIR, f"maze_retarget_{seed}.pkl")
+    if os.path.exists(filepath):
+        return
+
+    with open(filepath, "wb") as fp:
+        venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+        new_venv = maze.remove_cheese(venv) if args.remove_cheese else venv
+
+        data: pd.DataFrame = visualization.retarget_heatmap(
+            new_venv,
+            hook,
+            retargeting_fn=retarget_to_square,
+            channels=effective_channels,
+            magnitude=magnitude,
+            compute_normal=True,
+        )
+
+        if args.collect_cheese_data:
+            cheese_data: pd.DataFrame = visualization.retarget_heatmap(
+                new_venv,
+                hook,
+                retargeting_fn=cheese_at_square,
+                compute_normal=False,
+            )
+            data = pd.concat([data, cheese_data])
+
+        data["channels"] = effective_channels
+        data["magnitude"] = magnitude
+        data["removed_cheese"] = args.remove_cheese
+
+        data["seed"] = seed
+
+        data["retarget_prob"] = data["retarget_prob"].apply(np.ravel)
+        data["ratio"] = data["retarget_prob"] / data["normal_prob"]
+        data["diff"] = data["retarget_prob"] - data["normal_prob"]
+
+        data.to_pickle(fp)
+
+
 # %%
-# Save vector fields and figures for a bunch of (seed, coeff) pairs; run
-# this from base directory
+# Save retargeting data
 
 if __name__ == "__main__":
-    import itertools, pickle
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_file",
@@ -105,7 +145,7 @@ if __name__ == "__main__":
     parser.add_argument("--collect_cheese_data", type=bool, default=True)
     parser.add_argument("--remove_cheese", type=bool, default=True)
     parser.add_argument("--device", type=str, default="cpu")
-    # parser.add_argument("-channels")
+    parser.add_argument("--num_workers", type=int, default=1)
     args = parser.parse_args()
 
     rand_region = 5
@@ -118,47 +158,12 @@ if __name__ == "__main__":
     # Strength of the intervention
     magnitude: float = 2.3
 
-    for seed in tqdm.tqdm(list(seeds)):
-        filepath = os.path.join(SAVE_DIR, f"maze_retarget_{seed}.pkl")
-        if os.path.exists(filepath):
-            continue
-
-        with open(filepath, "wb") as fp:
-            venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-            new_venv = maze.remove_cheese(venv) if args.remove_cheese else venv
-
-            data: pd.DataFrame = visualization.retarget_heatmap(
-                new_venv,
-                hook,
-                retargeting_fn=retarget_to_square,
-                channels=effective_channels,
-                magnitude=magnitude,
-                compute_normal=True,
-            )
-
-            if args.collect_cheese_data:
-                cheese_data: pd.DataFrame = visualization.retarget_heatmap(
-                    new_venv,
-                    hook,
-                    retargeting_fn=cheese_at_square,
-                    compute_normal=False,
-                )
-                data = pd.concat([data, cheese_data])
-
-            data["channels"] = effective_channels
-            data["magnitude"] = magnitude
-            data["removed_cheese"] = args.remove_cheese
-
-            data["seed"] = seed
-
-            # Process the data
-            data["retarget_prob"] = data["retarget_prob"].apply(
-                np.ravel
-            )  # Flatten the (1,)-shaped tuples in this column
-            data["ratio"] = data["retarget_prob"] / data["normal_prob"]
-            data["diff"] = data["retarget_prob"] - data["normal_prob"]
-
-            data.to_pickle(fp)
-
-        plt.clf()
-        plt.close()
+    # Use a Pool to run the process_seed function across all seeds in parallel
+    with multiprocessing.Pool(processes=args.num_workers) as pool:
+        pool.starmap(
+            process_seed,
+            [
+                (seed, args, SAVE_DIR, effective_channels, magnitude)
+                for seed in seeds
+            ],
+        )
