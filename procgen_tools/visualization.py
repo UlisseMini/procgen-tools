@@ -504,9 +504,7 @@ def retarget_heatmap(
     padding: int = maze.get_padding(inner_grid)
     reachable: List[Tuple[int, int]] = maze.get_legal_mouse_positions(
         inner_grid
-    ) + [
-        (0, 0)
-    ]  # Add the starting mouse position
+    )  # NOTE not adding starting mouse position for now
 
     # Get the probabilities for each square
     data: Dict[str, List[float]] = defaultdict(list)
@@ -540,7 +538,6 @@ def retarget_heatmap(
             "d_to_coord": len(
                 maze.pathfind(grid=inner_grid, start=(0, 0), end=coord)
             ),
-            "start": (0, 0),
         }
         if compute_normal:
             new_data["normal_prob"] = maze.geometric_probability_path(

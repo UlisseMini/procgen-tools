@@ -20,6 +20,7 @@ import itertools, pickle
 import argparse
 import tqdm
 import multiprocessing
+import torch as t
 
 import circrl.module_hook as cmh
 
@@ -75,10 +76,13 @@ def cheese_at_square(
     venv,
     hook,
     inner_coord: Tuple[int, int],
-    filter_coord: Optional[Tuple[int, int]],
+    coord: Optional[Tuple[int, int]],
 ) -> float:
     """Returns the probability of navigating to a square, given that
     the cheese is placed at the given square."""
+    if coord == (0, 0):  # Can't place cheese at the mouse position
+        return None
+
     grid: np.ndarray = maze.state_from_venv(venv).inner_grid()
     padding: int = maze.get_padding(grid)
     new_coord: Tuple[int, int] = (
@@ -92,46 +96,42 @@ def cheese_at_square(
 
 # Define the main processing routine for a single seed in a function
 def process_seed(seed, args, SAVE_DIR, effective_channels, magnitude):
-    filepath = os.path.join(SAVE_DIR, f"maze_retarget_{seed}.pkl")
-
-    # Make the directory if it doesn't exist
-    os.makedirs(SAVE_DIR, exist_ok=True)
+    filepath = os.path.join(SAVE_DIR, f"maze_retarget_{seed}.csv")
     if os.path.exists(filepath):
         return
 
-    with open(filepath, "wb") as fp:
-        venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
-        new_venv = maze.remove_cheese(venv) if args.remove_cheese else venv
+    venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
+    new_venv = maze.remove_cheese(venv) if args.remove_cheese else venv
 
-        data: pd.DataFrame = visualization.retarget_heatmap(
+    data: pd.DataFrame = visualization.retarget_heatmap(
+        new_venv,
+        hook,
+        retargeting_fn=retarget_to_square,
+        channels=effective_channels,
+        magnitude=magnitude,
+        compute_normal=True,
+    )
+
+    if args.collect_cheese_data:
+        cheese_data: pd.DataFrame = visualization.retarget_heatmap(
             new_venv,
             hook,
-            retargeting_fn=retarget_to_square,
-            channels=effective_channels,
-            magnitude=magnitude,
-            compute_normal=True,
+            retargeting_fn=cheese_at_square,
+            compute_normal=False,
         )
+        data["cheese_prob"] = cheese_data["retarget_prob"]
 
-        if args.collect_cheese_data:
-            cheese_data: pd.DataFrame = visualization.retarget_heatmap(
-                new_venv,
-                hook,
-                retargeting_fn=cheese_at_square,
-                compute_normal=False,
-            )
-            data = pd.concat([data, cheese_data])
+    data["channels"] = [effective_channels] * len(data)
+    data["magnitude"] = magnitude
+    data["removed_cheese"] = args.remove_cheese
 
-        data["channels"] = effective_channels
-        data["magnitude"] = magnitude
-        data["removed_cheese"] = args.remove_cheese
+    data["seed"] = seed
 
-        data["seed"] = seed
+    data["retarget_prob"] = data["retarget_prob"].apply(np.ravel)
+    data["ratio"] = data["retarget_prob"] / data["normal_prob"]
+    data["diff"] = data["retarget_prob"] - data["normal_prob"]
 
-        data["retarget_prob"] = data["retarget_prob"].apply(np.ravel)
-        data["ratio"] = data["retarget_prob"] / data["normal_prob"]
-        data["diff"] = data["retarget_prob"] - data["normal_prob"]
-
-        data.to_pickle(fp)
+    data.to_csv(filepath, index=False)
 
 
 # %%
@@ -152,21 +152,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     rand_region = 5
-    device = t.device(args.device)
     seeds = range(args.num_levels)
 
+    # Initialize the model and hook inside the function for each process
+    device = t.device(args.device)
     policy = models.load_policy(args.model_file, 15, device)
     hook = cmh.ModuleHook(policy)
 
     # Strength of the intervention
     magnitude: float = 2.3
-
-    # Use a Pool to run the process_seed function across all seeds in parallel
-    with multiprocessing.Pool(processes=args.num_workers) as pool:
-        pool.starmap(
-            process_seed,
-            [
-                (seed, args, SAVE_DIR, effective_channels, magnitude)
-                for seed in seeds
-            ],
-        )
+    for seed in seeds:
+        process_seed(seed, args, SAVE_DIR, effective_channels, magnitude)
