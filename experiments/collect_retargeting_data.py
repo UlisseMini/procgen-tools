@@ -138,16 +138,16 @@ def process_seed(seed, args, SAVE_DIR):
     new_data["intervention"] = [args.intervention] * len(new_data)
     new_data["seed"] = seed
     new_data["removed_cheese"] = args.remove_cheese
-    print(new_data.head())
 
     # Concat the new data with the old data
     if os.path.exists(filepath):
+        data = pd.read_csv(filepath)
         data = pd.concat([data, new_data])
     else:
         data = new_data
 
     data.to_csv(
-        os.path.join(SAVE_DIR, f"maze_retarget_{seed}_test.csv"), index=False
+        os.path.join(SAVE_DIR, f"maze_retarget_{seed}.csv"), index=False
     )
 
 
@@ -198,5 +198,5 @@ if __name__ == "__main__":
     hook = cmh.ModuleHook(policy)
 
     # Strength of the intervention
-    for seed in [1]:  # seeds:
+    for seed in seeds:
         process_seed(seed, args, SAVE_DIR)
