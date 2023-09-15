@@ -1,4 +1,3 @@
-# %%
 try:
     import procgen_tools
 except ImportError:
@@ -30,7 +29,6 @@ AX_SIZE = 6
 cheese_channels = [7, 8, 42, 44, 55, 77, 82, 88, 89, 99, 113]
 effective_channels = [8, 55, 77, 82, 88, 89, 113]
 
-# %% [markdown]
 # # Showing mean probability of reaching each part of the maze
 
 
@@ -95,48 +93,81 @@ def cheese_at_square(
 
 
 # Define the main processing routine for a single seed in a function
-def process_seed(seed, args, SAVE_DIR, effective_channels, magnitude):
+def process_seed(seed, args, SAVE_DIR):
     filepath = os.path.join(SAVE_DIR, f"maze_retarget_{seed}.csv")
-    if os.path.exists(filepath):
-        return
 
+    # Initialize the model and hook inside the function for each process
     venv = maze.create_venv(num=1, start_level=seed, num_levels=1)
     new_venv = maze.remove_cheese(venv) if args.remove_cheese else venv
+    if os.path.exists(filepath):
+        data = pd.read_csv(filepath)
+        # See if we already have the data for this setting
+        mask = (
+            (data["magnitude"] == args.magnitude)
+            & (data["removed_cheese"] == args.remove_cheese)
+            & (data["intervention"] == str(args.intervention))
+            & (data["seed"] == seed)
+        )
 
-    data: pd.DataFrame = visualization.retarget_heatmap(
-        new_venv,
-        hook,
-        retargeting_fn=retarget_to_square,
-        channels=effective_channels,
-        magnitude=magnitude,
-        compute_normal=True,
-    )
+        if len(data[mask]) > 0:
+            return
 
-    if args.collect_cheese_data:
-        cheese_data: pd.DataFrame = visualization.retarget_heatmap(
+    # Don't overwrite TODO
+    if args.intervention == "cheese":
+        new_data: pd.DataFrame = visualization.retarget_heatmap(
             new_venv,
             hook,
             retargeting_fn=cheese_at_square,
-            compute_normal=False,
         )
-        data["cheese_prob"] = cheese_data["retarget_prob"]
+    elif args.intervention == "normal":
+        new_data: pd.DataFrame = visualization.retarget_heatmap(
+            new_venv,
+            hook,
+            retargeting_fn=None,
+        )
+    else:  # retarget
+        new_data: pd.DataFrame = visualization.retarget_heatmap(
+            new_venv,
+            hook,
+            retargeting_fn=retarget_to_square,
+            channels=args.intervention,
+            magnitude=args.magnitude,
+        )
+        # TODO check that the "probability" column is floats
+        new_data["magnitude"] = args.magnitude
+    new_data["intervention"] = [args.intervention] * len(new_data)
+    new_data["seed"] = seed
+    new_data["removed_cheese"] = args.remove_cheese
+    print(new_data.head())
 
-    data["channels"] = [effective_channels] * len(data)
-    data["magnitude"] = magnitude
-    data["removed_cheese"] = args.remove_cheese
+    # Concat the new data with the old data
+    if os.path.exists(filepath):
+        data = pd.concat([data, new_data])
+    else:
+        data = new_data
 
-    data["seed"] = seed
-
-    data["retarget_prob"] = data["retarget_prob"].apply(np.ravel)
-    data["ratio"] = data["retarget_prob"] / data["normal_prob"]
-    data["diff"] = data["retarget_prob"] - data["normal_prob"]
-
-    data.to_csv(filepath, index=False)
+    data.to_csv(
+        os.path.join(SAVE_DIR, f"maze_retarget_{seed}_test.csv"), index=False
+    )
 
 
-# %%
+# Parsing arguments
+def intervention_type(value):
+    # Attempt to split the value by spaces (in case multiple values are
+    # provided)
+    # We will be given either "cheese", "normal", or a list of integers
+    # (cast as a string, e.g. [1, 2]
+    values = value.split(" ")
+    if len(values) == 1:
+        if values[0] in ("cheese", "normal", "effective", "all"):
+            return values[0]
+        else:
+            return [int(x) for x in values[0].split(",")]
+    else:
+        return [int(x) for x in values]
+
+
 # Save retargeting data
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -145,21 +176,27 @@ if __name__ == "__main__":
         default="trained_models/maze_I/model_rand_region_5.pth",
     )
     parser.add_argument("--num_levels", type=int, default=100)
-    parser.add_argument("--collect_cheese_data", type=bool, default=True)
     parser.add_argument("--remove_cheese", type=bool, default=True)
     parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--num_workers", type=int, default=1)
+    parser.add_argument(
+        "--intervention", type=intervention_type, default=effective_channels
+    )
+    parser.add_argument("--magnitude", type=float, default=2.3)
     args = parser.parse_args()
 
+    print(type(args.intervention), args.intervention)
+    if args.intervention == "effective":
+        args.intervention = effective_channels
+    elif args.intervention == "all":
+        args.intervention = cheese_channels
     rand_region = 5
     seeds = range(args.num_levels)
 
-    # Initialize the model and hook inside the function for each process
+    # # Initialize the model and hook inside the function for each process
     device = t.device(args.device)
     policy = models.load_policy(args.model_file, 15, device)
     hook = cmh.ModuleHook(policy)
 
     # Strength of the intervention
-    magnitude: float = 2.3
-    for seed in seeds:
-        process_seed(seed, args, SAVE_DIR, effective_channels, magnitude)
+    for seed in [1]:  # seeds:
+        process_seed(seed, args, SAVE_DIR)

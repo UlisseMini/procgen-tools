@@ -488,15 +488,14 @@ def vf_heatmap(
 def retarget_heatmap(
     venv,
     hook,
-    retargeting_fn: Callable,
-    compute_normal: bool = False,
+    retargeting_fn: Optional[Callable],
     **retargeting_fn_kwargs,
 ) -> pd.DataFrame:
     """Returns a DataFrame of retargeted probabilities for all squares in
     the maze, where each row contains a geometric average of the
     probabilities under retargeting the given channels to that square
     using the given magnitude."""
-    if compute_normal:
+    if retargeting_fn is None:
         with hook.use_patches({}):  # Remove all patches
             vf: Dict = vector_field(venv, hook.network)
 
@@ -519,7 +518,19 @@ def retarget_heatmap(
         filter_coord: Tuple[int, int] = get_channel_from_grid_pos(
             padded_coord, layer=default_layer, flip_y=True
         )
-        if filter_coord in retargeting_cache:
+
+        new_data = {
+            "row": coord[0],
+            "col": coord[1],
+            "filter_coord": filter_coord,
+            "maze_size": inner_grid.shape[0],
+            "d_to_coord": len(
+                maze.pathfind(grid=inner_grid, start=(0, 0), end=coord)
+            ),
+        }
+        if retargeting_fn is None:  # NOTE this is for the normal probability
+            channel_val = maze.geometric_probability_path((0, 0), coord, vf)
+        elif filter_coord in retargeting_cache:
             channel_val = retargeting_cache[filter_coord]
         else:
             channel_val = retargeting_fn(
@@ -529,20 +540,9 @@ def retarget_heatmap(
                 inner_coord=coord,
                 **retargeting_fn_kwargs,
             )
-        new_data = {
-            "row": coord[0],
-            "col": coord[1],
-            "filter_coord": filter_coord,
-            "retarget_prob": channel_val,
-            "maze_size": inner_grid.shape[0],
-            "d_to_coord": len(
-                maze.pathfind(grid=inner_grid, start=(0, 0), end=coord)
-            ),
-        }
-        if compute_normal:
-            new_data["normal_prob"] = maze.geometric_probability_path(
-                (0, 0), coord, vf
-            )
+            retargeting_cache[filter_coord] = channel_val
+
+        new_data["probability"] = channel_val
         for k, v in new_data.items():
             data[k].append(v)
 
