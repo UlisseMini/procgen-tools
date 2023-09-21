@@ -621,22 +621,6 @@ def show_grid_heatmap(
                 extra_adjustment=False,
             )
 
-            # Get the center square of size size in the pixel slices
-            # center = (
-            #     (pixel_slices[0].stop - pixel_slices[0].start) // 2,
-            #     (pixel_slices[1].stop - pixel_slices[1].start) // 2,
-            # )
-            # pixel_slices = (
-            #     slice(
-            #         center[0] - int(size * center[0]),
-            #         center[0] + int(size * center[0]),
-            #     ),
-            #     slice(
-            #         center[1] - int(size * center[1]),
-            #         center[1] + int(size * center[1]),
-            #     ),
-            # )
-
             heatmap_overlay[pixel_slices[0], pixel_slices[1]] = cm(
                 heatmap[coord]
             )  # Flip because the rows are upside-down by default

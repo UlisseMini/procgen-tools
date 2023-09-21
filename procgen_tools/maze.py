@@ -945,6 +945,20 @@ def get_path_to_corner(inner_grid, graph, start_node=(0, 0)):
     return nx.shortest_path(graph, start_node, corner_node)
 
 
+def distance_to_tr_path(
+    grid: np.ndarray, target: Square, tr_path: Optional[List[Square]] = None
+) -> int:
+    """Computes the distance between a target and the path from the
+    origin to the top-right square. If no `tr_path`
+    is provided, then computes the path."""
+    if tr_path is None:
+        tr_path = pathfind(
+            grid, (0, 0), (grid.shape[0] - 1, grid.shape[1] - 1)
+        )
+    target_path: List[Square] = pathfind(grid, (0, 0), target)
+    return len(set(target_path) - set(tr_path))
+
+
 def pathfind(grid: np.ndarray, start, end):
     _, came_from, extra = shortest_path(
         grid, start, stop_condition=lambda _, sq: sq == end
