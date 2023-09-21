@@ -1004,8 +1004,8 @@ def geometric_probability_path(
 
 def deltas_from(grid: np.ndarray, sq):
     """Returns the deltas between the decision square and the cheese, and the decision square and the top-right corner."""
-    path_to_cheese = maze.pathfind(grid, sq, maze.get_cheese_pos(grid))
-    path_to_top_right = maze.pathfind(
+    path_to_cheese = pathfind(grid, sq, get_cheese_pos(grid))
+    path_to_top_right = pathfind(
         grid, sq, (grid.shape[0] - 1, grid.shape[1] - 1)
     )
     delta_cheese = (path_to_cheese[1][0] - sq[0], path_to_cheese[1][1] - sq[1])
@@ -1639,7 +1639,7 @@ def venv_with_all_mouse_positions(venv):
     """
     assert (
         venv.num_envs == 1
-    ), f"Did you forget to use maze.copy_venv to get a single env?"
+    ), f"Did you forget to use copy_venv to get a single env?"
 
     sb_back = venv.env.callmethod("get_state")[0]
     env_state = EnvState(sb_back)
