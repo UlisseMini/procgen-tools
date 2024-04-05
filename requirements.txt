@@ -21,6 +21,7 @@ networkx>=3.0
 # Idk, random fancy stuff
 statsmodels
 prettytable
+funcy
 
 # Build procgenAISC, not needed for now
 
